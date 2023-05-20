@@ -15,6 +15,7 @@
 
 template<> ErlNifResourceType * NifRes<struct AdbcDatabase>::type = nullptr;
 template<> ErlNifResourceType * NifRes<struct AdbcConnection>::type = nullptr;
+template<> ErlNifResourceType * NifRes<struct ArrowArrayStream>::type = nullptr;
 
 static ERL_NIF_TERM nif_error_from_adbc_error(ErlNifEnv *env, struct AdbcError * error) {
     return erlang::nif::error(env, enif_make_tuple3(env,
@@ -245,19 +246,73 @@ static ERL_NIF_TERM adbc_connection_release(ErlNifEnv *env, int argc, const ERL_
     return erlang::nif::ok(env);
 }
 
+static ERL_NIF_TERM adbc_connection_get_info(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
+    using res_type = NifRes<struct AdbcConnection>;
+    using array_stream_type = NifRes<struct ArrowArrayStream>;
+
+    ERL_NIF_TERM ret, error;
+    res_type * connection = nullptr;
+    if ((connection = res_type::get_resource(env, argv[0], error)) == nullptr) {
+        return error;
+    }
+    if (connection->val == nullptr) {
+        return enif_make_badarg(env);
+    }
+
+    std::vector<uint32_t> info_codes;
+    if (!erlang::nif::get_list(env, argv[1], info_codes)) {
+        return enif_make_badarg(env);
+    }
+    uint32_t* ptr = nullptr;
+    size_t info_codes_length = info_codes.size();
+    if (info_codes_length != 0) {
+        ptr = info_codes.data();
+    }
+
+    array_stream_type * array_stream = nullptr;
+    if ((array_stream = array_stream_type::allocate_resource(env, error)) == nullptr) {
+        return error;
+    }
+    array_stream->val = (array_stream_type::val_type_p)enif_alloc(sizeof(array_stream_type::val_type));
+    memset(array_stream->val, 0, sizeof(array_stream_type::val_type));
+
+    struct AdbcError adbc_error;
+    AdbcStatusCode code = AdbcConnectionGetInfo(connection->val, ptr, info_codes_length, array_stream->val, &adbc_error);
+    if (code != ADBC_STATUS_OK) {
+        ret = nif_error_from_adbc_error(env, &adbc_error);
+        enif_free(array_stream->val);
+        enif_release_resource(array_stream);
+        if (adbc_error.release != nullptr) {
+            adbc_error.release(&adbc_error);
+        }
+        return ret;
+    }
+
+    ret = enif_make_resource(env, array_stream);
+    enif_release_resource(array_stream);
+    return erlang::nif::ok(env, ret);
+}
+
 static int on_load(ErlNifEnv *env, void **, ERL_NIF_TERM) {
     ErlNifResourceType *rt;
 
     {
         using res_type = NifRes<struct AdbcDatabase>;
-        rt = enif_open_resource_type(env, "Elixir.ADBC.Nif", "NifResAdbcDatabase", res_type::destruct_resource, ERL_NIF_RT_CREATE, NULL);
+        rt = enif_open_resource_type(env, "Elixir.Adbc.Nif", "NifResAdbcDatabase", res_type::destruct_resource, ERL_NIF_RT_CREATE, NULL);
         if (!rt) return -1;
         res_type::type = rt;
     }
 
     {
         using res_type = NifRes<struct AdbcConnection>;
-        rt = enif_open_resource_type(env, "Elixir.ADBC.Nif", "NifResAdbcConnection", res_type::destruct_resource, ERL_NIF_RT_CREATE, NULL);
+        rt = enif_open_resource_type(env, "Elixir.Adbc.Nif", "NifResAdbcConnection", res_type::destruct_resource, ERL_NIF_RT_CREATE, NULL);
+        if (!rt) return -1;
+        res_type::type = rt;
+    }
+
+    {
+        using res_type = NifRes<struct ArrowArrayStream>;
+        rt = enif_open_resource_type(env, "Elixir.Adbc.Nif", "NifResArrowArrayStream", res_type::destruct_resource, ERL_NIF_RT_CREATE, NULL);
         if (!rt) return -1;
         res_type::type = rt;
     }
@@ -282,7 +337,8 @@ static ErlNifFunc nif_functions[] = {
     {"adbc_connection_new", 0, adbc_connection_new, 0},
     {"adbc_connection_set_option", 3, adbc_connection_set_option, 0},
     {"adbc_connection_init", 2, adbc_connection_init, 0},
-    {"adbc_connection_release", 1, adbc_connection_release, 0}
+    {"adbc_connection_release", 1, adbc_connection_release, 0},
+    {"adbc_connection_get_info", 2, adbc_connection_get_info, 0}
 };
 
 ERL_NIF_INIT(Elixir.Adbc.Nif, nif_functions, on_load, on_reload, on_upgrade, NULL);

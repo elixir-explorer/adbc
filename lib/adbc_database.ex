@@ -15,6 +15,7 @@ defmodule Adbc.Database do
     case Adbc.Nif.adbc_database_new() do
       {:ok, ref} ->
         {:ok, %T{reference: ref}}
+
       {:error, {reason, code, sql_state}} ->
         {:error, {reason, code, sql_state}}
     end
@@ -28,8 +29,8 @@ defmodule Adbc.Database do
   """
   @doc group: :adbc_database
   @spec set_option(%T{}, String.t(), String.t()) :: :ok | Adbc.Error.adbc_error()
-  def set_option(self=%T{}, key, value)
-  when is_binary(key) and is_binary(value) do
+  def set_option(self = %T{}, key, value)
+      when is_binary(key) and is_binary(value) do
     Adbc.Nif.adbc_database_set_option(self.reference, key, value)
   end
 
@@ -41,7 +42,7 @@ defmodule Adbc.Database do
   """
   @doc group: :adbc_database
   @spec init(%T{}) :: :ok | Adbc.Error.adbc_error()
-  def init(self=%T{}) do
+  def init(self = %T{}) do
     Adbc.Nif.adbc_database_init(self.reference)
   end
 
@@ -50,7 +51,7 @@ defmodule Adbc.Database do
   """
   @doc group: :adbc_database
   @spec release(%T{}) :: :ok | Adbc.Error.adbc_error()
-  def release(self=%T{}) do
+  def release(self = %T{}) do
     Adbc.Nif.adbc_database_release(self.reference)
   end
 end

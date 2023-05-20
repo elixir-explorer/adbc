@@ -276,6 +276,7 @@ int get_list(ErlNifEnv *env, ERL_NIF_TERM list, std::vector<std::string> &var);
 int get_list(ErlNifEnv *env, ERL_NIF_TERM list, std::vector<int> &var);
 int get_list(ErlNifEnv *env, ERL_NIF_TERM list, std::vector<int64_t> &var);
 int get_list(ErlNifEnv *env, ERL_NIF_TERM list, std::vector<uint64_t> &var);
+int get_list(ErlNifEnv *env, ERL_NIF_TERM list, std::vector<uint32_t> &var);
 
 }
 }

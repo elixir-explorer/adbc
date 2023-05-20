@@ -1,6 +1,8 @@
 defmodule Adbc.Connection.Test do
   use ExUnit.Case
   doctest Adbc.Connection
+
+  alias Adbc.ArrayStream
   alias Adbc.Connection
   alias Adbc.Database
 
@@ -36,5 +38,22 @@ defmodule Adbc.Connection.Test do
     assert_raise ArgumentError, fn ->
       Connection.release(connection)
     end
+  end
+
+  test "get all info from a connection" do
+    {:ok, %Database{} = database} = Database.new()
+    assert is_reference(database.reference)
+
+    assert :ok == Database.init(database)
+
+    {:ok, %Connection{} = connection} = Connection.new()
+    assert is_reference(connection.reference)
+
+    assert :ok == Connection.init(connection, database)
+    {:ok, %ArrayStream{} = array_stream} = Connection.get_info(connection)
+    assert is_reference(array_stream.reference)
+    assert :ok == Connection.release(connection)
+
+    assert :ok == Database.release(database)
   end
 end

@@ -601,6 +601,56 @@ static ERL_NIF_TERM adbc_connection_read_partition(ErlNifEnv *env, int argc, con
     return erlang::nif::ok(env, ret);
 }
 
+static ERL_NIF_TERM adbc_connection_commit(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
+    using res_type = NifRes<struct AdbcConnection>;
+
+    ERL_NIF_TERM ret, error;
+    res_type * connection = nullptr;
+    if ((connection = res_type::get_resource(env, argv[0], error)) == nullptr) {
+        return error;
+    }
+    if (connection->val == nullptr) {
+        return enif_make_badarg(env);
+    }
+
+    struct AdbcError adbc_error;
+    AdbcStatusCode code = AdbcConnectionCommit(connection->val, &adbc_error);
+    if (code != ADBC_STATUS_OK) {
+        ret = nif_error_from_adbc_error(env, &adbc_error);
+        if (adbc_error.release != nullptr) {
+            adbc_error.release(&adbc_error);
+        }
+        return ret;
+    }
+
+    return erlang::nif::ok(env);
+}
+
+static ERL_NIF_TERM adbc_connection_rollback(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
+    using res_type = NifRes<struct AdbcConnection>;
+
+    ERL_NIF_TERM ret, error;
+    res_type * connection = nullptr;
+    if ((connection = res_type::get_resource(env, argv[0], error)) == nullptr) {
+        return error;
+    }
+    if (connection->val == nullptr) {
+        return enif_make_badarg(env);
+    }
+
+    struct AdbcError adbc_error;
+    AdbcStatusCode code = AdbcConnectionRollback(connection->val, &adbc_error);
+    if (code != ADBC_STATUS_OK) {
+        ret = nif_error_from_adbc_error(env, &adbc_error);
+        if (adbc_error.release != nullptr) {
+            adbc_error.release(&adbc_error);
+        }
+        return ret;
+    }
+
+    return erlang::nif::ok(env);
+}
+
 static int on_load(ErlNifEnv *env, void **, ERL_NIF_TERM) {
     ErlNifResourceType *rt;
 
@@ -657,7 +707,9 @@ static ErlNifFunc nif_functions[] = {
     {"adbc_connection_get_objects", 7, adbc_connection_get_objects, 0},
     {"adbc_connection_get_table_schema", 4, adbc_connection_get_table_schema, 0},
     {"adbc_connection_get_table_types", 1, adbc_connection_get_table_types, 0},
-    {"adbc_connection_read_partition", 3, adbc_connection_read_partition, 0}
+    {"adbc_connection_read_partition", 3, adbc_connection_read_partition, 0},
+    {"adbc_connection_commit", 1, adbc_connection_commit, 0},
+    {"adbc_connection_rollback", 1, adbc_connection_rollback, 0}
 };
 
 ERL_NIF_INIT(Elixir.Adbc.Nif, nif_functions, on_load, on_reload, on_upgrade, NULL);

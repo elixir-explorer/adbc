@@ -364,4 +364,26 @@ defmodule Adbc.Connection do
         {:error, {reason, code, sql_state}}
     end
   end
+
+  @doc """
+  Commit any pending transactions. Only used if autocommit is disabled.
+
+  Behavior is undefined if this is mixed with SQL transaction statements.
+  """
+  @doc group: :adbc_connection_transaction
+  @spec commit(Adbc.Connection.t()) :: :ok | Adbc.Error.adbc_error()
+  def commit(self = %T{}) do
+    Adbc.Nif.adbc_connection_commit(self.reference)
+  end
+
+  @doc """
+  Roll back any pending transactions. Only used if autocommit is disabled.
+
+  Behavior is undefined if this is mixed with SQL transaction statements.
+  """
+  @doc group: :adbc_connection_transaction
+  @spec rollback(Adbc.Connection.t()) :: :ok | Adbc.Error.adbc_error()
+  def rollback(self = %T{}) do
+    Adbc.Nif.adbc_connection_rollback(self.reference)
+  end
 end

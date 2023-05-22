@@ -133,7 +133,10 @@ defmodule Adbc.Statement do
     Defaults to `byte_size(plan)`.
   """
   @doc group: :adbc_statement_substrait
-  def set_substrait_plan(self = %T{}, plan, length \\ :auto) when is_binary(plan) and ((is_integer(length) and length > 0) or length == :auto) do
+  @spec set_substrait_plan(Adbc.Statement.t(), binary(), non_neg_integer() | :auto) ::
+          :ok | Adbc.Error.adbc_error()
+  def set_substrait_plan(self = %T{}, plan, length \\ :auto)
+      when is_binary(plan) and ((is_integer(length) and length > 0) or length == :auto) do
     length =
       if length == :auto do
         byte_size(plan)

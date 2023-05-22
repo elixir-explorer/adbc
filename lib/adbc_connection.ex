@@ -6,7 +6,7 @@ defmodule Adbc.Connection do
   defstruct [:reference]
   alias __MODULE__, as: T
   alias Adbc.Database
-  alias Adbc.ArrayStream
+  alias Adbc.ArrowArrayStream
   alias Adbc.Helper
 
   @doc """
@@ -104,7 +104,7 @@ defmodule Adbc.Connection do
   def get_info(self = %T{}, info_codes \\ []) when is_list(info_codes) do
     case Adbc.Nif.adbc_connection_get_info(self.reference, info_codes) do
       {:ok, array_stream_ref} ->
-        {:ok, %ArrayStream{reference: array_stream_ref}}
+        {:ok, %ArrowArrayStream{reference: array_stream_ref}}
 
       {:error, {reason, code, sql_state}} ->
         {:error, {reason, code, sql_state}}
@@ -220,7 +220,7 @@ defmodule Adbc.Connection do
       column_name
     ) do
       {:ok, array_stream_ref} ->
-        {:ok, %ArrayStream{reference: array_stream_ref}}
+        {:ok, %ArrowArrayStream{reference: array_stream_ref}}
 
       {:error, {reason, code, sql_state}} ->
         {:error, {reason, code, sql_state}}

@@ -2,7 +2,7 @@ defmodule Adbc.Connection.Test do
   use ExUnit.Case
   doctest Adbc.Connection
 
-  alias Adbc.ArrayStream
+  alias Adbc.ArrowArrayStream
   alias Adbc.Connection
   alias Adbc.Database
 
@@ -50,7 +50,7 @@ defmodule Adbc.Connection.Test do
     assert is_reference(connection.reference)
 
     assert :ok == Connection.init(connection, database)
-    {:ok, %ArrayStream{} = array_stream} = Connection.get_info(connection)
+    {:ok, %ArrowArrayStream{} = array_stream} = Connection.get_info(connection)
     assert is_reference(array_stream.reference)
     assert :ok == Connection.release(connection)
 
@@ -67,7 +67,7 @@ defmodule Adbc.Connection.Test do
     assert is_reference(connection.reference)
 
     assert :ok == Connection.init(connection, database)
-    {:ok, %ArrayStream{} = array_stream} = Connection.get_objects(connection, 0)
+    {:ok, %ArrowArrayStream{} = array_stream} = Connection.get_objects(connection, 0)
     assert is_reference(array_stream.reference)
     assert :ok == Connection.release(connection)
 

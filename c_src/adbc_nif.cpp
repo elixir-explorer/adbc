@@ -16,6 +16,7 @@
 template<> ErlNifResourceType * NifRes<struct AdbcDatabase>::type = nullptr;
 template<> ErlNifResourceType * NifRes<struct AdbcConnection>::type = nullptr;
 template<> ErlNifResourceType * NifRes<struct ArrowArrayStream>::type = nullptr;
+template<> ErlNifResourceType * NifRes<struct ArrowSchema>::type = nullptr;
 
 static ERL_NIF_TERM nif_error_from_adbc_error(ErlNifEnv *env, struct AdbcError * error) {
     return erlang::nif::error(env, enif_make_tuple3(env,
@@ -35,6 +36,10 @@ static ERL_NIF_TERM adbc_database_new(ErlNifEnv *env, int argc, const ERL_NIF_TE
     }
 
     database->val = (res_type::val_type_p)enif_alloc(sizeof(res_type::val_type));
+    if (database->val == nullptr) {
+        enif_release_resource(database);
+        return erlang::nif::error(env, "out of memory");
+    }
     memset(database->val, 0, sizeof(res_type::val_type));
     struct AdbcError adbc_error;
     AdbcStatusCode code = AdbcDatabaseNew(database->val, &adbc_error);
@@ -143,6 +148,10 @@ static ERL_NIF_TERM adbc_connection_new(ErlNifEnv *env, int argc, const ERL_NIF_
     }
 
     connection->val = (res_type::val_type_p)enif_alloc(sizeof(res_type::val_type));
+    if (connection->val == nullptr) {
+        enif_release_resource(connection);
+        return erlang::nif::error(env, "out of memory");
+    }
     memset(connection->val, 0, sizeof(res_type::val_type));
     struct AdbcError adbc_error;
     AdbcStatusCode code = AdbcConnectionNew(connection->val, &adbc_error);
@@ -226,7 +235,6 @@ static ERL_NIF_TERM adbc_connection_release(ErlNifEnv *env, int argc, const ERL_
     if ((connection = res_type::get_resource(env, argv[0], error)) == nullptr) {
         return error;
     }
-
     if (connection->val == nullptr) {
         return enif_make_badarg(env);
     }
@@ -274,6 +282,10 @@ static ERL_NIF_TERM adbc_connection_get_info(ErlNifEnv *env, int argc, const ERL
         return error;
     }
     array_stream->val = (array_stream_type::val_type_p)enif_alloc(sizeof(array_stream_type::val_type));
+    if (array_stream->val == nullptr) {
+        enif_release_resource(array_stream);
+        return erlang::nif::error(env, "out of memory");
+    }
     memset(array_stream->val, 0, sizeof(array_stream_type::val_type));
 
     struct AdbcError adbc_error;
@@ -376,6 +388,13 @@ static ERL_NIF_TERM adbc_connection_get_objects(ErlNifEnv *env, int argc, const 
         return error;
     }
     array_stream->val = (array_stream_type::val_type_p)enif_alloc(sizeof(array_stream_type::val_type));
+    if (array_stream->val == nullptr) {
+        enif_release_resource(array_stream);
+        for (auto& at : table_types) {
+            if (at) enif_free((void *)at);
+        }
+        return erlang::nif::error(env, "out of memory");
+    }
     memset(array_stream->val, 0, sizeof(array_stream_type::val_type));
 
     struct AdbcError adbc_error;
@@ -410,6 +429,77 @@ static ERL_NIF_TERM adbc_connection_get_objects(ErlNifEnv *env, int argc, const 
     return erlang::nif::ok(env, ret);
 }
 
+static ERL_NIF_TERM adbc_connection_get_table_schema(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
+    using res_type = NifRes<struct AdbcConnection>;
+    using schema_type = NifRes<struct ArrowSchema>;
+
+    ERL_NIF_TERM ret, error;
+    res_type * connection = nullptr;
+    if ((connection = res_type::get_resource(env, argv[0], error)) == nullptr) {
+        return error;
+    }
+    if (connection->val == nullptr) {
+        return enif_make_badarg(env);
+    }
+
+    std::string catalog, db_schema, table_name;
+    const char * catalog_p = nullptr;
+    const char * db_schema_p = nullptr;
+    const char * table_name_p = nullptr;
+
+    if (!erlang::nif::get(env, argv[1], catalog)) {
+        if (!erlang::nif::check_nil(env, argv[1])) {
+            return enif_make_badarg(env);
+        } else {
+            catalog_p = catalog.c_str();
+        }
+    }
+    if (!erlang::nif::get(env, argv[2], db_schema)) {
+        if (!erlang::nif::check_nil(env, argv[2])) {
+            return enif_make_badarg(env);
+        } else {
+            db_schema_p = db_schema.c_str();
+        }
+    }
+    if (!erlang::nif::get(env, argv[3], table_name)) {
+        return enif_make_badarg(env);
+    }
+    table_name_p = table_name.c_str();
+
+    schema_type * schema = nullptr;
+    if ((schema = schema_type::allocate_resource(env, error)) == nullptr) {
+        return error;
+    }
+    schema->val = (schema_type::val_type_p)enif_alloc(sizeof(schema_type::val_type));
+    if (schema->val == nullptr) {
+        enif_release_resource(schema);
+        return erlang::nif::error(env, "out fo memory");
+    }
+    memset(schema->val, 0, sizeof(schema_type::val_type));
+
+    struct AdbcError adbc_error;
+    AdbcStatusCode code = AdbcConnectionGetTableSchema(
+        connection->val, 
+        catalog_p,
+        db_schema_p,
+        table_name_p,
+        schema->val,
+        &adbc_error);
+    if (code != ADBC_STATUS_OK) {
+        ret = nif_error_from_adbc_error(env, &adbc_error);
+        enif_free(schema->val);
+        enif_release_resource(schema);
+        if (adbc_error.release != nullptr) {
+            adbc_error.release(&adbc_error);
+        }
+        return ret;
+    }
+
+    ret = enif_make_resource(env, schema);
+    enif_release_resource(schema);
+    return erlang::nif::ok(env, ret);
+}
+
 static int on_load(ErlNifEnv *env, void **, ERL_NIF_TERM) {
     ErlNifResourceType *rt;
 
@@ -430,6 +520,13 @@ static int on_load(ErlNifEnv *env, void **, ERL_NIF_TERM) {
     {
         using res_type = NifRes<struct ArrowArrayStream>;
         rt = enif_open_resource_type(env, "Elixir.Adbc.Nif", "NifResArrowArrayStream", res_type::destruct_resource, ERL_NIF_RT_CREATE, NULL);
+        if (!rt) return -1;
+        res_type::type = rt;
+    }
+
+    {
+        using res_type = NifRes<struct ArrowSchema>;
+        rt = enif_open_resource_type(env, "Elixir.Adbc.Nif", "NifResArrowSchema", res_type::destruct_resource, ERL_NIF_RT_CREATE, NULL);
         if (!rt) return -1;
         res_type::type = rt;
     }
@@ -456,7 +553,8 @@ static ErlNifFunc nif_functions[] = {
     {"adbc_connection_init", 2, adbc_connection_init, 0},
     {"adbc_connection_release", 1, adbc_connection_release, 0},
     {"adbc_connection_get_info", 2, adbc_connection_get_info, 0},
-    {"adbc_connection_get_objects", 7, adbc_connection_get_objects, 0}
+    {"adbc_connection_get_objects", 7, adbc_connection_get_objects, 0},
+    {"adbc_connection_get_table_schema", 4, adbc_connection_get_table_schema, 0}
 };
 
 ERL_NIF_INIT(Elixir.Adbc.Nif, nif_functions, on_load, on_reload, on_upgrade, NULL);

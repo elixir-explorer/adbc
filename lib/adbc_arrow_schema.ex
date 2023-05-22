@@ -1,6 +1,6 @@
-defmodule Adbc.ArrowArrayStream do
+defmodule Adbc.ArrowSchema do
   @moduledoc """
-  Documentation for `Adbc.ArrowArrayStream`.
+  Documentation for `Adbc.ArrowSchema`.
   """
 
   @typedoc """

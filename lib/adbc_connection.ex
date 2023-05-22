@@ -3,17 +3,27 @@ defmodule Adbc.Connection do
   Documentation for `Adbc.Connection`.
   """
 
+  @typedoc """
+  - **reference**: `reference`.
+
+    The underlying erlang resource variable.
+
+  """
+  @type t :: %__MODULE__{
+          reference: reference()
+        }
   defstruct [:reference]
   alias __MODULE__, as: T
   alias Adbc.Database
   alias Adbc.ArrowArrayStream
+  alias Adbc.ArrowSchema
   alias Adbc.Helper
 
   @doc """
   Allocate a new (but uninitialized) connection.
   """
   @doc group: :adbc_connection
-  @spec new() :: {:ok, %T{}} | Adbc.Error.adbc_error()
+  @spec new() :: {:ok, Adbc.Connection.t()} | Adbc.Error.adbc_error()
   def new do
     case Adbc.Nif.adbc_connection_new() do
       {:ok, ref} ->
@@ -31,7 +41,7 @@ defmodule Adbc.Connection do
   support setting options after initialization as well.
   """
   @doc group: :adbc_connection
-  @spec set_option(%T{}, String.t(), String.t()) :: :ok | Adbc.Error.adbc_error()
+  @spec set_option(Adbc.Connection.t(), String.t(), String.t()) :: :ok | Adbc.Error.adbc_error()
   def set_option(self = %T{}, key, value)
       when is_binary(key) and is_binary(value) do
     Adbc.Nif.adbc_connection_set_option(self.reference, key, value)
@@ -44,7 +54,7 @@ defmodule Adbc.Connection do
   as well.
   """
   @doc group: :adbc_connection
-  @spec init(%T{}, %Database{}) :: :ok | Adbc.Error.adbc_error()
+  @spec init(Adbc.Connection.t(), %Database{}) :: :ok | Adbc.Error.adbc_error()
   def init(self = %T{}, database = %Database{}) do
     Adbc.Nif.adbc_connection_init(self.reference, database.reference)
   end
@@ -53,7 +63,7 @@ defmodule Adbc.Connection do
   Destroy this connection.
   """
   @doc group: :adbc_connection
-  @spec release(%T{}) :: :ok | Adbc.Error.adbc_error()
+  @spec release(Adbc.Connection.t()) :: :ok | Adbc.Error.adbc_error()
   def release(self = %T{}) do
     Adbc.Nif.adbc_connection_release(self.reference)
   end
@@ -100,7 +110,8 @@ defmodule Adbc.Connection do
     Defaults to `[]`.
   """
   @doc group: :adbc_connection_metadata
-  @spec get_info(%T{}, list(neg_integer())) :: {:ok, %ArrayStream{}} | Adbc.Error.adbc_error()
+  @spec get_info(Adbc.Connection.t(), list(neg_integer())) ::
+          {:ok, Adbc.ArrowArrayStream.t()} | Adbc.Error.adbc_error()
   def get_info(self = %T{}, info_codes \\ []) when is_list(info_codes) do
     case Adbc.Nif.adbc_connection_get_info(self.reference, info_codes) do
       {:ok, array_stream_ref} ->
@@ -202,6 +213,14 @@ defmodule Adbc.Connection do
   | fk_column_name           | utf8 not null           |
   ```
   """
+  @doc group: :adbc_connection_metadata
+  @spec get_objects(Adbc.Connection.t(), non_neg_integer(), [
+          {:catalog, String.t() | nil},
+          {:db_schema, String.t() | nil},
+          {:table_name, String.t() | nil},
+          {:table_type, [String.t()] | nil},
+          {:column_name, String.t() | nil}
+        ]) :: {:ok, Adbc.ArrowArrayStream.t()} | Adbc.Error.adbc_error()
   def get_objects(self = %T{}, depth, opts \\ [])
       when is_integer(depth) and depth >= 0 do
     catalog = Helper.get_keyword!(opts, :catalog, :string, allow_nil: true)
@@ -211,16 +230,52 @@ defmodule Adbc.Connection do
     column_name = Helper.get_keyword!(opts, :column_name, :string, allow_nil: true)
 
     case Adbc.Nif.adbc_connection_get_objects(
-      self.reference,
-      depth,
-      catalog,
-      db_schema,
-      table_name,
-      table_type,
-      column_name
-    ) do
+           self.reference,
+           depth,
+           catalog,
+           db_schema,
+           table_name,
+           table_type,
+           column_name
+         ) do
       {:ok, array_stream_ref} ->
         {:ok, %ArrowArrayStream{reference: array_stream_ref}}
+
+      {:error, {reason, code, sql_state}} ->
+        {:error, {reason, code, sql_state}}
+    end
+  end
+
+  @doc """
+  Get the Arrow schema of a table.
+
+  ##### Positional Parameters
+
+  - `self`: `Adbc.Connection.t()`
+
+    A valid `Adbc.Connection` struct.
+
+  - `catalog`: `String.t()` | `nil`
+
+    The catalog (or `nil` if not applicable).
+
+  - `db_schema`: `String.t()` | `nil`
+
+    The database schema (or `nil` if not applicable).
+
+  - `table_name`: `String.t()`
+
+    The table name.
+  """
+  @doc group: :adbc_connection_metadata
+  @spec get_table_schema(Adbc.Connection.t(), String.t() | nil, String.t() | nil, String.t()) ::
+          {:ok, Adbc.ArrowSchema.t()} | Adbc.Error.adbc_error()
+  def get_table_schema(self = %T{}, catalog, db_schema, table_name)
+      when (is_binary(catalog) or catalog == nil) and (is_binary(db_schema) or catalog == nil) and
+             is_binary(table_name) do
+    case Adbc.Nif.adbc_connection_get_table_schema(self.reference, catalog, db_schema, table_name) do
+      {:ok, schema_ref} ->
+        {:ok, %ArrowSchema{reference: schema_ref}}
 
       {:error, {reason, code, sql_state}} ->
         {:error, {reason, code, sql_state}}

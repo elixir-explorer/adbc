@@ -3,6 +3,7 @@ defmodule Adbc.Connection.Test do
   doctest Adbc.Connection
 
   alias Adbc.ArrowArrayStream
+  alias Adbc.ArrowSchema
   alias Adbc.Connection
   alias Adbc.Database
 
@@ -73,4 +74,21 @@ defmodule Adbc.Connection.Test do
 
     assert :ok == Database.release(database)
   end
+
+  # test "get table schema from a connection" do
+  #   {:ok, %Database{} = database} = Database.new()
+  #   assert is_reference(database.reference)
+
+  #   assert :ok == Database.init(database)
+
+  #   {:ok, %Connection{} = connection} = Connection.new()
+  #   assert is_reference(connection.reference)
+
+  #   assert :ok == Connection.init(connection, database)
+  #   {:ok, %ArrowSchema{} = schema} = Connection.get_table_schema(connection, nil, nil, "table")
+  #   assert is_reference(schema.reference)
+  #   assert :ok == Connection.release(connection)
+
+  #   assert :ok == Database.release(database)
+  # end
 end

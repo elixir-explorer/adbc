@@ -10,7 +10,9 @@ defmodule Adbc.Statement do
         }
   defstruct [:reference]
   alias __MODULE__, as: T
+  alias Adbc.ArrowArray
   alias Adbc.ArrowArrayStream
+  alias Adbc.ArrowSchema
 
   @doc """
   Create a new statement for a given connection.
@@ -150,5 +152,54 @@ defmodule Adbc.Statement do
       end
 
     Adbc.Nif.adbc_statement_set_substrait_plan(self.reference, plan, length)
+  end
+
+  @doc """
+  Bind Arrow data. This can be used for bulk inserts or prepared statements.
+
+  ##### Positional Parameter
+
+  - `self`: `Adbc.Statement.t()`
+
+    The statement.
+
+  - `values`: `Adbc.ArrowArray.t()`
+
+    The values to bind. The driver will call the release callback itself,
+    although it may not do this until the statement is released.
+
+  - `schema`: `Adbc.ArrowSchema.t()`
+
+    The schema of the values to bind.
+
+  """
+  @doc group: :adbc_statement
+  @spec bind(Adbc.Statement.t(), Adbc.ArrowArray.t(), Adbc.ArrowSchema.t()) ::
+          :ok | Adbc.Error.adbc_error()
+  def bind(self = %T{}, values = %ArrowArray{}, schema = %ArrowSchema{}) do
+    Adbc.Nif.adbc_statement_bind(self.reference, values.reference, schema.reference)
+  end
+
+  @doc """
+  Bind Arrow data. This can be used for bulk inserts or prepared statements.
+
+  ##### Positional Parameter
+
+  - `self`: `Adbc.Statement.t()`
+
+    The statement.
+
+  - `stream`: `Adbc.ArrowArrayStream.t()`
+
+    The values to bind. The driver will call the
+    release callback itself, although it may not do this until the
+    statement is released.
+
+  """
+  @doc group: :adbc_statement
+  @spec bind_stream(Adbc.Statement.t(), Adbc.ArrowArrayStream.t()) ::
+          :ok | Adbc.Error.adbc_error()
+  def bind_stream(self = %T{}, stream = %ArrowArrayStream{}) do
+    Adbc.Nif.adbc_statement_bind(self.reference, stream.reference)
   end
 end

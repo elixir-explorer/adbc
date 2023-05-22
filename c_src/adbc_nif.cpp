@@ -15,9 +15,10 @@
 
 template<> ErlNifResourceType * NifRes<struct AdbcDatabase>::type = nullptr;
 template<> ErlNifResourceType * NifRes<struct AdbcConnection>::type = nullptr;
-template<> ErlNifResourceType * NifRes<struct ArrowArrayStream>::type = nullptr;
-template<> ErlNifResourceType * NifRes<struct ArrowSchema>::type = nullptr;
 template<> ErlNifResourceType * NifRes<struct AdbcStatement>::type = nullptr;
+template<> ErlNifResourceType * NifRes<struct ArrowArrayStream>::type = nullptr;
+template<> ErlNifResourceType * NifRes<struct ArrowArray>::type = nullptr;
+template<> ErlNifResourceType * NifRes<struct ArrowSchema>::type = nullptr;
 
 static ERL_NIF_TERM nif_error_from_adbc_error(ErlNifEnv *env, struct AdbcError * error) {
     return erlang::nif::error(env, enif_make_tuple3(env,
@@ -865,6 +866,85 @@ static ERL_NIF_TERM adbc_statement_set_substrait_plan(ErlNifEnv *env, int argc, 
     return erlang::nif::ok(env);
 }
 
+static ERL_NIF_TERM adbc_statement_bind(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
+    using res_type = NifRes<struct AdbcStatement>;
+    using array_type = NifRes<struct ArrowArray>;
+    using schema_type = NifRes<struct ArrowSchema>;
+
+    ERL_NIF_TERM ret, error;
+
+    res_type * statement = nullptr;
+    if ((statement = res_type::get_resource(env, argv[0], error)) == nullptr) {
+        return error;
+    }
+    if (statement->val == nullptr) {
+        return enif_make_badarg(env);
+    }
+    
+    array_type * values = nullptr;
+    if ((values = array_type::get_resource(env, argv[1], error)) == nullptr) {
+        return error;
+    }
+    if (values->val == nullptr) {
+        return enif_make_badarg(env);
+    }
+
+    schema_type * schema = nullptr;
+    if ((schema = schema_type::get_resource(env, argv[2], error)) == nullptr) {
+        return error;
+    }
+    if (schema->val == nullptr) {
+        return enif_make_badarg(env);
+    }
+
+    struct AdbcError adbc_error;
+    AdbcStatusCode code = AdbcStatementBind(statement->val, values->val, schema->val, &adbc_error);
+    if (code != ADBC_STATUS_OK) {
+        ret = nif_error_from_adbc_error(env, &adbc_error);
+        if (adbc_error.release != nullptr) {
+            adbc_error.release(&adbc_error);
+        }
+        return ret;
+    }
+
+    return erlang::nif::ok(env);
+}
+
+static ERL_NIF_TERM adbc_statement_bind_stream(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
+    using res_type = NifRes<struct AdbcStatement>;
+    using array_stream_type = NifRes<struct ArrowArrayStream>;
+
+    ERL_NIF_TERM ret, error;
+
+    res_type * statement = nullptr;
+    if ((statement = res_type::get_resource(env, argv[0], error)) == nullptr) {
+        return error;
+    }
+    if (statement->val == nullptr) {
+        return enif_make_badarg(env);
+    }
+    
+    array_stream_type * stream = nullptr;
+    if ((stream = array_stream_type::get_resource(env, argv[1], error)) == nullptr) {
+        return error;
+    }
+    if (stream->val == nullptr) {
+        return enif_make_badarg(env);
+    }
+
+    struct AdbcError adbc_error;
+    AdbcStatusCode code = AdbcStatementBindStream(statement->val, stream->val, &adbc_error);
+    if (code != ADBC_STATUS_OK) {
+        ret = nif_error_from_adbc_error(env, &adbc_error);
+        if (adbc_error.release != nullptr) {
+            adbc_error.release(&adbc_error);
+        }
+        return ret;
+    }
+
+    return erlang::nif::ok(env);
+}
+
 static int on_load(ErlNifEnv *env, void **, ERL_NIF_TERM) {
     ErlNifResourceType *rt;
 
@@ -883,6 +963,13 @@ static int on_load(ErlNifEnv *env, void **, ERL_NIF_TERM) {
     }
 
     {
+        using res_type = NifRes<struct AdbcStatement>;
+        rt = enif_open_resource_type(env, "Elixir.Adbc.Nif", "NifResAdbcStatement", res_type::destruct_resource, ERL_NIF_RT_CREATE, NULL);
+        if (!rt) return -1;
+        res_type::type = rt;
+    }
+
+    {
         using res_type = NifRes<struct ArrowArrayStream>;
         rt = enif_open_resource_type(env, "Elixir.Adbc.Nif", "NifResArrowArrayStream", res_type::destruct_resource, ERL_NIF_RT_CREATE, NULL);
         if (!rt) return -1;
@@ -890,15 +977,15 @@ static int on_load(ErlNifEnv *env, void **, ERL_NIF_TERM) {
     }
 
     {
-        using res_type = NifRes<struct ArrowSchema>;
-        rt = enif_open_resource_type(env, "Elixir.Adbc.Nif", "NifResArrowSchema", res_type::destruct_resource, ERL_NIF_RT_CREATE, NULL);
+        using res_type = NifRes<struct ArrowArray>;
+        rt = enif_open_resource_type(env, "Elixir.Adbc.Nif", "NifResArrowArray", res_type::destruct_resource, ERL_NIF_RT_CREATE, NULL);
         if (!rt) return -1;
         res_type::type = rt;
     }
 
     {
-        using res_type = NifRes<struct AdbcStatement>;
-        rt = enif_open_resource_type(env, "Elixir.Adbc.Nif", "NifResAdbcStatement", res_type::destruct_resource, ERL_NIF_RT_CREATE, NULL);
+        using res_type = NifRes<struct ArrowSchema>;
+        rt = enif_open_resource_type(env, "Elixir.Adbc.Nif", "NifResArrowSchema", res_type::destruct_resource, ERL_NIF_RT_CREATE, NULL);
         if (!rt) return -1;
         res_type::type = rt;
     }
@@ -937,7 +1024,9 @@ static ErlNifFunc nif_functions[] = {
     {"adbc_statement_execute_query", 1, adbc_statement_execute_query, 0},
     {"adbc_statement_prepare", 1, adbc_statement_prepare, 0},
     {"adbc_statement_set_sql_query", 2, adbc_statement_set_sql_query, 0},
-    {"adbc_statement_set_substrait_plan", 3, adbc_statement_set_substrait_plan, 0}
+    {"adbc_statement_set_substrait_plan", 3, adbc_statement_set_substrait_plan, 0},
+    {"adbc_statement_bind", 3, adbc_statement_bind, 0},
+    {"adbc_statement_bind_stream", 2, adbc_statement_bind_stream, 0},
 };
 
 ERL_NIF_INIT(Elixir.Adbc.Nif, nif_functions, on_load, on_reload, on_upgrade, NULL);

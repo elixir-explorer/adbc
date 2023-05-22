@@ -301,9 +301,62 @@ defmodule Adbc.Connection do
 
   """
   @doc group: :adbc_connection_metadata
-  @spec get_table_types(Adbc.Connection.t()) :: {:ok, Adbc.ArrowArrayStream.t()} | Adbc.Error.adbc_error()
-  def get_table_types(self=%T{}) do
+  @spec get_table_types(Adbc.Connection.t()) ::
+          {:ok, Adbc.ArrowArrayStream.t()} | Adbc.Error.adbc_error()
+  def get_table_types(self = %T{}) do
     case Adbc.Nif.adbc_connection_get_table_types(self.reference) do
+      {:ok, array_stream_ref} ->
+        {:ok, %ArrowArrayStream{reference: array_stream_ref}}
+
+      {:error, {reason, code, sql_state}} ->
+        {:error, {reason, code, sql_state}}
+    end
+  end
+
+  @doc """
+  Construct a statement for a partition of a query. The
+  results can then be read independently.
+
+  A partition can be retrieved from AdbcPartitions.
+
+  ##### Positional Parameters
+
+  - `self`: `Adbc.Connection.t()`
+
+    A valid `Adbc.Connection` struct.
+
+  - `serialized_partition`: `binary()`
+
+    The partition descriptor.
+
+  - `serialized_length`: `non_neg_integer()`
+
+    The partition descriptor length.
+
+    Defaults to `byte_size(serialized_partition)`.
+
+  """
+  @doc group: :adbc_connection_partition
+  @spec read_partition(Adbc.Connection.t(), binary(), non_neg_integer() | :auto) ::
+          {:ok, Adbc.ArrowArrayStream.t()} | Adbc.Error.adbc_error()
+  def read_partition(self = %T{}, serialized_partition, serialized_length \\ :auto) do
+    serialized_length =
+      if serialized_length == :auto do
+        byte_size(serialized_partition)
+      else
+        if serialized_length > byte_size(serialized_partition) do
+          raise RuntimeError,
+                "parameter `serialized_length` > bytes of acutal size of `serialized_partition` (#{byte_size(serialized_partition)})"
+        else
+          serialized_length
+        end
+      end
+
+    case Adbc.Nif.adbc_connection_read_partition(
+           self.reference,
+           serialized_partition,
+           serialized_length
+         ) do
       {:ok, array_stream_ref} ->
         {:ok, %ArrowArrayStream{reference: array_stream_ref}}
 

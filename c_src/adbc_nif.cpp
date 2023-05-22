@@ -541,6 +541,66 @@ static ERL_NIF_TERM adbc_connection_get_table_types(ErlNifEnv *env, int argc, co
     return erlang::nif::ok(env, ret);
 }
 
+static ERL_NIF_TERM adbc_connection_read_partition(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
+    using res_type = NifRes<struct AdbcConnection>;
+    using array_stream_type = NifRes<struct ArrowArrayStream>;
+
+    ERL_NIF_TERM ret, error;
+    res_type * connection = nullptr;
+    if ((connection = res_type::get_resource(env, argv[0], error)) == nullptr) {
+        return error;
+    }
+    if (connection->val == nullptr) {
+        return enif_make_badarg(env);
+    }
+
+    ErlNifBinary serialized_partition;
+    size_t serialized_length;
+
+    if (!enif_inspect_binary(env, argv[1], &serialized_partition)) {
+        return enif_make_badarg(env);
+    }
+    if (!erlang::nif::get(env, argv[2], &serialized_length)) {
+        return enif_make_badarg(env);
+    }
+    if (serialized_length > serialized_partition.size) {
+        return enif_make_badarg(env);
+    }
+
+    array_stream_type * array_stream = nullptr;
+    if ((array_stream = array_stream_type::allocate_resource(env, error)) == nullptr) {
+        return error;
+    }
+    array_stream->val = (array_stream_type::val_type_p)enif_alloc(sizeof(array_stream_type::val_type));
+    if (array_stream->val == nullptr) {
+        enif_release_resource(array_stream);
+        return erlang::nif::error(env, "out of memory");
+    }
+    memset(array_stream->val, 0, sizeof(array_stream_type::val_type));
+
+    struct AdbcError adbc_error;
+    AdbcStatusCode code = AdbcConnectionReadPartition(
+        connection->val,
+        (const uint8_t *)serialized_partition.data,
+        serialized_length,
+        array_stream->val,
+        &adbc_error
+    );
+    if (code != ADBC_STATUS_OK) {
+        ret = nif_error_from_adbc_error(env, &adbc_error);
+        enif_free(array_stream->val);
+        enif_release_resource(array_stream);
+        if (adbc_error.release != nullptr) {
+            adbc_error.release(&adbc_error);
+        }
+        return ret;
+    }
+
+    ret = enif_make_resource(env, array_stream);
+    enif_release_resource(array_stream);
+    return erlang::nif::ok(env, ret);
+}
+
 static int on_load(ErlNifEnv *env, void **, ERL_NIF_TERM) {
     ErlNifResourceType *rt;
 
@@ -596,7 +656,8 @@ static ErlNifFunc nif_functions[] = {
     {"adbc_connection_get_info", 2, adbc_connection_get_info, 0},
     {"adbc_connection_get_objects", 7, adbc_connection_get_objects, 0},
     {"adbc_connection_get_table_schema", 4, adbc_connection_get_table_schema, 0},
-    {"adbc_connection_get_table_types", 1, adbc_connection_get_table_types, 0}
+    {"adbc_connection_get_table_types", 1, adbc_connection_get_table_types, 0},
+    {"adbc_connection_read_partition", 3, adbc_connection_read_partition, 0}
 };
 
 ERL_NIF_INIT(Elixir.Adbc.Nif, nif_functions, on_load, on_reload, on_upgrade, NULL);

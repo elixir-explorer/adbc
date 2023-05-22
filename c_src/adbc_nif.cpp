@@ -694,6 +694,35 @@ static ERL_NIF_TERM adbc_statement_new(ErlNifEnv *env, int argc, const ERL_NIF_T
     return erlang::nif::ok(env, ret);
 }
 
+static ERL_NIF_TERM adbc_statement_release(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
+    using res_type = NifRes<struct AdbcStatement>;
+
+    ERL_NIF_TERM ret, error;
+
+    res_type * statement = nullptr;
+    if ((statement = res_type::get_resource(env, argv[0], error)) == nullptr) {
+        return error;
+    }
+    if (statement->val == nullptr) {
+        return enif_make_badarg(env);
+    }
+
+    struct AdbcError adbc_error;
+    AdbcStatusCode code = AdbcStatementRelease(statement->val, &adbc_error);
+    if (code != ADBC_STATUS_OK) {
+        ret = nif_error_from_adbc_error(env, &adbc_error);
+        if (adbc_error.release != nullptr) {
+            adbc_error.release(&adbc_error);
+        }
+        return ret;
+    }
+
+    enif_free(statement->val);
+    statement->val = nullptr;
+
+    return erlang::nif::ok(env);
+}
+
 static int on_load(ErlNifEnv *env, void **, ERL_NIF_TERM) {
     ErlNifResourceType *rt;
 
@@ -761,7 +790,8 @@ static ErlNifFunc nif_functions[] = {
     {"adbc_connection_commit", 1, adbc_connection_commit, 0},
     {"adbc_connection_rollback", 1, adbc_connection_rollback, 0},
 
-    {"adbc_statement_new", 1, adbc_statement_new, 0}
+    {"adbc_statement_new", 1, adbc_statement_new, 0},
+    {"adbc_statement_release", 1, adbc_statement_release, 0}
 };
 
 ERL_NIF_INIT(Elixir.Adbc.Nif, nif_functions, on_load, on_reload, on_upgrade, NULL);

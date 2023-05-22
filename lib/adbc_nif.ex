@@ -52,4 +52,6 @@ defmodule Adbc.Nif do
   def adbc_connection_commit(_self), do: :erlang.nif_error(:not_loaded)
 
   def adbc_connection_rollback(_self), do: :erlang.nif_error(:not_loaded)
+
+  def adbc_statement_new(_connection), do: :erlang.nif_error(:not_loaded)
 end

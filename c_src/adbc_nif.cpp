@@ -796,6 +796,75 @@ static ERL_NIF_TERM adbc_statement_prepare(ErlNifEnv *env, int argc, const ERL_N
     return erlang::nif::ok(env);
 }
 
+static ERL_NIF_TERM adbc_statement_set_sql_query(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
+    using res_type = NifRes<struct AdbcStatement>;
+
+    ERL_NIF_TERM ret, error;
+
+    res_type * statement = nullptr;
+    if ((statement = res_type::get_resource(env, argv[0], error)) == nullptr) {
+        return error;
+    }
+    if (statement->val == nullptr) {
+        return enif_make_badarg(env);
+    }
+    std::string query;
+    if (!erlang::nif::get(env, argv[1], query)) {
+        return enif_make_badarg(env);
+    }
+
+    struct AdbcError adbc_error;
+    AdbcStatusCode code = AdbcStatementSetSqlQuery(statement->val, query.c_str(), &adbc_error);
+    if (code != ADBC_STATUS_OK) {
+        ret = nif_error_from_adbc_error(env, &adbc_error);
+        if (adbc_error.release != nullptr) {
+            adbc_error.release(&adbc_error);
+        }
+        return ret;
+    }
+
+    return erlang::nif::ok(env);
+}
+
+static ERL_NIF_TERM adbc_statement_set_substrait_plan(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
+    using res_type = NifRes<struct AdbcStatement>;
+
+    ERL_NIF_TERM ret, error;
+
+    res_type * statement = nullptr;
+    if ((statement = res_type::get_resource(env, argv[0], error)) == nullptr) {
+        return error;
+    }
+    if (statement->val == nullptr) {
+        return enif_make_badarg(env);
+    }
+    
+    ErlNifBinary plan;
+    size_t length;
+
+    if (!enif_inspect_binary(env, argv[1], &plan)) {
+        return enif_make_badarg(env);
+    }
+    if (!erlang::nif::get(env, argv[2], &length)) {
+        return enif_make_badarg(env);
+    }
+    if (length > plan.size) {
+        return enif_make_badarg(env);
+    }
+
+    struct AdbcError adbc_error;
+    AdbcStatusCode code = AdbcStatementSetSubstraitPlan(statement->val, (const uint8_t *)plan.data, length, &adbc_error);
+    if (code != ADBC_STATUS_OK) {
+        ret = nif_error_from_adbc_error(env, &adbc_error);
+        if (adbc_error.release != nullptr) {
+            adbc_error.release(&adbc_error);
+        }
+        return ret;
+    }
+
+    return erlang::nif::ok(env);
+}
+
 static int on_load(ErlNifEnv *env, void **, ERL_NIF_TERM) {
     ErlNifResourceType *rt;
 
@@ -866,7 +935,9 @@ static ErlNifFunc nif_functions[] = {
     {"adbc_statement_new", 1, adbc_statement_new, 0},
     {"adbc_statement_release", 1, adbc_statement_release, 0},
     {"adbc_statement_execute_query", 1, adbc_statement_execute_query, 0},
-    {"adbc_statement_prepare", 1, adbc_statement_prepare, 0}
+    {"adbc_statement_prepare", 1, adbc_statement_prepare, 0},
+    {"adbc_statement_set_sql_query", 2, adbc_statement_set_sql_query, 0},
+    {"adbc_statement_set_substrait_plan", 3, adbc_statement_set_substrait_plan, 0}
 };
 
 ERL_NIF_INIT(Elixir.Adbc.Nif, nif_functions, on_load, on_reload, on_upgrade, NULL);

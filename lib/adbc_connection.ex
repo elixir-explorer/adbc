@@ -281,4 +281,34 @@ defmodule Adbc.Connection do
         {:error, {reason, code, sql_state}}
     end
   end
+
+  @doc """
+  Get a list of table types in the database.
+
+  The result is an Arrow dataset with the following schema:
+
+  ```markdown
+  Field Name     | Field Type
+  ---------------|--------------
+  table_type     | utf8 not null
+  ```
+
+  ##### Positional Parameters
+
+  - `self`: `Adbc.Connection.t()`
+
+    A valid `Adbc.Connection` struct.
+
+  """
+  @doc group: :adbc_connection_metadata
+  @spec get_table_types(Adbc.Connection.t()) :: {:ok, Adbc.ArrowArrayStream.t()} | Adbc.Error.adbc_error()
+  def get_table_types(self=%T{}) do
+    case Adbc.Nif.adbc_connection_get_table_types(self.reference) do
+      {:ok, array_stream_ref} ->
+        {:ok, %ArrowArrayStream{reference: array_stream_ref}}
+
+      {:error, {reason, code, sql_state}} ->
+        {:error, {reason, code, sql_state}}
+    end
+  end
 end

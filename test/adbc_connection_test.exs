@@ -91,4 +91,21 @@ defmodule Adbc.Connection.Test do
 
   #   assert :ok == Database.release(database)
   # end
+
+  test "get table types from a connection" do
+    {:ok, %Database{} = database} = Database.new()
+    assert is_reference(database.reference)
+
+    assert :ok == Database.init(database)
+
+    {:ok, %Connection{} = connection} = Connection.new()
+    assert is_reference(connection.reference)
+
+    assert :ok == Connection.init(connection, database)
+    {:ok, %ArrowArrayStream{} = array_stream} = Connection.get_table_types(connection)
+    assert is_reference(array_stream.reference)
+    assert :ok == Connection.release(connection)
+
+    assert :ok == Database.release(database)
+  end
 end

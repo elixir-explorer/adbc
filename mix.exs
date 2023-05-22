@@ -39,7 +39,7 @@ defmodule ADBC.MixProject do
 
   defp docs do
     [
-      main: "ADBC",
+      main: "Adbc.Database",
       source_ref: "v#{@version}",
       source_url: @github_url
     ]

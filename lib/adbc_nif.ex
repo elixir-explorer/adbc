@@ -29,4 +29,15 @@ defmodule Adbc.Nif do
   def adbc_connection_release(_self), do: :erlang.nif_error(:not_loaded)
 
   def adbc_connection_get_info(_self, _info_codes), do: :erlang.nif_error(:not_loaded)
+
+  def adbc_connection_get_objects(
+        _self,
+        _depth,
+        _catalog,
+        _db_schema,
+        _table_name,
+        _table_type,
+        _column_name
+      ),
+      do: :erlang.nif_error(:not_loaded)
 end

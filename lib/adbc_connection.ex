@@ -7,6 +7,7 @@ defmodule Adbc.Connection do
   alias __MODULE__, as: T
   alias Adbc.Database
   alias Adbc.ArrayStream
+  alias Adbc.Helper
 
   @doc """
   Allocate a new (but uninitialized) connection.
@@ -26,7 +27,7 @@ defmodule Adbc.Connection do
   @doc """
   Set an option.
 
-  Options may be set before `Adbc.Connection.init/1`.  Some drivers may
+  Options may be set before `Adbc.Connection.init/2`.  Some drivers may
   support setting options after initialization as well.
   """
   @doc group: :adbc_connection
@@ -61,7 +62,7 @@ defmodule Adbc.Connection do
   Get metadata about the database/driver.
   The result is an Arrow dataset with the following schema:
 
-  ```
+  ```markdown
   Field Name                  | Field Type
   ----------------------------|------------------------
   info_name                   | uint32 not null
@@ -70,7 +71,7 @@ defmodule Adbc.Connection do
 
   `INFO_SCHEMA` is a dense union with members:
 
-  ```
+  ```markdown
   Field Name (Type Code)      | Field Type
   ----------------------------|------------------------
   string_value (0)            | utf8
@@ -102,6 +103,122 @@ defmodule Adbc.Connection do
   @spec get_info(%T{}, list(neg_integer())) :: {:ok, %ArrayStream{}} | Adbc.Error.adbc_error()
   def get_info(self = %T{}, info_codes \\ []) when is_list(info_codes) do
     case Adbc.Nif.adbc_connection_get_info(self.reference, info_codes) do
+      {:ok, array_stream_ref} ->
+        {:ok, %ArrayStream{reference: array_stream_ref}}
+
+      {:error, {reason, code, sql_state}} ->
+        {:error, {reason, code, sql_state}}
+    end
+  end
+
+  @doc """
+  Get a hierarchical view of all catalogs, database schemas, tables, and columns.
+
+  The result is an Arrow dataset with the following schema:
+
+  ```markdown
+  | Field Name               | Field Type              |
+  |--------------------------|-------------------------|
+  | catalog_name             | utf8                    |
+  | catalog_db_schemas       | list<DB_SCHEMA_SCHEMA>  |
+  ```
+
+  `DB_SCHEMA_SCHEMA` is a Struct with fields:
+
+  ```markdown
+  | Field Name               | Field Type              |
+  |--------------------------|-------------------------|
+  | db_schema_name           | utf8                    |
+  | db_schema_tables         | list<TABLE_SCHEMA>      |
+  ```
+
+  `TABLE_SCHEMA` is a Struct with fields:
+
+  ```markdown
+  | Field Name               | Field Type              |
+  |--------------------------|-------------------------|
+  | table_name               | utf8 not null           |
+  | table_type               | utf8 not null           |
+  | table_columns            | list<COLUMN_SCHEMA>     |
+  | table_constraints        | list<CONSTRAINT_SCHEMA> |
+  ```
+
+  `COLUMN_SCHEMA` is a Struct with fields:
+
+  ```markdown
+  | Field Name               | Field Type              | Comments |
+  |--------------------------|-------------------------|----------|
+  | column_name              | utf8 not null           |          |
+  | ordinal_position         | int32                   | (1)      |
+  | remarks                  | utf8                    | (2)      |
+  | xdbc_data_type           | int16                   | (3)      |
+  | xdbc_type_name           | utf8                    | (3)      |
+  | xdbc_column_size         | int32                   | (3)      |
+  | xdbc_decimal_digits      | int16                   | (3)      |
+  | xdbc_num_prec_radix      | int16                   | (3)      |
+  | xdbc_nullable            | int16                   | (3)      |
+  | xdbc_column_def          | utf8                    | (3)      |
+  | xdbc_sql_data_type       | int16                   | (3)      |
+  | xdbc_datetime_sub        | int16                   | (3)      |
+  | xdbc_char_octet_length   | int32                   | (3)      |
+  | xdbc_is_nullable         | utf8                    | (3)      |
+  | xdbc_scope_catalog       | utf8                    | (3)      |
+  | xdbc_scope_schema        | utf8                    | (3)      |
+  | xdbc_scope_table         | utf8                    | (3)      |
+  | xdbc_is_autoincrement    | bool                    | (3)      |
+  | xdbc_is_generatedcolumn  | bool                    | (3)      |
+  ```
+
+  1. The column's ordinal position in the table (starting from 1).
+  2. Database-specific description of the column.
+  3. Optional value.  Should be null if not supported by the driver.
+     xdbc_ values are meant to provide JDBC/ODBC-compatible metadata
+     in an agnostic manner.
+
+  `CONSTRAINT_SCHEMA` is a Struct with fields:
+
+  ```markdown
+  | Field Name               | Field Type              | Comments |
+  |--------------------------|-------------------------|----------|
+  | constraint_name          | utf8                    |          |
+  | constraint_type          | utf8 not null           | (1)      |
+  | constraint_column_names  | list<utf8> not null     | (2)      |
+  | constraint_column_usage  | list<USAGE_SCHEMA>      | (3)      |
+  ```
+
+  1. One of 'CHECK', 'FOREIGN KEY', 'PRIMARY KEY', or 'UNIQUE'.
+  2. The columns on the current table that are constrained, in
+     order.
+  3. For FOREIGN KEY only, the referenced table and columns.
+
+  `USAGE_SCHEMA` is a Struct with fields:
+
+  ```markdown
+  | Field Name               | Field Type              |
+  |--------------------------|-------------------------|
+  | fk_catalog               | utf8                    |
+  | fk_db_schema             | utf8                    |
+  | fk_table                 | utf8 not null           |
+  | fk_column_name           | utf8 not null           |
+  ```
+  """
+  def get_objects(self = %T{}, depth, opts \\ [])
+      when is_integer(depth) and depth >= 0 do
+    catalog = Helper.get_keyword!(opts, :catalog, :string, allow_nil: true)
+    db_schema = Helper.get_keyword!(opts, :db_schema, :string, allow_nil: true)
+    table_name = Helper.get_keyword!(opts, :table_name, :string, allow_nil: true)
+    table_type = Helper.get_keyword!(opts, :table_type, [:string], allow_nil: true)
+    column_name = Helper.get_keyword!(opts, :column_name, :string, allow_nil: true)
+
+    case Adbc.Nif.adbc_connection_get_objects(
+      self.reference,
+      depth,
+      catalog,
+      db_schema,
+      table_name,
+      table_type,
+      column_name
+    ) do
       {:ok, array_stream_ref} ->
         {:ok, %ArrayStream{reference: array_stream_ref}}
 

@@ -3,39 +3,62 @@
 ### SQLite Example
 
 ```elixir
-alias Adbc.Database
-alias Adbc.Connection
-alias Adbc.Statement
+iex> alias Adbc.Database
+Adbc.Database
+iex> alias Adbc.Connection
+Adbc.Connection
+iex> alias Adbc.Statement
+Adbc.Statement
 
 # new and init an SQLite database with filename as my_db.db
-{:ok, database} = Database.new()
-Database.set_option(database, "driver", "adbc_driver_sqlite")
-Database.set_option(database, "uri", "file:my_db.db")
-Database.init(database)
+iex> {:ok, database} = Database.new()
+{:ok, %Adbc.Database{reference: #Reference<0.1918355494.3778674689.52121>}}
+iex> Database.set_option(database, "driver", "adbc_driver_sqlite")
+:ok
+iex> Database.set_option(database, "uri", "file:my_db.db")
+:ok
+iex> Database.init(database)
+:ok
 
 # init the connection
-{:ok, connection} = Connection.new()
-:ok = Connection.init(connection, database)
+iex> {:ok, connection} = Connection.new()
+{:ok, %Adbc.Connection{reference: #Reference<0.1918355494.3778674689.52179>}}
+iex> :ok = Connection.init(connection, database)
+:ok
 
 # init statement with the connection
-{:ok, statement} = Statement.new(connection)
+iex> {:ok, statement} = Statement.new(connection)
+{:ok, %Adbc.Statement{reference: #Reference<0.1918355494.3778674689.52210>}}
 
 # execute query
 # this creates a table if not exists
-Statement.set_sql_query(statement, "CREATE TABLE foo (col) IF NOT EXISTS")
-Statement.prepare(statement)
-{:ok, _stream, _row_affected} = Statement.execute_query(statement)
+iex> Statement.set_sql_query(statement, "CREATE TABLE IF NOT EXISTS foo (col)")
+:ok
+iex> Statement.prepare(statement)
+:ok
+iex> {:ok, _stream, _row_affected} = Statement.execute_query(statement)
+{:ok,
+ %Adbc.ArrowArrayStream{reference: #Reference<0.1918355494.3778674689.52253>},
+ -1}
 
 # execute another query
 # this inserts a row with value 42 into the foo table
-Statement.set_sql_query(statement, "INSERT INTO foo VALUES (42)")
-Statement.prepare(statement)
-{:ok, _stream, _row_affected} = Statement.execute_query(statement)
+iex> Statement.set_sql_query(statement, "INSERT INTO foo VALUES (42)")
+:ok
+iex> Statement.prepare(statement)
+:ok
+iex> {:ok, _stream, _row_affected} = Statement.execute_query(statement)
+{:ok,
+ %Adbc.ArrowArrayStream{reference: #Reference<0.1918355494.3778674689.52300>},
+ -1}
 
 # release resources
-Statement.release(statement)
-Connection.release(connection)
-Database.release(database)
+iex> Statement.release(statement)
+:ok
+iex> Connection.release(connection)
+:ok
+iex> Database.release(database)
+:ok
 ```
 
 ## Installation

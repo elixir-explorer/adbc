@@ -115,19 +115,21 @@ defmodule Adbc.Helper do
           {"", "dll"}
       end
 
-    {otp_app, shared_library_name} =
+    otp_app =
       case driver do
         "sqlite" ->
-          {:adbc, "adbc_driver_sqlite"}
+          :adbc_driver_sqlite
         "postgresql" ->
-          {:adbc_driver_postgresql, "adbc_driver_postgresql"}
+          :adbc_driver_postgresql
         "flightsql" ->
-          {:adbc_driver_flightsql, "adbc_driver_flightsql"}
+          :adbc_driver_flightsql
+        "snowflake" ->
+          :adbc_driver_snowflake
       end
-    shared_driver_path(otp_app, prefix, shared_library_name, extension)
+    shared_driver_path(otp_app, prefix, extension)
   end
 
-  defp shared_driver_path(otp_app, prefix, shared_library_name, extension) do
-    "#{:code.priv_dir(otp_app)}/lib/#{prefix}#{shared_library_name}.#{extension}"
+  defp shared_driver_path(otp_app, prefix, extension) do
+    "#{:code.priv_dir(otp_app)}/lib/#{prefix}#{to_string(otp_app)}.#{extension}"
   end
 end

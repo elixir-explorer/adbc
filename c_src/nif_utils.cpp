@@ -201,6 +201,11 @@ int make(ErlNifEnv *env, int var, ERL_NIF_TERM &out) {
     return 0;
 }
 
+int make(ErlNifEnv *env, uint64_t var, ERL_NIF_TERM &out) {
+    out = make(env, var);
+    return 0;
+}
+
 int make(ErlNifEnv *env, double var, ERL_NIF_TERM &out) {
     out = make(env, var);
     return 0;

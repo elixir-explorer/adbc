@@ -54,7 +54,7 @@ defmodule Adbc.Statement do
 
   - `self`: `Adbc.Statement.t()`
 
-    The statement to release.
+    The statement to execute.
   """
   @doc group: :adbc_statement
   @spec execute_query(Adbc.Statement.t()) ::

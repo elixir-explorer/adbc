@@ -161,6 +161,7 @@ int make(ErlNifEnv *env, bool var, ERL_NIF_TERM &out);
 int make(ErlNifEnv *env, long var, ERL_NIF_TERM &out);
 int make(ErlNifEnv *env, int var, ERL_NIF_TERM &out);
 int make(ErlNifEnv *env, double var, ERL_NIF_TERM &out);
+int make(ErlNifEnv *env, uint64_t var, ERL_NIF_TERM &out);
 int make(ErlNifEnv *env, ErlNifBinary var, ERL_NIF_TERM &out);
 int make(ErlNifEnv *env, const std::string& var, ERL_NIF_TERM &out);
 int make(ErlNifEnv *env, const char *string, ERL_NIF_TERM &out);

@@ -9,11 +9,21 @@ defmodule Adbc.Helper do
     if allow_nil? and val == nil do
       val
     else
-      case get_keyword(key, val, type) do
-        {:ok, val} ->
+      case {get_keyword(key, val, type), is_list(must_in)} do
+        {{:ok, val}, true} ->
+          if Enum.member?(must_in, val) do
+            val
+          else
+            raise ArgumentError, """
+            expect keyword parameter `#{inspect(key)}` to be one of the following values,
+            #{inspect(must_in)}
+            """
+          end
+
+        {{:ok, val}, false} ->
           val
 
-        {:error, reason} ->
+        {{:error, reason}, _} ->
           raise ArgumentError, reason
       end
     end
@@ -94,42 +104,30 @@ defmodule Adbc.Helper do
     end
   end
 
-  def list_of_binary(data) when is_list(data) do
-    count = Enum.count(data)
-
-    if count > 0 do
-      first = Enum.at(data, 0)
-
-      if is_binary(first) do
-        expected_size = byte_size(first)
-
-        if rem(expected_size, HNSWLib.Nif.float_size()) != 0 do
-          raise ArgumentError,
-                "vector feature size should be a multiple of #{HNSWLib.Nif.float_size()} (sizeof(float))"
-        else
-          features = trunc(expected_size / HNSWLib.Nif.float_size())
-
-          if list_of_binary(data, expected_size) == false do
-            raise ArgumentError, "all vectors in the input list should have the same size"
-          else
-            {count, features}
-          end
-        end
+  def shared_driver_path(driver) do
+    {prefix, extension} =
+        case :os.type() do
+        {:unix, :darwin} ->
+          {"lib", "dylib"}
+        {:unix, _} ->
+          {"lib", "so"}
+        {:win32, _} ->
+          {"", "dll"}
       end
-    else
-      {0, 0}
-    end
+
+    {otp_app, shared_library_name} =
+      case driver do
+        "sqlite" ->
+          {:adbc, "adbc_driver_sqlite"}
+        "postgresql" ->
+          {:adbc_driver_postgresql, "adbc_driver_postgresql"}
+        "flightsql" ->
+          {:adbc_driver_flightsql, "adbc_driver_flightsql"}
+      end
+    shared_driver_path(otp_app, prefix, shared_library_name, extension)
   end
 
-  defp list_of_binary([elem | rest], expected_size) when is_binary(elem) do
-    if byte_size(elem) == expected_size do
-      list_of_binary(rest, expected_size)
-    else
-      false
-    end
-  end
-
-  defp list_of_binary([], expected_size) do
-    expected_size
+  defp shared_driver_path(otp_app, prefix, shared_library_name, extension) do
+    "#{:code.priv_dir(otp_app)}/lib/#{prefix}#{shared_library_name}.#{extension}"
   end
 end

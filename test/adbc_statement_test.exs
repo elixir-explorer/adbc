@@ -9,6 +9,7 @@ defmodule Adbc.Statement.Test do
   test "new statement and release it" do
     {:ok, %Database{} = database} = Database.new()
     assert is_reference(database.reference)
+    :ok = Database.set_option(database, "driver", "adbc_driver_sqlite")
 
     assert :ok == Database.init(database)
 
@@ -28,6 +29,7 @@ defmodule Adbc.Statement.Test do
   test "release a statement twice should raise an ArgumentError" do
     {:ok, %Database{} = database} = Database.new()
     assert is_reference(database.reference)
+    :ok = Database.set_option(database, "driver", "adbc_driver_sqlite")
 
     assert :ok == Database.init(database)
 

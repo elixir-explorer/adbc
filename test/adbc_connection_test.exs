@@ -10,6 +10,7 @@ defmodule Adbc.Connection.Test do
   test "allocate a connection, init it and then release it" do
     {:ok, %Database{} = database} = Database.new()
     assert is_reference(database.reference)
+    :ok = Database.set_option(database, "driver", "adbc_driver_sqlite")
 
     assert :ok == Database.init(database)
 
@@ -25,6 +26,7 @@ defmodule Adbc.Connection.Test do
   test "release a connection twice should raise an ArgumentError" do
     {:ok, %Database{} = database} = Database.new()
     assert is_reference(database.reference)
+    :ok = Database.set_option(database, "driver", "adbc_driver_sqlite")
 
     assert :ok == Database.init(database)
 
@@ -45,6 +47,7 @@ defmodule Adbc.Connection.Test do
     test "get all info from a connection" do
       {:ok, %Database{} = database} = Database.new()
       assert is_reference(database.reference)
+      :ok = Database.set_option(database, "driver", "adbc_driver_sqlite")
 
       assert :ok == Database.init(database)
 
@@ -62,6 +65,7 @@ defmodule Adbc.Connection.Test do
     test "get all objects from a connection" do
       {:ok, %Database{} = database} = Database.new()
       assert is_reference(database.reference)
+      :ok = Database.set_option(database, "driver", "adbc_driver_sqlite")
 
       assert :ok == Database.init(database)
 
@@ -96,6 +100,7 @@ defmodule Adbc.Connection.Test do
     test "get table types from a connection" do
       {:ok, %Database{} = database} = Database.new()
       assert is_reference(database.reference)
+      :ok = Database.set_option(database, "driver", "adbc_driver_sqlite")
 
       assert :ok == Database.init(database)
 

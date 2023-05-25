@@ -37,7 +37,6 @@ endif()
 
 message(STATUS "CMAKE_TOOLCHAIN_FILE: ${CMAKE_TOOLCHAIN_FILE}")
 
-find_package(AdbcDriverSQLite REQUIRED PATHS "${PRIV_DIR}/" NO_DEFAULT_PATH)
 find_package(AdbcDriverManager REQUIRED PATHS "${PRIV_DIR}/" NO_DEFAULT_PATH)
 include_directories("${PRIV_DIR}/include")
 
@@ -55,7 +54,7 @@ include_directories("${ADBC_SRC}")
 add_library(adbc_nif SHARED
     ${SOURCE_FILES}
 )
-target_link_libraries(adbc_nif PUBLIC AdbcDriverSQLite::adbc_driver_sqlite_shared AdbcDriverManager::adbc_driver_manager_shared)
+target_link_libraries(adbc_nif PUBLIC AdbcDriverManager::adbc_driver_manager_shared)
 install(
     TARGETS adbc_nif
     RUNTIME DESTINATION "${PRIV_DIR}"

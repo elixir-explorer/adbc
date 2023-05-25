@@ -44,6 +44,7 @@ static ERL_NIF_TERM adbc_database_new(ErlNifEnv *env, int argc, const ERL_NIF_TE
     }
     memset(database->val, 0, sizeof(res_type::val_type));
     struct AdbcError adbc_error;
+    memset(&adbc_error, 0, sizeof(adbc_error));
     AdbcStatusCode code = AdbcDatabaseNew(database->val, &adbc_error);
     if (code != ADBC_STATUS_OK) {
         enif_free(database->val);
@@ -78,6 +79,7 @@ static ERL_NIF_TERM adbc_database_set_option(ErlNifEnv *env, int argc, const ERL
     }
 
     struct AdbcError adbc_error;
+    memset(&adbc_error, 0, sizeof(adbc_error));
     AdbcStatusCode code = AdbcDatabaseSetOption(database->val, key.c_str(), value.c_str(), &adbc_error);
     if (code != ADBC_STATUS_OK) {
         ret = nif_error_from_adbc_error(env, &adbc_error);
@@ -100,6 +102,7 @@ static ERL_NIF_TERM adbc_database_init(ErlNifEnv *env, int argc, const ERL_NIF_T
     }
 
     struct AdbcError adbc_error;
+    memset(&adbc_error, 0, sizeof(adbc_error));
     AdbcStatusCode code = AdbcDatabaseInit(database->val, &adbc_error);
     if (code != ADBC_STATUS_OK) {
         ret = nif_error_from_adbc_error(env, &adbc_error);
@@ -126,6 +129,7 @@ static ERL_NIF_TERM adbc_database_release(ErlNifEnv *env, int argc, const ERL_NI
     }
 
     struct AdbcError adbc_error;
+    memset(&adbc_error, 0, sizeof(adbc_error));
     AdbcStatusCode code = AdbcDatabaseRelease(database->val, &adbc_error);
     if (code != ADBC_STATUS_OK) {
         ret = nif_error_from_adbc_error(env, &adbc_error);
@@ -156,6 +160,7 @@ static ERL_NIF_TERM adbc_connection_new(ErlNifEnv *env, int argc, const ERL_NIF_
     }
     memset(connection->val, 0, sizeof(res_type::val_type));
     struct AdbcError adbc_error;
+    memset(&adbc_error, 0, sizeof(adbc_error));
     AdbcStatusCode code = AdbcConnectionNew(connection->val, &adbc_error);
     if (code != ADBC_STATUS_OK) {
         enif_free(connection->val);
@@ -190,6 +195,7 @@ static ERL_NIF_TERM adbc_connection_set_option(ErlNifEnv *env, int argc, const E
     }
 
     struct AdbcError adbc_error;
+    memset(&adbc_error, 0, sizeof(adbc_error));
     AdbcStatusCode code = AdbcConnectionSetOption(connection->val, key.c_str(), value.c_str(), &adbc_error);
     if (code != ADBC_STATUS_OK) {
         ret = nif_error_from_adbc_error(env, &adbc_error);
@@ -217,6 +223,7 @@ static ERL_NIF_TERM adbc_connection_init(ErlNifEnv *env, int argc, const ERL_NIF
     }
 
     struct AdbcError adbc_error;
+    memset(&adbc_error, 0, sizeof(adbc_error));
     AdbcStatusCode code = AdbcConnectionInit(connection->val, db->val, &adbc_error);
     if (code != ADBC_STATUS_OK) {
         ret = nif_error_from_adbc_error(env, &adbc_error);
@@ -242,6 +249,7 @@ static ERL_NIF_TERM adbc_connection_release(ErlNifEnv *env, int argc, const ERL_
     }
 
     struct AdbcError adbc_error;
+    memset(&adbc_error, 0, sizeof(adbc_error));
     AdbcStatusCode code = AdbcConnectionRelease(connection->val, &adbc_error);
     if (code != ADBC_STATUS_OK) {
         ret = nif_error_from_adbc_error(env, &adbc_error);
@@ -291,6 +299,7 @@ static ERL_NIF_TERM adbc_connection_get_info(ErlNifEnv *env, int argc, const ERL
     memset(array_stream->val, 0, sizeof(array_stream_type::val_type));
 
     struct AdbcError adbc_error;
+    memset(&adbc_error, 0, sizeof(adbc_error));
     AdbcStatusCode code = AdbcConnectionGetInfo(connection->val, ptr, info_codes_length, array_stream->val, &adbc_error);
     if (code != ADBC_STATUS_OK) {
         ret = nif_error_from_adbc_error(env, &adbc_error);
@@ -400,6 +409,7 @@ static ERL_NIF_TERM adbc_connection_get_objects(ErlNifEnv *env, int argc, const 
     memset(array_stream->val, 0, sizeof(array_stream_type::val_type));
 
     struct AdbcError adbc_error;
+    memset(&adbc_error, 0, sizeof(adbc_error));
     AdbcStatusCode code = AdbcConnectionGetObjects(
         connection->val, 
         depth,
@@ -480,6 +490,7 @@ static ERL_NIF_TERM adbc_connection_get_table_schema(ErlNifEnv *env, int argc, c
     memset(schema->val, 0, sizeof(schema_type::val_type));
 
     struct AdbcError adbc_error;
+    memset(&adbc_error, 0, sizeof(adbc_error));
     AdbcStatusCode code = AdbcConnectionGetTableSchema(
         connection->val, 
         catalog_p,
@@ -527,6 +538,7 @@ static ERL_NIF_TERM adbc_connection_get_table_types(ErlNifEnv *env, int argc, co
     memset(array_stream->val, 0, sizeof(array_stream_type::val_type));
 
     struct AdbcError adbc_error;
+    memset(&adbc_error, 0, sizeof(adbc_error));
     AdbcStatusCode code = AdbcConnectionGetTableTypes(connection->val, array_stream->val, &adbc_error);
     if (code != ADBC_STATUS_OK) {
         ret = nif_error_from_adbc_error(env, &adbc_error);
@@ -581,6 +593,7 @@ static ERL_NIF_TERM adbc_connection_read_partition(ErlNifEnv *env, int argc, con
     memset(array_stream->val, 0, sizeof(array_stream_type::val_type));
 
     struct AdbcError adbc_error;
+    memset(&adbc_error, 0, sizeof(adbc_error));
     AdbcStatusCode code = AdbcConnectionReadPartition(
         connection->val,
         (const uint8_t *)serialized_partition.data,
@@ -616,6 +629,7 @@ static ERL_NIF_TERM adbc_connection_commit(ErlNifEnv *env, int argc, const ERL_N
     }
 
     struct AdbcError adbc_error;
+    memset(&adbc_error, 0, sizeof(adbc_error));
     AdbcStatusCode code = AdbcConnectionCommit(connection->val, &adbc_error);
     if (code != ADBC_STATUS_OK) {
         ret = nif_error_from_adbc_error(env, &adbc_error);
@@ -641,6 +655,7 @@ static ERL_NIF_TERM adbc_connection_rollback(ErlNifEnv *env, int argc, const ERL
     }
 
     struct AdbcError adbc_error;
+    memset(&adbc_error, 0, sizeof(adbc_error));
     AdbcStatusCode code = AdbcConnectionRollback(connection->val, &adbc_error);
     if (code != ADBC_STATUS_OK) {
         ret = nif_error_from_adbc_error(env, &adbc_error);
@@ -679,6 +694,7 @@ static ERL_NIF_TERM adbc_statement_new(ErlNifEnv *env, int argc, const ERL_NIF_T
     memset(statement->val, 0, sizeof(res_type::val_type));
 
     struct AdbcError adbc_error;
+    memset(&adbc_error, 0, sizeof(adbc_error));
     AdbcStatusCode code = AdbcStatementNew(connection->val, statement->val, &adbc_error);
     if (code != ADBC_STATUS_OK) {
         enif_free(statement->val);
@@ -709,6 +725,7 @@ static ERL_NIF_TERM adbc_statement_release(ErlNifEnv *env, int argc, const ERL_N
     }
 
     struct AdbcError adbc_error;
+    memset(&adbc_error, 0, sizeof(adbc_error));
     AdbcStatusCode code = AdbcStatementRelease(statement->val, &adbc_error);
     if (code != ADBC_STATUS_OK) {
         ret = nif_error_from_adbc_error(env, &adbc_error);
@@ -751,6 +768,7 @@ static ERL_NIF_TERM adbc_statement_execute_query(ErlNifEnv *env, int argc, const
 
     int64_t rows_affected = 0;
     struct AdbcError adbc_error;
+    memset(&adbc_error, 0, sizeof(adbc_error));
     AdbcStatusCode code = AdbcStatementExecuteQuery(statement->val, array_stream->val, &rows_affected, &adbc_error);
     if (code != ADBC_STATUS_OK) {
         ret = nif_error_from_adbc_error(env, &adbc_error);
@@ -785,6 +803,7 @@ static ERL_NIF_TERM adbc_statement_prepare(ErlNifEnv *env, int argc, const ERL_N
     }
 
     struct AdbcError adbc_error;
+    memset(&adbc_error, 0, sizeof(adbc_error));
     AdbcStatusCode code = AdbcStatementPrepare(statement->val, &adbc_error);
     if (code != ADBC_STATUS_OK) {
         ret = nif_error_from_adbc_error(env, &adbc_error);
@@ -815,6 +834,7 @@ static ERL_NIF_TERM adbc_statement_set_sql_query(ErlNifEnv *env, int argc, const
     }
 
     struct AdbcError adbc_error;
+    memset(&adbc_error, 0, sizeof(adbc_error));
     AdbcStatusCode code = AdbcStatementSetSqlQuery(statement->val, query.c_str(), &adbc_error);
     if (code != ADBC_STATUS_OK) {
         ret = nif_error_from_adbc_error(env, &adbc_error);
@@ -854,6 +874,7 @@ static ERL_NIF_TERM adbc_statement_set_substrait_plan(ErlNifEnv *env, int argc, 
     }
 
     struct AdbcError adbc_error;
+    memset(&adbc_error, 0, sizeof(adbc_error));
     AdbcStatusCode code = AdbcStatementSetSubstraitPlan(statement->val, (const uint8_t *)plan.data, length, &adbc_error);
     if (code != ADBC_STATUS_OK) {
         ret = nif_error_from_adbc_error(env, &adbc_error);
@@ -898,6 +919,7 @@ static ERL_NIF_TERM adbc_statement_bind(ErlNifEnv *env, int argc, const ERL_NIF_
     }
 
     struct AdbcError adbc_error;
+    memset(&adbc_error, 0, sizeof(adbc_error));
     AdbcStatusCode code = AdbcStatementBind(statement->val, values->val, schema->val, &adbc_error);
     if (code != ADBC_STATUS_OK) {
         ret = nif_error_from_adbc_error(env, &adbc_error);
@@ -933,6 +955,7 @@ static ERL_NIF_TERM adbc_statement_bind_stream(ErlNifEnv *env, int argc, const E
     }
 
     struct AdbcError adbc_error;
+    memset(&adbc_error, 0, sizeof(adbc_error));
     AdbcStatusCode code = AdbcStatementBindStream(statement->val, stream->val, &adbc_error);
     if (code != ADBC_STATUS_OK) {
         ret = nif_error_from_adbc_error(env, &adbc_error);
@@ -971,6 +994,7 @@ static ERL_NIF_TERM adbc_statement_get_parameter_schema(ErlNifEnv *env, int argc
     memset(schema->val, 0, sizeof(schema_type::val_type));
 
     struct AdbcError adbc_error;
+    memset(&adbc_error, 0, sizeof(adbc_error));
     AdbcStatusCode code = AdbcStatementGetParameterSchema(statement->val, schema->val, &adbc_error);
     if (code != ADBC_STATUS_OK) {
         ret = nif_error_from_adbc_error(env, &adbc_error);

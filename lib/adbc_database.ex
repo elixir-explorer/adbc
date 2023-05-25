@@ -13,6 +13,7 @@ defmodule Adbc.Database do
           reference: reference()
         }
   defstruct [:reference]
+  alias Adbc.Helper
   alias __MODULE__, as: T
 
   @doc """
@@ -38,6 +39,17 @@ defmodule Adbc.Database do
   """
   @doc group: :adbc_database
   @spec set_option(Adbc.Database.t(), String.t(), String.t()) :: :ok | Adbc.Error.adbc_error()
+  def set_option(self = %T{}, "driver", value) when is_binary(value) do
+    value =
+      case value do
+        "adbc_driver_" <> driver ->
+          Helper.shared_driver_path(driver)
+        other ->
+          other
+      end
+    Adbc.Nif.adbc_database_set_option(self.reference, "driver", value)
+  end
+
   def set_option(self = %T{}, key, value)
       when is_binary(key) and is_binary(value) do
     Adbc.Nif.adbc_database_set_option(self.reference, key, value)

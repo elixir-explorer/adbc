@@ -3,7 +3,6 @@ defmodule Adbc.Connection.Test do
   doctest Adbc.Connection
 
   alias Adbc.ArrowArrayStream
-  alias Adbc.ArrowSchema
   alias Adbc.Connection
   alias Adbc.Database
 

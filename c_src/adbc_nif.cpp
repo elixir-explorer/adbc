@@ -945,6 +945,48 @@ static ERL_NIF_TERM adbc_statement_bind_stream(ErlNifEnv *env, int argc, const E
     return erlang::nif::ok(env);
 }
 
+static ERL_NIF_TERM adbc_statement_get_parameter_schema(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
+    using res_type = NifRes<struct AdbcStatement>;
+    using schema_type = NifRes<struct ArrowSchema>;
+
+    ERL_NIF_TERM ret, error;
+
+    res_type * statement = nullptr;
+    if ((statement = res_type::get_resource(env, argv[0], error)) == nullptr) {
+        return error;
+    }
+    if (statement->val == nullptr) {
+        return enif_make_badarg(env);
+    }
+    
+    schema_type * schema = nullptr;
+    if ((schema = schema_type::allocate_resource(env, error)) == nullptr) {
+        return error;
+    }
+    schema->val = (schema_type::val_type_p)enif_alloc(sizeof(schema_type::val_type));
+    if (schema->val == nullptr) {
+        enif_release_resource(schema);
+        return erlang::nif::error(env, "out of memory");
+    }
+    memset(schema->val, 0, sizeof(schema_type::val_type));
+
+    struct AdbcError adbc_error;
+    AdbcStatusCode code = AdbcStatementGetParameterSchema(statement->val, schema->val, &adbc_error);
+    if (code != ADBC_STATUS_OK) {
+        ret = nif_error_from_adbc_error(env, &adbc_error);
+        enif_free(schema->val);
+        enif_release_resource(schema);
+        if (adbc_error.release != nullptr) {
+            adbc_error.release(&adbc_error);
+        }
+        return ret;
+    }
+
+    ret = enif_make_resource(env, schema);
+    enif_release_resource(schema);
+    return erlang::nif::ok(env, ret);
+}
+
 static int on_load(ErlNifEnv *env, void **, ERL_NIF_TERM) {
     ErlNifResourceType *rt;
 
@@ -1027,6 +1069,7 @@ static ErlNifFunc nif_functions[] = {
     {"adbc_statement_set_substrait_plan", 3, adbc_statement_set_substrait_plan, 0},
     {"adbc_statement_bind", 3, adbc_statement_bind, 0},
     {"adbc_statement_bind_stream", 2, adbc_statement_bind_stream, 0},
+    {"adbc_statement_get_parameter_schema", 1, adbc_statement_get_parameter_schema, 0}
 };
 
 ERL_NIF_INIT(Elixir.Adbc.Nif, nif_functions, on_load, on_reload, on_upgrade, NULL);

@@ -200,6 +200,34 @@ defmodule Adbc.Statement do
   @spec bind_stream(Adbc.Statement.t(), Adbc.ArrowArrayStream.t()) ::
           :ok | Adbc.Error.adbc_error()
   def bind_stream(self = %T{}, stream = %ArrowArrayStream{}) do
-    Adbc.Nif.adbc_statement_bind(self.reference, stream.reference)
+    Adbc.Nif.adbc_statement_bind_stream(self.reference, stream.reference)
+  end
+
+  @doc """
+  Get the schema for bound parameters.
+
+  This retrieves an Arrow schema describing the number, names, and
+  types of the parameters in a parameterized statement.  The fields
+  of the schema should be in order of the ordinal position of the
+  parameters; named parameters should appear only once.
+
+  If the parameter does not have a name, or the name cannot be
+  determined, the name of the corresponding field in the schema will
+  be an empty string.  If the type cannot be determined, the type of
+  the corresponding field will be NA (NullType).
+
+  This should be called after `Adbc.Statement.prepare/1`.
+  """
+  @doc group: :adbc_statement
+  @spec get_parameter_schema(Adbc.Statement.t()) ::
+          {:ok, %ArrowSchema{}} | Adbc.Error.adbc_error()
+  def get_parameter_schema(self = %T{}) do
+    case Adbc.Nif.adbc_statement_get_parameter_schema(self.reference) do
+      {:ok, schema_ref} ->
+        {:ok, %ArrowSchema{reference: schema_ref}}
+
+      {:error, {reason, code, sql_state}} ->
+        {:error, {reason, code, sql_state}}
+    end
   end
 end

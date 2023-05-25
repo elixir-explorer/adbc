@@ -118,7 +118,7 @@ defmodule Adbc.Helper do
     otp_app =
       case driver do
         "sqlite" ->
-          :adbc_driver_sqlite
+          :adbc
         "postgresql" ->
           :adbc_driver_postgresql
         "flightsql" ->
@@ -129,7 +129,7 @@ defmodule Adbc.Helper do
     shared_driver_path(otp_app, prefix, extension)
   end
 
-  defp shared_driver_path(otp_app, prefix, extension) do
-    "#{:code.priv_dir(otp_app)}/lib/#{prefix}#{to_string(otp_app)}.#{extension}"
+  defp shared_driver_path(:adbc, prefix, extension) do
+    "#{:code.priv_dir(:adbc)}/lib/#{prefix}adbc_driver_sqlite.#{extension}"
   end
 end

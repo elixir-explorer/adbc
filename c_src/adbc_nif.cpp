@@ -754,6 +754,25 @@ static ERL_NIF_TERM adbc_error_new(ErlNifEnv *env, int argc, const ERL_NIF_TERM 
         enif_make_uint64(env, (uint64_t)(uint64_t *)res->val)
     );
 }
+static ERL_NIF_TERM adbc_error_to_term(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
+    using res_type = NifRes<struct AdbcError>;
+    ERL_NIF_TERM ret, error;
+
+    res_type * res = nullptr;
+    if ((res = res_type::get_resource(env, argv[0], error)) == nullptr) {
+        return error;
+    }
+    if (res->val == nullptr) {
+        return enif_make_badarg(env);
+    }
+
+    if (res->val->message == nullptr) {
+        return erlang::nif::error(env, "error hasn't been set");
+    }
+
+    ret = nif_error_from_adbc_error(env, res->val);
+    return erlang::nif::ok(env, ret);
+}
 
 static ERL_NIF_TERM adbc_statement_new(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
     using res_type = NifRes<struct AdbcStatement>;
@@ -1231,6 +1250,7 @@ static ErlNifFunc nif_functions[] = {
     {"adbc_arrow_array_stream_get_pointer", 1, adbc_arrow_array_stream_get_pointer, 0},
 
     {"adbc_error_new", 0, adbc_error_new, 0},
+    {"adbc_error_to_term", 1, adbc_error_to_term, 0},
 
     {"adbc_get_all_function_pointers", 0, adbc_get_all_function_pointers, 0}
 };

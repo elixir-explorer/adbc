@@ -38,4 +38,8 @@ defmodule Adbc.Error do
         {:error, reason}
     end
   end
+
+  def to_term(self = %T{}) do
+    Adbc.Nif.adbc_error_to_term(self.reference)
+  end
 end

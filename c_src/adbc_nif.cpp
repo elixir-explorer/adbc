@@ -759,20 +759,26 @@ static ERL_NIF_TERM adbc_arrow_array_stream_new(ErlNifEnv *env, int argc, const 
     );
 }
 
-// static ERL_NIF_TERM adbc_arrow_array_stream_get_pointer(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
-//     using res_type = NifRes<struct ArrowArrayStream>;
-//     ERL_NIF_TERM error;
+static ERL_NIF_TERM adbc_arrow_array_stream_reset(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
+    using res_type = NifRes<struct ArrowArraySteam>;
+    ERL_NIF_TERM ret, error;
 
-//     res_type * res = nullptr;
-//     if ((res = res_type::get_resource(env, argv[0], error)) == nullptr) {
-//         return error;
-//     }
-//     if (res->val == nullptr) {
-//         return enif_make_badarg(env);
-//     }
+    res_type * res = nullptr;
+    if ((res = res_type::get_resource(env, argv[0], error)) == nullptr) {
+        return error;
+    }
+    if (res->val == nullptr) {
+        return enif_make_badarg(env);
+    }
 
-//     return enif_make_uint64(env, (uint64_t)(uint64_t *)res->val);
-// }
+    if (res->val->release) {
+        res->val->release(res->val);
+    }
+
+    memset(res->val, 0, sizeof(res_type::val_type));
+
+    return erlang::nif::ok(env);
+}
 
 static ERL_NIF_TERM adbc_error_new(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
     using res_type = NifRes<struct AdbcError>;
@@ -799,6 +805,28 @@ static ERL_NIF_TERM adbc_error_new(ErlNifEnv *env, int argc, const ERL_NIF_TERM 
         enif_make_uint64(env, (uint64_t)(uint64_t *)res->val)
     );
 }
+
+static ERL_NIF_TERM adbc_error_reset(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
+    using res_type = NifRes<struct AdbcError>;
+    ERL_NIF_TERM ret, error;
+
+    res_type * res = nullptr;
+    if ((res = res_type::get_resource(env, argv[0], error)) == nullptr) {
+        return error;
+    }
+    if (res->val == nullptr) {
+        return enif_make_badarg(env);
+    }
+
+    if (res->val->release) {
+        res->val->release(res->val);
+    }
+
+    memset(res->val, 0, sizeof(res_type::val_type));
+
+    return erlang::nif::ok(env);
+}
+
 static ERL_NIF_TERM adbc_error_to_term(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
     using res_type = NifRes<struct AdbcError>;
     ERL_NIF_TERM ret, error;
@@ -1293,9 +1321,10 @@ static ErlNifFunc nif_functions[] = {
     {"adbc_arrow_schema_get_pointer", 1, adbc_arrow_schema_get_pointer, 0},
     {"adbc_arrow_array_get_pointer", 1, adbc_arrow_array_get_pointer, 0},
     {"adbc_arrow_array_stream_new", 0, adbc_arrow_array_stream_new, 0},
-    // {"adbc_arrow_array_stream_get_pointer", 1, adbc_arrow_array_stream_get_pointer, 0},
+    {"adbc_arrow_array_stream_reset", 1, adbc_arrow_array_stream_reset, 0},
 
     {"adbc_error_new", 0, adbc_error_new, 0},
+    {"adbc_error_reset", 1, adbc_error_reset, 0},
     {"adbc_error_to_term", 1, adbc_error_to_term, 0},
 
     {"adbc_get_all_function_pointers", 0, adbc_get_all_function_pointers, 0}

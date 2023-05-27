@@ -80,6 +80,7 @@ defmodule Adbc.Nif do
   def adbc_arrow_array_stream_new(), do: :erlang.nif_error(:not_loaded)
 
   def adbc_error_new(), do: :erlang.nif_error(:not_loaded)
+  def adbc_error_reset(_error), do: :erlang.nif_error(:not_loaded)
   def adbc_error_to_term(_error), do: :erlang.nif_error(:not_loaded)
 
   def adbc_get_all_function_pointers(), do: :erlang.nif_error(:not_loaded)

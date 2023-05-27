@@ -23,20 +23,41 @@ defmodule Adbc.Error do
              vendor_code :: integer(),
              sqlstate :: <<_::40>>
            }}
+  @type t :: %__MODULE__{
+    reference: reference(),
+    pointer: non_neg_integer()
+  }
   defstruct [:reference, :pointer]
   alias __MODULE__, as: T
 
+  @doc """
+  Create a new zero'ed struct AdbcError
+  """
+  @spec new :: {:ok, Adbc.Error.t()} | {:error, String.t()}
   def new do
     case Adbc.Nif.adbc_error_new() do
       {:ok, ref, ptr} ->
-        %T{
+        {:ok, %T{
           reference: ref,
           pointer: ptr
-        }
+        }}
 
       {:error, reason} ->
         {:error, reason}
     end
+  end
+
+  @doc """
+  Reset the underlying C struct AdbcError to all zero
+  so that it can be reused
+
+  If the underlying C struct AdbcError has been set to
+  store a previous error, AdbcError::release() will be
+  called automatically before memset'ing it to zeros.
+  """
+  @spec reset(Adbc.Error.t()) :: :ok | {:error, String.t()}
+  def reset(self = %T{}) do
+    Adbc.Nif.adbc_error_reset(self.reference)
   end
 
   def to_term(self = %T{}) do

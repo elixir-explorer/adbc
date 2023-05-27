@@ -32,15 +32,33 @@ struct NifRes {
         return self_res;
     }
 
-    static void destruct_resource(ErlNifEnv *env, void *args) {
-        auto res = (res_type *)args;
-        if (res) {
-            if (res->val) {
-                enif_free(res->val);
-                res->val = nullptr;
-            }
+    static void destruct_resource(ErlNifEnv *env, void *args);
+};
+
+template <typename T>
+void NifRes<T>::destruct_resource(ErlNifEnv *env, void *args) {
+    auto res = (NifRes<T> *)args;
+    if (res) {
+        if (res->val) {
+            enif_free(res->val);
+            res->val = nullptr;
         }
     }
-};
+}
+
+template <>
+void NifRes<struct AdbcError>::destruct_resource(ErlNifEnv *env, void *args) {
+    auto res = (NifRes<struct AdbcError> *)args;
+    if (res) {
+        if (res->val) {
+            auto adbc_error = (struct AdbcError *)res->val;
+            if (adbc_error->release) {
+                adbc_error->release(adbc_error);
+            }
+            enif_free(res->val);
+            res->val = nullptr;
+        }
+    }
+}
 
 #endif  /* ADBC_NIF_RESOURCE_HPP */

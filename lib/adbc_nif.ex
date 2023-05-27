@@ -53,6 +53,8 @@ defmodule Adbc.Nif do
 
   def adbc_connection_rollback(_self), do: :erlang.nif_error(:not_loaded)
 
+  def adbc_statement_get_pointer(_statement), do: :erlang.nif_error(:not_loaded)
+
   def adbc_statement_new(_connection), do: :erlang.nif_error(:not_loaded)
 
   def adbc_statement_release(_statement), do: :erlang.nif_error(:not_loaded)
@@ -71,6 +73,10 @@ defmodule Adbc.Nif do
   def adbc_statement_bind_stream(_statement, _stream), do: :erlang.nif_error(:not_loaded)
 
   def adbc_statement_get_parameter_schema(_statement), do: :erlang.nif_error(:not_loaded)
+
+  def adbc_arrow_schema_get_pointer(_arrow_schema), do: :erlang.nif_error(:not_loaded)
+  def adbc_arrow_array_get_pointer(_arrow_array), do: :erlang.nif_error(:not_loaded)
+  def adbc_arrow_array_stream_get_pointer(_arrow_array_stream), do: :erlang.nif_error(:not_loaded)
 
   def adbc_get_all_function_pointers(), do: :erlang.nif_error(:not_loaded)
 end

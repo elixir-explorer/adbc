@@ -13,4 +13,10 @@ defmodule Adbc.ArrowSchema do
           reference: reference()
         }
   defstruct [:reference]
+  alias __MODULE__, as: T
+
+  @spec get_pointer(Adbc.ArrowSchema.t()) :: binary()
+  def get_pointer(self = %T{}) do
+    Adbc.Nif.adbc_arrow_schema_get_pointer(self.reference)
+  end
 end

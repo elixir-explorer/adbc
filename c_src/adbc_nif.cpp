@@ -668,6 +668,66 @@ static ERL_NIF_TERM adbc_connection_rollback(ErlNifEnv *env, int argc, const ERL
     return erlang::nif::ok(env);
 }
 
+static ERL_NIF_TERM adbc_statement_get_pointer(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
+    using res_type = NifRes<struct AdbcStatement>;
+    ERL_NIF_TERM error;
+
+    res_type * res = nullptr;
+    if ((res = res_type::get_resource(env, argv[0], error)) == nullptr) {
+        return error;
+    }
+    if (res->val == nullptr) {
+        return enif_make_badarg(env);
+    }
+
+    return enif_make_uint64(env, (uint64_t)(uint64_t *)res->val);
+}
+
+static ERL_NIF_TERM adbc_arrow_schema_get_pointer(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
+    using res_type = NifRes<struct ArrowSchema>;
+    ERL_NIF_TERM error;
+
+    res_type * res = nullptr;
+    if ((res = res_type::get_resource(env, argv[0], error)) == nullptr) {
+        return error;
+    }
+    if (res->val == nullptr) {
+        return enif_make_badarg(env);
+    }
+
+    return enif_make_uint64(env, (uint64_t)(uint64_t *)res->val);
+}
+
+static ERL_NIF_TERM adbc_arrow_array_get_pointer(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
+    using res_type = NifRes<struct ArrowArray>;
+    ERL_NIF_TERM error;
+
+    res_type * res = nullptr;
+    if ((res = res_type::get_resource(env, argv[0], error)) == nullptr) {
+        return error;
+    }
+    if (res->val == nullptr) {
+        return enif_make_badarg(env);
+    }
+
+    return enif_make_uint64(env, (uint64_t)(uint64_t *)res->val);
+}
+
+static ERL_NIF_TERM adbc_arrow_array_stream_get_pointer(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
+    using res_type = NifRes<struct ArrowArrayStream>;
+    ERL_NIF_TERM error;
+
+    res_type * res = nullptr;
+    if ((res = res_type::get_resource(env, argv[0], error)) == nullptr) {
+        return error;
+    }
+    if (res->val == nullptr) {
+        return enif_make_badarg(env);
+    }
+
+    return enif_make_uint64(env, (uint64_t)(uint64_t *)res->val);
+}
+
 static ERL_NIF_TERM adbc_statement_new(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
     using res_type = NifRes<struct AdbcStatement>;
     using connection_type = NifRes<struct AdbcConnection>;
@@ -1121,6 +1181,7 @@ static ErlNifFunc nif_functions[] = {
     {"adbc_connection_commit", 1, adbc_connection_commit, 0},
     {"adbc_connection_rollback", 1, adbc_connection_rollback, 0},
 
+    {"adbc_statement_get_pointer", 1, adbc_statement_get_pointer, 0},
     {"adbc_statement_new", 1, adbc_statement_new, 0},
     {"adbc_statement_release", 1, adbc_statement_release, 0},
     {"adbc_statement_execute_query", 1, adbc_statement_execute_query, 0},
@@ -1130,6 +1191,10 @@ static ErlNifFunc nif_functions[] = {
     {"adbc_statement_bind", 3, adbc_statement_bind, 0},
     {"adbc_statement_bind_stream", 2, adbc_statement_bind_stream, 0},
     {"adbc_statement_get_parameter_schema", 1, adbc_statement_get_parameter_schema, 0},
+
+    {"adbc_arrow_schema_get_pointer", 1, adbc_arrow_schema_get_pointer, 0},
+    {"adbc_arrow_array_get_pointer", 1, adbc_arrow_array_get_pointer, 0},
+    {"adbc_arrow_array_stream_get_pointer", 1, adbc_arrow_array_stream_get_pointer, 0},
 
     {"adbc_get_all_function_pointers", 0, adbc_get_all_function_pointers, 0}
 };

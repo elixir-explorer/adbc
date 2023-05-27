@@ -13,4 +13,10 @@ defmodule Adbc.ArrowArray do
           reference: reference()
         }
   defstruct [:reference]
+  alias __MODULE__, as: T
+
+  @spec get_pointer(Adbc.ArrowArray.t()) :: binary()
+  def get_pointer(self = %T{}) do
+    Adbc.Nif.adbc_arrow_array_get_pointer(self.reference)
+  end
 end

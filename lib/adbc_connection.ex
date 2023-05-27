@@ -115,10 +115,11 @@ defmodule Adbc.Connection do
   def get_info(self = %T{}, info_codes \\ []) when is_list(info_codes) do
     case Adbc.Nif.adbc_connection_get_info(self.reference, info_codes) do
       {:ok, ref, ptr} ->
-        {:ok, %ArrowArrayStream{
-          reference: ref,
-          pointer: ptr
-        }}
+        {:ok,
+         %ArrowArrayStream{
+           reference: ref,
+           pointer: ptr
+         }}
 
       {:error, {reason, code, sql_state}} ->
         {:error, {reason, code, sql_state}}
@@ -242,10 +243,11 @@ defmodule Adbc.Connection do
            column_name
          ) do
       {:ok, ref, ptr} ->
-        {:ok, %ArrowArrayStream{
-          reference: ref,
-          pointer: ptr
-        }}
+        {:ok,
+         %ArrowArrayStream{
+           reference: ref,
+           pointer: ptr
+         }}
 
       {:error, {reason, code, sql_state}} ->
         {:error, {reason, code, sql_state}}
@@ -312,10 +314,11 @@ defmodule Adbc.Connection do
   def get_table_types(self = %T{}) do
     case Adbc.Nif.adbc_connection_get_table_types(self.reference) do
       {:ok, ref, ptr} ->
-        {:ok, %ArrowArrayStream{
-          reference: ref,
-          pointer: ptr
-        }}
+        {:ok,
+         %ArrowArrayStream{
+           reference: ref,
+           pointer: ptr
+         }}
 
       {:error, {reason, code, sql_state}} ->
         {:error, {reason, code, sql_state}}
@@ -367,10 +370,11 @@ defmodule Adbc.Connection do
            serialized_length
          ) do
       {:ok, ref, ptr} ->
-        {:ok, %ArrowArrayStream{
-          reference: ref,
-          pointer: ptr
-        }}
+        {:ok,
+         %ArrowArrayStream{
+           reference: ref,
+           pointer: ptr
+         }}
 
       {:error, {reason, code, sql_state}} ->
         {:error, {reason, code, sql_state}}

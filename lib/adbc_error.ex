@@ -24,9 +24,9 @@ defmodule Adbc.Error do
              sqlstate :: <<_::40>>
            }}
   @type t :: %__MODULE__{
-    reference: reference(),
-    pointer: non_neg_integer()
-  }
+          reference: reference(),
+          pointer: non_neg_integer()
+        }
   defstruct [:reference, :pointer]
   alias __MODULE__, as: T
 
@@ -37,10 +37,11 @@ defmodule Adbc.Error do
   def new do
     case Adbc.Nif.adbc_error_new() do
       {:ok, ref, ptr} ->
-        {:ok, %T{
-          reference: ref,
-          pointer: ptr
-        }}
+        {:ok,
+         %T{
+           reference: ref,
+           pointer: ptr
+         }}
 
       {:error, reason} ->
         {:error, reason}

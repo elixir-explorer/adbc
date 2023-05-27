@@ -12,10 +12,10 @@ defmodule Adbc.ArrowArrayStream do
   @type t :: %__MODULE__{
           reference: reference()
         }
-  defstruct [:reference]
+  defstruct [:reference, :pointer]
   alias __MODULE__, as: T
 
-  @spec get_pointer(Adbc.ArrowArrayStream.t()) :: binary()
+  @spec get_pointer(Adbc.ArrowArrayStream.t()) :: non_neg_integer()
   def get_pointer(self = %T{}) do
     Adbc.Nif.adbc_arrow_array_stream_get_pointer(self.reference)
   end

@@ -61,4 +61,19 @@ void NifRes<struct AdbcError>::destruct_resource(ErlNifEnv *env, void *args) {
     }
 }
 
+template <>
+void NifRes<struct ArrowArrayStream>::destruct_resource(ErlNifEnv *env, void *args) {
+    auto res = (NifRes<struct ArrowArrayStream> *)args;
+    if (res) {
+        if (res->val) {
+            auto adbc_error = (struct ArrowArrayStream *)res->val;
+            if (adbc_error->release) {
+                adbc_error->release(adbc_error);
+            }
+            enif_free(res->val);
+            res->val = nullptr;
+        }
+    }
+}
+
 #endif  /* ADBC_NIF_RESOURCE_HPP */

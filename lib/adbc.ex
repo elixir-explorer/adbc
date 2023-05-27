@@ -9,6 +9,7 @@ defmodule Adbc do
   @spec get_function_pointer(String.t() | nil) :: map() | non_neg_integer()
   def get_function_pointer(func_name \\ nil) do
     ptr = Adbc.Nif.adbc_get_all_function_pointers()
+
     if func_name != nil do
       ptr[func_name]
     else

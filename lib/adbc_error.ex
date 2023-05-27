@@ -23,4 +23,19 @@ defmodule Adbc.Error do
              vendor_code :: integer(),
              sqlstate :: <<_::40>>
            }}
+  defstruct [:reference, :pointer]
+  alias __MODULE__, as: T
+
+  def new do
+    case Adbc.Nif.adbc_error_new() do
+      {:ok, ref, ptr} ->
+        %T{
+          reference: ref,
+          pointer: ptr
+        }
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
 end

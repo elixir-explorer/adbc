@@ -44,9 +44,11 @@ defmodule Adbc.Database do
       case value do
         "adbc_driver_" <> driver ->
           Helper.shared_driver_path(driver)
+
         other ->
           other
       end
+
     Adbc.Nif.adbc_database_set_option(self.reference, "driver", value)
   end
 

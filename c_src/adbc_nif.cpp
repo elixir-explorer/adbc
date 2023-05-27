@@ -16,6 +16,7 @@
 template<> ErlNifResourceType * NifRes<struct AdbcDatabase>::type = nullptr;
 template<> ErlNifResourceType * NifRes<struct AdbcConnection>::type = nullptr;
 template<> ErlNifResourceType * NifRes<struct AdbcStatement>::type = nullptr;
+template<> ErlNifResourceType * NifRes<struct AdbcError>::type = nullptr;
 template<> ErlNifResourceType * NifRes<struct ArrowArrayStream>::type = nullptr;
 template<> ErlNifResourceType * NifRes<struct ArrowArray>::type = nullptr;
 template<> ErlNifResourceType * NifRes<struct ArrowSchema>::type = nullptr;
@@ -728,6 +729,32 @@ static ERL_NIF_TERM adbc_arrow_array_stream_get_pointer(ErlNifEnv *env, int argc
     return enif_make_uint64(env, (uint64_t)(uint64_t *)res->val);
 }
 
+static ERL_NIF_TERM adbc_error_new(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
+    using res_type = NifRes<struct AdbcError>;
+    ERL_NIF_TERM ret, error;
+
+    res_type * res = nullptr;
+    if ((res = res_type::allocate_resource(env, error)) == nullptr) {
+        return error;
+    }
+
+    res->val = (res_type::val_type_p)enif_alloc(sizeof(res_type::val_type));
+    if (res->val == nullptr) {
+        enif_release_resource(res);
+        return erlang::nif::error(env, "out of memory");
+    }
+    memset(res->val, 0, sizeof(res_type::val_type));
+
+    ret = enif_make_resource(env, res);
+    enif_release_resource(res);
+
+    return enif_make_tuple3(env, 
+        erlang::nif::ok(env), 
+        ret, 
+        enif_make_uint64(env, (uint64_t)(uint64_t *)res->val)
+    );
+}
+
 static ERL_NIF_TERM adbc_statement_new(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
     using res_type = NifRes<struct AdbcStatement>;
     using connection_type = NifRes<struct AdbcConnection>;
@@ -1132,6 +1159,13 @@ static int on_load(ErlNifEnv *env, void **, ERL_NIF_TERM) {
     }
 
     {
+        using res_type = NifRes<struct AdbcError>;
+        rt = enif_open_resource_type(env, "Elixir.Adbc.Nif", "NifResAdbcError", res_type::destruct_resource, ERL_NIF_RT_CREATE, NULL);
+        if (!rt) return -1;
+        res_type::type = rt;
+    }
+
+    {
         using res_type = NifRes<struct ArrowArrayStream>;
         rt = enif_open_resource_type(env, "Elixir.Adbc.Nif", "NifResArrowArrayStream", res_type::destruct_resource, ERL_NIF_RT_CREATE, NULL);
         if (!rt) return -1;
@@ -1195,6 +1229,8 @@ static ErlNifFunc nif_functions[] = {
     {"adbc_arrow_schema_get_pointer", 1, adbc_arrow_schema_get_pointer, 0},
     {"adbc_arrow_array_get_pointer", 1, adbc_arrow_array_get_pointer, 0},
     {"adbc_arrow_array_stream_get_pointer", 1, adbc_arrow_array_stream_get_pointer, 0},
+
+    {"adbc_error_new", 0, adbc_error_new, 0},
 
     {"adbc_get_all_function_pointers", 0, adbc_get_all_function_pointers, 0}
 };

@@ -106,11 +106,13 @@ defmodule Adbc.Helper do
 
   def shared_driver_path(driver) do
     {prefix, extension} =
-        case :os.type() do
+      case :os.type() do
         {:unix, :darwin} ->
           {"lib", "dylib"}
+
         {:unix, _} ->
           {"lib", "so"}
+
         {:win32, _} ->
           {"", "dll"}
       end
@@ -119,13 +121,17 @@ defmodule Adbc.Helper do
       case driver do
         "sqlite" ->
           :adbc
+
         "postgresql" ->
           :adbc_driver_postgresql
+
         "flightsql" ->
           :adbc_driver_flightsql
+
         "snowflake" ->
           :adbc_driver_snowflake
       end
+
     shared_driver_path(otp_app, prefix, extension)
   end
 

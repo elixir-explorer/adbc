@@ -314,7 +314,11 @@ static ERL_NIF_TERM adbc_connection_get_info(ErlNifEnv *env, int argc, const ERL
 
     ret = enif_make_resource(env, array_stream);
     enif_release_resource(array_stream);
-    return erlang::nif::ok(env, ret);
+    return enif_make_tuple3(env,
+        erlang::nif::ok(env),
+        ret,
+        enif_make_uint64(env, (uint64_t)(uint64_t *)array_stream->val)
+    );
 }
 
 static ERL_NIF_TERM adbc_connection_get_objects(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
@@ -439,7 +443,12 @@ static ERL_NIF_TERM adbc_connection_get_objects(ErlNifEnv *env, int argc, const 
     for (auto& at : table_types) {
         if (at) enif_free((void *)at);
     }
-    return erlang::nif::ok(env, ret);
+
+    return enif_make_tuple3(env,
+        erlang::nif::ok(env),
+        ret,
+        enif_make_uint64(env, (uint64_t)(uint64_t *)array_stream->val)
+    );
 }
 
 static ERL_NIF_TERM adbc_connection_get_table_schema(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
@@ -553,7 +562,12 @@ static ERL_NIF_TERM adbc_connection_get_table_types(ErlNifEnv *env, int argc, co
 
     ret = enif_make_resource(env, array_stream);
     enif_release_resource(array_stream);
-    return erlang::nif::ok(env, ret);
+    
+    return enif_make_tuple3(env,
+        erlang::nif::ok(env),
+        ret,
+        enif_make_uint64(env, (uint64_t)(uint64_t *)array_stream->val)
+    );
 }
 
 static ERL_NIF_TERM adbc_connection_read_partition(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
@@ -614,7 +628,12 @@ static ERL_NIF_TERM adbc_connection_read_partition(ErlNifEnv *env, int argc, con
 
     ret = enif_make_resource(env, array_stream);
     enif_release_resource(array_stream);
-    return erlang::nif::ok(env, ret);
+    
+    return enif_make_tuple3(env,
+        erlang::nif::ok(env),
+        ret,
+        enif_make_uint64(env, (uint64_t)(uint64_t *)array_stream->val)
+    );
 }
 
 static ERL_NIF_TERM adbc_connection_commit(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
@@ -714,20 +733,46 @@ static ERL_NIF_TERM adbc_arrow_array_get_pointer(ErlNifEnv *env, int argc, const
     return enif_make_uint64(env, (uint64_t)(uint64_t *)res->val);
 }
 
-static ERL_NIF_TERM adbc_arrow_array_stream_get_pointer(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
+static ERL_NIF_TERM adbc_arrow_array_stream_new(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
     using res_type = NifRes<struct ArrowArrayStream>;
-    ERL_NIF_TERM error;
+    ERL_NIF_TERM ret, error;
 
     res_type * res = nullptr;
-    if ((res = res_type::get_resource(env, argv[0], error)) == nullptr) {
+    if ((res = res_type::allocate_resource(env, error)) == nullptr) {
         return error;
     }
-    if (res->val == nullptr) {
-        return enif_make_badarg(env);
-    }
 
-    return enif_make_uint64(env, (uint64_t)(uint64_t *)res->val);
+    res->val = (res_type::val_type_p)enif_alloc(sizeof(res_type::val_type));
+    if (res->val == nullptr) {
+        enif_release_resource(res);
+        return erlang::nif::error(env, "out of memory");
+    }
+    memset(res->val, 0, sizeof(res_type::val_type));
+
+    ret = enif_make_resource(env, res);
+    enif_release_resource(res);
+
+    return enif_make_tuple3(env, 
+        erlang::nif::ok(env), 
+        ret, 
+        enif_make_uint64(env, (uint64_t)(uint64_t *)res->val)
+    );
 }
+
+// static ERL_NIF_TERM adbc_arrow_array_stream_get_pointer(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
+//     using res_type = NifRes<struct ArrowArrayStream>;
+//     ERL_NIF_TERM error;
+
+//     res_type * res = nullptr;
+//     if ((res = res_type::get_resource(env, argv[0], error)) == nullptr) {
+//         return error;
+//     }
+//     if (res->val == nullptr) {
+//         return enif_make_badarg(env);
+//     }
+
+//     return enif_make_uint64(env, (uint64_t)(uint64_t *)res->val);
+// }
 
 static ERL_NIF_TERM adbc_error_new(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
     using res_type = NifRes<struct AdbcError>;
@@ -1247,7 +1292,8 @@ static ErlNifFunc nif_functions[] = {
 
     {"adbc_arrow_schema_get_pointer", 1, adbc_arrow_schema_get_pointer, 0},
     {"adbc_arrow_array_get_pointer", 1, adbc_arrow_array_get_pointer, 0},
-    {"adbc_arrow_array_stream_get_pointer", 1, adbc_arrow_array_stream_get_pointer, 0},
+    {"adbc_arrow_array_stream_new", 0, adbc_arrow_array_stream_new, 0},
+    // {"adbc_arrow_array_stream_get_pointer", 1, adbc_arrow_array_stream_get_pointer, 0},
 
     {"adbc_error_new", 0, adbc_error_new, 0},
     {"adbc_error_to_term", 1, adbc_error_to_term, 0},

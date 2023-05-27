@@ -10,7 +10,8 @@ defmodule Adbc.ArrowArrayStream do
 
   """
   @type t :: %__MODULE__{
-          reference: reference()
+          reference: reference(),
+          pointer: non_neg_integer()
         }
   defstruct [:reference, :pointer]
   alias __MODULE__, as: T

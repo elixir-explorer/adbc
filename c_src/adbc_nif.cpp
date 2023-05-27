@@ -760,7 +760,7 @@ static ERL_NIF_TERM adbc_arrow_array_stream_new(ErlNifEnv *env, int argc, const 
 }
 
 static ERL_NIF_TERM adbc_arrow_array_stream_reset(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
-    using res_type = NifRes<struct ArrowArraySteam>;
+    using res_type = NifRes<struct ArrowArrayStream>;
     ERL_NIF_TERM ret, error;
 
     res_type * res = nullptr;

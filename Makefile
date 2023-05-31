@@ -50,17 +50,15 @@ adbc:
 
 $(NIF_SO): adbc
 	@ mkdir -p "$(PRIV_DIR)"
-	@ if [ ! -f "$(NIF_SO)" ]; then \
-		mkdir -p "$(CMAKE_ADBC_NIF_BUILD_DIR)" && \
-		cd "$(CMAKE_ADBC_NIF_BUILD_DIR)" && \
-		cmake --no-warn-unused-cli \
-			-D CMAKE_BUILD_TYPE="$(CMAKE_BUILD_TYPE)" \
-			-D C_SRC="$(C_SRC)" \
-			-D ADBC_SRC="$(ADBC_SRC)" \
-			-D MIX_APP_PATH="$(MIX_APP_PATH)" \
-			-D PRIV_DIR="$(PRIV_DIR)" \
-			-D ERTS_INCLUDE_DIR="$(ERTS_INCLUDE_DIR)" \
-			$(CMAKE_CONFIGURE_FLAGS) $(CMAKE_ADBC_NIF_OPTIONS) "$(shell pwd)" && \
-		make "$(MAKE_BUILD_FLAGS)" && \
-		cp "$(CMAKE_ADBC_NIF_BUILD_DIR)/adbc_nif.so" "$(NIF_SO)" ; \
-	fi
+	@ mkdir -p "$(CMAKE_ADBC_NIF_BUILD_DIR)" && \
+	cd "$(CMAKE_ADBC_NIF_BUILD_DIR)" && \
+	cmake --no-warn-unused-cli \
+		-D CMAKE_BUILD_TYPE="$(CMAKE_BUILD_TYPE)" \
+		-D C_SRC="$(C_SRC)" \
+		-D ADBC_SRC="$(ADBC_SRC)" \
+		-D MIX_APP_PATH="$(MIX_APP_PATH)" \
+		-D PRIV_DIR="$(PRIV_DIR)" \
+		-D ERTS_INCLUDE_DIR="$(ERTS_INCLUDE_DIR)" \
+		$(CMAKE_CONFIGURE_FLAGS) $(CMAKE_ADBC_NIF_OPTIONS) "$(shell pwd)" && \
+	make "$(MAKE_BUILD_FLAGS)" && \
+	cp "$(CMAKE_ADBC_NIF_BUILD_DIR)/adbc_nif.so" "$(NIF_SO)"

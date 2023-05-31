@@ -49,6 +49,7 @@ static ERL_NIF_TERM adbc_database_new(ErlNifEnv *env, int argc, const ERL_NIF_TE
     AdbcStatusCode code = AdbcDatabaseNew(database->val, &adbc_error);
     if (code != ADBC_STATUS_OK) {
         enif_free(database->val);
+        database->val = nullptr;
         enif_release_resource(database);
         ret = nif_error_from_adbc_error(env, &adbc_error);
         if (adbc_error.release != nullptr) {
@@ -165,6 +166,7 @@ static ERL_NIF_TERM adbc_connection_new(ErlNifEnv *env, int argc, const ERL_NIF_
     AdbcStatusCode code = AdbcConnectionNew(connection->val, &adbc_error);
     if (code != ADBC_STATUS_OK) {
         enif_free(connection->val);
+        connection->val = nullptr;
         enif_release_resource(connection);
         ret = nif_error_from_adbc_error(env, &adbc_error);
         if (adbc_error.release != nullptr) {
@@ -305,6 +307,7 @@ static ERL_NIF_TERM adbc_connection_get_info(ErlNifEnv *env, int argc, const ERL
     if (code != ADBC_STATUS_OK) {
         ret = nif_error_from_adbc_error(env, &adbc_error);
         enif_free(array_stream->val);
+        array_stream->val = nullptr;
         enif_release_resource(array_stream);
         if (adbc_error.release != nullptr) {
             adbc_error.release(&adbc_error);
@@ -428,6 +431,7 @@ static ERL_NIF_TERM adbc_connection_get_objects(ErlNifEnv *env, int argc, const 
     if (code != ADBC_STATUS_OK) {
         ret = nif_error_from_adbc_error(env, &adbc_error);
         enif_free(array_stream->val);
+        array_stream->val = nullptr;
         enif_release_resource(array_stream);
         if (adbc_error.release != nullptr) {
             adbc_error.release(&adbc_error);
@@ -511,6 +515,7 @@ static ERL_NIF_TERM adbc_connection_get_table_schema(ErlNifEnv *env, int argc, c
     if (code != ADBC_STATUS_OK) {
         ret = nif_error_from_adbc_error(env, &adbc_error);
         enif_free(schema->val);
+        schema->val = nullptr;
         enif_release_resource(schema);
         if (adbc_error.release != nullptr) {
             adbc_error.release(&adbc_error);
@@ -553,6 +558,7 @@ static ERL_NIF_TERM adbc_connection_get_table_types(ErlNifEnv *env, int argc, co
     if (code != ADBC_STATUS_OK) {
         ret = nif_error_from_adbc_error(env, &adbc_error);
         enif_free(array_stream->val);
+        array_stream->val = nullptr;
         enif_release_resource(array_stream);
         if (adbc_error.release != nullptr) {
             adbc_error.release(&adbc_error);
@@ -619,6 +625,7 @@ static ERL_NIF_TERM adbc_connection_read_partition(ErlNifEnv *env, int argc, con
     if (code != ADBC_STATUS_OK) {
         ret = nif_error_from_adbc_error(env, &adbc_error);
         enif_free(array_stream->val);
+        array_stream->val = nullptr;
         enif_release_resource(array_stream);
         if (adbc_error.release != nullptr) {
             adbc_error.release(&adbc_error);
@@ -892,6 +899,7 @@ static ERL_NIF_TERM adbc_statement_new(ErlNifEnv *env, int argc, const ERL_NIF_T
     AdbcStatusCode code = AdbcStatementNew(connection->val, statement->val, &adbc_error);
     if (code != ADBC_STATUS_OK) {
         enif_free(statement->val);
+        statement->val = nullptr;
         enif_release_resource(statement);
         ret = nif_error_from_adbc_error(env, &adbc_error);
         if (adbc_error.release != nullptr) {
@@ -967,6 +975,7 @@ static ERL_NIF_TERM adbc_statement_execute_query(ErlNifEnv *env, int argc, const
     if (code != ADBC_STATUS_OK) {
         ret = nif_error_from_adbc_error(env, &adbc_error);
         enif_free(array_stream->val);
+        array_stream->val = nullptr;
         enif_release_resource(array_stream);
         if (adbc_error.release != nullptr) {
             adbc_error.release(&adbc_error);
@@ -1193,6 +1202,7 @@ static ERL_NIF_TERM adbc_statement_get_parameter_schema(ErlNifEnv *env, int argc
     if (code != ADBC_STATUS_OK) {
         ret = nif_error_from_adbc_error(env, &adbc_error);
         enif_free(schema->val);
+        schema->val = nullptr;
         enif_release_resource(schema);
         if (adbc_error.release != nullptr) {
             adbc_error.release(&adbc_error);

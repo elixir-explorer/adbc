@@ -787,7 +787,7 @@ static ERL_NIF_TERM adbc_arrow_array_stream_new(ErlNifEnv *env, int argc, const 
         return error;
     }
 
-    res->val = (res_type::val_type_p)malloc(sizeof(res_type::val_type));
+    res->val = (res_type::val_type_p)enif_alloc(sizeof(res_type::val_type));
     if (res->val == nullptr) {
         enif_release_resource(res);
         return erlang::nif::error(env, "out of memory");

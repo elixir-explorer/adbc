@@ -70,7 +70,7 @@ void NifRes<struct ArrowArrayStream>::destruct_resource(ErlNifEnv *env, void *ar
             if (adbc_error->release) {
                 adbc_error->release(adbc_error);
             }
-            free(res->val);
+            enif_free(res->val);
             res->val = nullptr;
         }
     }

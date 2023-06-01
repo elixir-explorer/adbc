@@ -740,29 +740,6 @@ static ERL_NIF_TERM adbc_arrow_array_get_pointer(ErlNifEnv *env, int argc, const
     return enif_make_uint64(env, (uint64_t)(uint64_t *)res->val);
 }
 
-static ERL_NIF_TERM adbc_arrow_array_stream_get_nif_resource_pointer(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
-    using res_type = NifRes<struct ArrowArrayStream>;
-    ERL_NIF_TERM error;
-
-    res_type * res = nullptr;
-    if ((res = res_type::get_resource(env, argv[0], error)) == nullptr) {
-        return error;
-    }
-    if (res->val == nullptr) {
-        return enif_make_badarg(env);
-    }
-
-    return enif_make_uint64(env, (uint64_t)res);
-}
-
-static ArrowArrayStream * adbc_arrow_array_stream_donate(uint64_t resource_ptr) {
-    using res_type = NifRes<struct ArrowArrayStream>;
-    res_type * res = (res_type *)(uint64_t *)resource_ptr;
-    ArrowArrayStream * val = res->val;
-    res->val = nullptr;
-    return val;
-}
-
 static ERL_NIF_TERM adbc_arrow_array_stream_get_pointer(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
     using res_type = NifRes<struct ArrowArrayStream>;
     ERL_NIF_TERM error;
@@ -1268,8 +1245,7 @@ static ERL_NIF_TERM adbc_get_all_function_pointers(ErlNifEnv *env, int argc, con
         {"AdbcStatementBindStream", (uint64_t)(uint64_t *)&AdbcStatementBindStream},
         {"AdbcStatementGetParameterSchema", (uint64_t)(uint64_t *)&AdbcStatementGetParameterSchema},
         {"AdbcStatementSetOption", (uint64_t)(uint64_t *)&AdbcStatementSetOption},
-        {"AdbcStatementExecutePartitions", (uint64_t)(uint64_t *)&AdbcStatementExecutePartitions},
-        {"adbc_arrow_array_stream_donate", (uint64_t)(uint64_t *)&adbc_arrow_array_stream_donate}
+        {"AdbcStatementExecutePartitions", (uint64_t)(uint64_t *)&AdbcStatementExecutePartitions}
     };
     erlang::nif::make(env, fptr, ret, false);
     return ret;
@@ -1370,7 +1346,6 @@ static ErlNifFunc nif_functions[] = {
     {"adbc_arrow_schema_get_pointer", 1, adbc_arrow_schema_get_pointer, 0},
     {"adbc_arrow_array_get_pointer", 1, adbc_arrow_array_get_pointer, 0},
     {"adbc_arrow_array_stream_get_pointer", 1, adbc_arrow_array_stream_get_pointer, 0},
-    {"adbc_arrow_array_stream_get_nif_resource_pointer", 1, adbc_arrow_array_stream_get_nif_resource_pointer, 0},
 
     {"adbc_error_new", 0, adbc_error_new, 0},
     {"adbc_error_reset", 1, adbc_error_reset, 0},

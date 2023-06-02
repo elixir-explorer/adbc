@@ -4,10 +4,19 @@ endif
 
 PRIV_DIR = $(MIX_APP_PATH)/priv
 NIF_SO = $(PRIV_DIR)/adbc_nif.so
+NIF_SO_REL = $(NIF_SO:$(shell pwd)/%=%)
 ADBC_SRC = $(shell pwd)/3rd_party/apache-arrow-adbc
 ADBC_C_SRC = $(shell pwd)/3rd_party/apache-arrow-adbc/c
-ADBC_DRIVER_COMMON_LIB = $(PRIV_DIR)/libadbc_driver_common.dylib
+UNAME_S := $(shell uname -s)
+ifeq ($(UNAME_S),Linux)
+	ADBC_DRIVER_COMMON_LIB = $(PRIV_DIR)/lib/libadbc_driver_manager.so
+endif
+ifeq ($(UNAME_S),Darwin)
+	ADBC_DRIVER_COMMON_LIB = $(PRIV_DIR)/lib/libadbc_driver_manager.dylib
+endif
+
 C_SRC = $(shell pwd)/c_src
+C_SRC_REL = c_src
 ifdef CMAKE_TOOLCHAIN_FILE
 	CMAKE_CONFIGURE_FLAGS=-D CMAKE_TOOLCHAIN_FILE="$(CMAKE_TOOLCHAIN_FILE)"
 endif
@@ -25,8 +34,10 @@ MAKE_BUILD_FLAGS ?= -j$(DEFAULT_JOBS)
 build: $(NIF_SO)
 	@echo > /dev/null
 
-adbc:
+priv_dir: $(PRIV_DIR)
 	@ mkdir -p "$(PRIV_DIR)"
+
+adbc: priv_dir
 	@ if [ ! -f "$(ADBC_DRIVER_COMMON_LIB)" ]; then \
 		mkdir -p "$(CMAKE_ADBC_BUILD_DIR)" && \
 		cd "$(CMAKE_ADBC_BUILD_DIR)" && \
@@ -48,8 +59,7 @@ adbc:
     	cmake --build . --target install -j ; \
 	fi
 
-$(NIF_SO): adbc
-	@ mkdir -p "$(PRIV_DIR)"
+$(NIF_SO_REL): priv_dir adbc $(C_SRC_REL)/adbc_nif_resource.hpp $(C_SRC_REL)/adbc_nif.cpp $(C_SRC_REL)/nif_utils.hpp $(C_SRC_REL)/nif_utils.cpp
 	@ mkdir -p "$(CMAKE_ADBC_NIF_BUILD_DIR)" && \
 	cd "$(CMAKE_ADBC_NIF_BUILD_DIR)" && \
 	cmake --no-warn-unused-cli \

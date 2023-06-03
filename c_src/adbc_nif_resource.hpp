@@ -4,15 +4,17 @@
 #pragma once
 
 #include <erl_nif.h>
+#include <atomic>
 #include <adbc.h>
 
 template <typename T>
 struct NifRes {
     using val_type_p = T *;
-    using val_type = typename std::remove_pointer<val_type_p>::type;
+    using val_type = T;
     using res_type = NifRes<T>;
 
-    val_type_p val;
+    val_type val;
+    std::atomic_bool released{false};
 
     static ErlNifResourceType * type;
     static res_type * allocate_resource(ErlNifEnv * env, ERL_NIF_TERM &error) {
@@ -21,14 +23,22 @@ struct NifRes {
             error = erlang::nif::error(env, "cannot allocate Nif resource");
             return res;
         }
+        memset(&res->val, 0, sizeof(val_type));
+        res->released = false;
         return res;
     }
 
     static res_type * get_resource(ErlNifEnv * env, ERL_NIF_TERM term, ERL_NIF_TERM &error) {
         res_type * self_res = nullptr;
-        if (!enif_get_resource(env, term, res_type::type, (void **)&self_res) || self_res == nullptr || self_res->val == nullptr) {
+        if (!enif_get_resource(env, term, res_type::type, (void **)&self_res) || self_res == nullptr) {
             error = erlang::nif::error(env, "cannot access Nif resource");
         }
+
+        if (self_res->released) {
+            self_res = nullptr;
+            error = enif_make_badarg(env);
+        }
+
         return self_res;
     }
 
@@ -38,26 +48,18 @@ struct NifRes {
 template <typename T>
 void NifRes<T>::destruct_resource(ErlNifEnv *env, void *args) {
     auto res = (NifRes<T> *)args;
-    if (res) {
-        if (res->val) {
-            enif_free(res->val);
-            res->val = nullptr;
-        }
-    }
+    res->released = true;
+    return;
 }
 
 template <>
 void NifRes<struct AdbcError>::destruct_resource(ErlNifEnv *env, void *args) {
     auto res = (NifRes<struct AdbcError> *)args;
     if (res) {
-        if (res->val) {
-            auto adbc_error = (struct AdbcError *)res->val;
-            if (adbc_error->release) {
-                adbc_error->release(adbc_error);
-            }
-            enif_free(res->val);
-            res->val = nullptr;
+        if (!res->released && res->val.release) {
+            res->val.release(&res->val);
         }
+        res->released = true;
     }
 }
 
@@ -65,14 +67,10 @@ template <>
 void NifRes<struct ArrowArrayStream>::destruct_resource(ErlNifEnv *env, void *args) {
     auto res = (NifRes<struct ArrowArrayStream> *)args;
     if (res) {
-        if (res->val) {
-            auto adbc_error = (struct ArrowArrayStream *)res->val;
-            if (adbc_error->release) {
-                adbc_error->release(adbc_error);
-            }
-            enif_free(res->val);
-            res->val = nullptr;
+        if (!res->released && res->val.release) {
+            res->val.release(&res->val);
         }
+        res->released = true;
     }
 }
 

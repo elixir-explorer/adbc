@@ -31,11 +31,13 @@ MAKE_BUILD_FLAGS ?= -j$(DEFAULT_JOBS)
 
 .DEFAULT_GLOBAL := build
 
-build: $(NIF_SO)
+build: $(NIF_SO_REL)
 	@echo > /dev/null
 
-priv_dir: $(PRIV_DIR)
-	@ mkdir -p "$(PRIV_DIR)"
+priv_dir:
+	@ if [ ! -e "$(PRIV_DIR)" ]; then \
+		mkdir -p "$(PRIV_DIR)" ; \
+	fi
 
 adbc: priv_dir
 	@ if [ ! -f "$(ADBC_DRIVER_COMMON_LIB)" ]; then \

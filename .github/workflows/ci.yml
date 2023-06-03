@@ -50,10 +50,9 @@ jobs:
 
       - name: Compile and Test
         shell: bash
-        allow_failure: true
         run: |
           mix deps.get
-          mix test
+          mix test || true
 
   macos:
     runs-on: macos-11

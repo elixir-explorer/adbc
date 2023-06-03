@@ -202,7 +202,7 @@ int make(ErlNifEnv *env, int var, ERL_NIF_TERM &out) {
 }
 
 int make(ErlNifEnv *env, uint64_t var, ERL_NIF_TERM &out) {
-    out = make(env, var);
+    out = make(env, (unsigned long long)var);
     return 0;
 }
 

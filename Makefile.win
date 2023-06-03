@@ -59,25 +59,23 @@ adbc: priv_dir
 			-DADBC_BUILD_TESTS="OFF" \
 			-DADBC_USE_ASAN="OFF" \
 			-DADBC_USE_UBSAN="OFF" \
-			-DCMAKE_BUILD_TYPE="${CMAKE_BUILD_TYPE}" \
-			-DCMAKE_INSTALL_PREFIX="${PRIV_DIR}" \
+			-DCMAKE_BUILD_TYPE="$(CMAKE_BUILD_TYPE)" \
+			-DCMAKE_INSTALL_PREFIX="$(PRIV_DIR)" \
 			-DADBC_DEPENDENCY_SOURCE=BUNDLED \
 			$(CMAKE_CONFIGURE_FLAGS) $(CMAKE_ADBC_OPTIONS) "$(ADBC_C_SRC)" && \
     	cmake --build . --target install -j ; \
 	fi
 
 $(NIF_SO): adbc priv_dir c_src\adbc_nif_resource.hpp c_src\adbc_nif.cpp c_src\nif_utils.cpp c_src\nif_utils.hpp
-	@ if not exist "$(NIF_SO)" ( \
-        if not exist "$(CMAKE_ADBC_NIF_BUILD_DIR)" mkdir "$(CMAKE_ADBC_NIF_BUILD_DIR)" && \
-		cd "$(CMAKE_HNSWLIB_BUILD_DIR)" && \
-		cmake -G "$(CMAKE_GENERATOR_TYPE)" \
-		  --no-warn-unused-cli \
-		  -D C_SRC="$(C_SRC)" \
-          -D ADBC_SRC="$(ADBC_SRC)" \
-		  -D MIX_APP_PATH="$(MIX_APP_PATH)" \
-		  -D PRIV_DIR="$(PRIV_DIR)" \
-		  -D ERTS_INCLUDE_DIR="$(ERTS_INCLUDE_DIR)" \
-		  $(CMAKE_CONFIGURE_FLAGS) $(CMAKE_ADBC_NIF_OPTIONS) "$(MAKEDIR)" && \
-		cmake --build . $(CMAKE_BUILD_PARAMETER) && \
-		cmake --install . $(CMAKE_BUILD_PARAMETER) \
-	)
+	@ if not exist "$(CMAKE_ADBC_NIF_BUILD_DIR)" mkdir "$(CMAKE_ADBC_NIF_BUILD_DIR)" && \
+    cd "$(CMAKE_HNSWLIB_BUILD_DIR)" && \
+    cmake -G "$(CMAKE_GENERATOR_TYPE)" \
+        --no-warn-unused-cli \
+        -D C_SRC="$(C_SRC)" \
+        -D ADBC_SRC="$(ADBC_SRC)" \
+        -D MIX_APP_PATH="$(MIX_APP_PATH)" \
+        -D PRIV_DIR="$(PRIV_DIR)" \
+        -D ERTS_INCLUDE_DIR="$(ERTS_INCLUDE_DIR)" \
+        $(CMAKE_CONFIGURE_FLAGS) $(CMAKE_ADBC_NIF_OPTIONS) "$(MAKEDIR)" && \
+    cmake --build . $(CMAKE_BUILD_PARAMETER) && \
+    cmake --install . $(CMAKE_BUILD_PARAMETER)

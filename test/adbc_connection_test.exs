@@ -36,10 +36,7 @@ defmodule Adbc.Connection.Test do
     assert :ok == Connection.release(connection)
 
     assert :ok == Database.release(database)
-
-    assert_raise ArgumentError, fn ->
-      Connection.release(connection)
-    end
+    assert {:error, "invalid state"} == Connection.release(connection)
   end
 
   describe "adbc connection metadata" do

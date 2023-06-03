@@ -122,14 +122,16 @@ static ERL_NIF_TERM adbc_database_release(ErlNifEnv *env, int argc, const ERL_NI
     memset(&adbc_error, 0, sizeof(adbc_error));
     AdbcStatusCode code = AdbcDatabaseRelease(&database->val, &adbc_error);
     if (code != ADBC_STATUS_OK) {
-        ret = nif_error_from_adbc_error(env, &adbc_error);
-        if (adbc_error.release != nullptr) {
-            adbc_error.release(&adbc_error);
+        if (code == ADBC_STATUS_INVALID_STATE) {
+            ret = erlang::nif::error(env, "invalid state");
+        } else {
+            ret = nif_error_from_adbc_error(env, &adbc_error);
+            if (adbc_error.release != nullptr) {
+                adbc_error.release(&adbc_error);
+            }
         }
         return ret;
     }
-
-    database->released = true;
 
     return erlang::nif::ok(env);
 }
@@ -232,14 +234,16 @@ static ERL_NIF_TERM adbc_connection_release(ErlNifEnv *env, int argc, const ERL_
     memset(&adbc_error, 0, sizeof(adbc_error));
     AdbcStatusCode code = AdbcConnectionRelease(&connection->val, &adbc_error);
     if (code != ADBC_STATUS_OK) {
-        ret = nif_error_from_adbc_error(env, &adbc_error);
-        if (adbc_error.release != nullptr) {
-            adbc_error.release(&adbc_error);
+        if (code == ADBC_STATUS_INVALID_STATE) {
+            ret = erlang::nif::error(env, "invalid state");
+        } else {
+            ret = nif_error_from_adbc_error(env, &adbc_error);
+            if (adbc_error.release != nullptr) {
+                adbc_error.release(&adbc_error);
+            }
         }
         return ret;
     }
-
-    connection->released = true;
 
     return erlang::nif::ok(env);
 }
@@ -809,14 +813,16 @@ static ERL_NIF_TERM adbc_statement_release(ErlNifEnv *env, int argc, const ERL_N
     memset(&adbc_error, 0, sizeof(adbc_error));
     AdbcStatusCode code = AdbcStatementRelease(&statement->val, &adbc_error);
     if (code != ADBC_STATUS_OK) {
-        ret = nif_error_from_adbc_error(env, &adbc_error);
-        if (adbc_error.release != nullptr) {
-            adbc_error.release(&adbc_error);
+        if (code == ADBC_STATUS_INVALID_STATE) {
+            ret = erlang::nif::error(env, "invalid state");
+        } else {
+            ret = nif_error_from_adbc_error(env, &adbc_error);
+            if (adbc_error.release != nullptr) {
+                adbc_error.release(&adbc_error);
+            }
         }
         return ret;
     }
-
-    statement->released = true;
 
     return erlang::nif::ok(env);
 }

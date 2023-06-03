@@ -41,10 +41,7 @@ defmodule Adbc.Statement.Test do
     assert is_reference(statement.reference)
 
     assert :ok == Statement.release(statement)
-
-    assert_raise ArgumentError, fn ->
-      :ok == Statement.release(statement)
-    end
+    assert {:error, "invalid state"} == Statement.release(statement)
 
     assert :ok == Connection.release(connection)
     assert :ok == Database.release(database)

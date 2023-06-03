@@ -1,0 +1,81 @@
+!IFNDEF MIX_APP_PATH
+MIX_APP_PATH=$(MAKEDIR)
+!ENDIF
+
+PRIV_DIR = $(MIX_APP_PATH)/priv
+NIF_SO = $(PRIV_DIR)/adbc_nif.dll
+ADBC_SRC = $(MAKEDIR)\3rd_party\apache-arrow-adbc
+ADBC_C_SRC = $(ADBC_SRC)\c
+C_SRC = $(MAKEDIR)\c_src
+!IFDEF CMAKE_TOOLCHAIN_FILE
+CMAKE_CONFIGURE_FLAGS=-D CMAKE_TOOLCHAIN_FILE="$(CMAKE_TOOLCHAIN_FILE)"
+!ENDIF
+
+!IFNDEF CMAKE_BUILD_TYPE
+CMAKE_BUILD_TYPE = Release
+!ENDIF
+!IFNDEF CMAKE_GENERATOR_TYPE
+!IFNDEF MSBUILD_PLATFORM
+
+!IF "$(HAVE_NINJA)" == "true"
+CMAKE_GENERATOR_TYPE=Ninja
+!ELSE
+CMAKE_GENERATOR_TYPE=NMake Makefiles
+!ENDIF
+
+!ENDIF
+!ENDIF
+
+CMAKE_ADBC_BUILD_DIR = $(MIX_APP_PATH)/cmake_adbc
+!IFNDEF CMAKE_ADBC_OPTIONS
+CMAKE_ADBC_OPTIONS = ""
+!ENDIF
+
+CMAKE_ADBC_NIF_BUILD_DIR = $(MIX_APP_PATH)/cmake_adbc_nif
+!IFNDEF CMAKE_ADBC_NIF_OPTIONS
+CMAKE_ADBC_NIF_OPTIONS = ""
+!ENDIF
+
+CMAKE_BUILD_PARAMETER= --config "$(CMAKE_BUILD_TYPE)"
+
+build: $(NIF_SO)
+
+priv_dir:
+    @ if not exist "$(PRIV_DIR)" mkdir "$(PRIV_DIR)"
+
+adbc: priv_dir
+    @ if not exist "$(ADBC_DRIVER_COMMON_LIB)" ( \
+		if not exist "$(CMAKE_ADBC_BUILD_DIR)" mkdir "$(CMAKE_ADBC_BUILD_DIR)" && \
+		cd "$(CMAKE_ADBC_BUILD_DIR)" && \
+		cmake -G "$(CMAKE_GENERATOR_TYPE)" \
+            --no-warn-unused-cli \
+			-DADBC_BUILD_SHARED="ON" \
+			-DADBC_DRIVER_MANAGER="ON" \
+			-DADBC_DRIVER_POSTGRESQL="OFF" \
+			-DADBC_DRIVER_SQLITE="ON" \
+			-DADBC_DRIVER_FLIGHTSQL="OFF" \
+			-DADBC_DRIVER_SNOWFLAKE="OFF" \
+			-DADBC_BUILD_STATIC="OFF" \
+			-DADBC_BUILD_TESTS="OFF" \
+			-DADBC_USE_ASAN="OFF" \
+			-DADBC_USE_UBSAN="OFF" \
+			-DCMAKE_BUILD_TYPE="$(CMAKE_BUILD_TYPE)" \
+			-DCMAKE_INSTALL_PREFIX="$(PRIV_DIR)" \
+			-DADBC_DEPENDENCY_SOURCE=BUNDLED \
+			$(CMAKE_CONFIGURE_FLAGS) $(CMAKE_ADBC_OPTIONS) "$(ADBC_C_SRC)" && \
+    	cmake --build . --target install -j ; \
+    )
+
+$(NIF_SO): adbc priv_dir c_src\adbc_nif_resource.hpp c_src\adbc_nif.cpp c_src\nif_utils.cpp c_src\nif_utils.hpp
+	@ if not exist "$(CMAKE_ADBC_NIF_BUILD_DIR)" mkdir "$(CMAKE_ADBC_NIF_BUILD_DIR)" && \
+    cd "$(CMAKE_HNSWLIB_BUILD_DIR)" && \
+    cmake -G "$(CMAKE_GENERATOR_TYPE)" \
+        --no-warn-unused-cli \
+        -D C_SRC="$(C_SRC)" \
+        -D ADBC_SRC="$(ADBC_SRC)" \
+        -D MIX_APP_PATH="$(MIX_APP_PATH)" \
+        -D PRIV_DIR="$(PRIV_DIR)" \
+        -D ERTS_INCLUDE_DIR="$(ERTS_INCLUDE_DIR)" \
+        $(CMAKE_CONFIGURE_FLAGS) $(CMAKE_ADBC_NIF_OPTIONS) "$(MAKEDIR)" && \
+    cmake --build . $(CMAKE_BUILD_PARAMETER) && \
+    cmake --install . $(CMAKE_BUILD_PARAMETER)

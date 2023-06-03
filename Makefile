@@ -36,8 +36,8 @@ build: $(NIF_SO_REL)
 
 priv_dir:
 	@ if [ ! -e "$(PRIV_DIR)" ]; then \
-		mkdir -p "$(PRIV_DIR)" ; \
-	fi
+ 		mkdir -p "$(PRIV_DIR)" ; \
+ 	fi
 
 adbc: priv_dir
 	@ if [ ! -f "$(ADBC_DRIVER_COMMON_LIB)" ]; then \
@@ -54,8 +54,8 @@ adbc: priv_dir
 			-DADBC_BUILD_TESTS="OFF" \
 			-DADBC_USE_ASAN="OFF" \
 			-DADBC_USE_UBSAN="OFF" \
-			-DCMAKE_BUILD_TYPE="${CMAKE_BUILD_TYPE}" \
-			-DCMAKE_INSTALL_PREFIX="${PRIV_DIR}" \
+			-DCMAKE_BUILD_TYPE="$(CMAKE_BUILD_TYPE)" \
+			-DCMAKE_INSTALL_PREFIX="$(PRIV_DIR)" \
 			-DADBC_DEPENDENCY_SOURCE=BUNDLED \
 			$(CMAKE_CONFIGURE_FLAGS) $(CMAKE_ADBC_OPTIONS) "$(ADBC_C_SRC)" && \
     	cmake --build . --target install -j ; \

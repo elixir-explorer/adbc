@@ -22,11 +22,15 @@ template<> ErlNifResourceType * NifRes<struct ArrowArray>::type = nullptr;
 template<> ErlNifResourceType * NifRes<struct ArrowSchema>::type = nullptr;
 
 static ERL_NIF_TERM nif_error_from_adbc_error(ErlNifEnv *env, struct AdbcError * error) {
-    return erlang::nif::error(env, enif_make_tuple3(env,
-        erlang::nif::make_binary(env, error->message),
-        enif_make_int(env, error->vendor_code),
-        erlang::nif::make_binary(env, error->sqlstate, 5)
-    ));
+    if (error->message == nullptr) {
+        return erlang::nif::error(env, "unknown error");
+    } else {
+        return erlang::nif::error(env, enif_make_tuple3(env,
+            erlang::nif::make_binary(env, error->message),
+            enif_make_int(env, error->vendor_code),
+            erlang::nif::make_binary(env, error->sqlstate, 5)
+        ));
+    }
 }
 
 static ERL_NIF_TERM adbc_database_new(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {

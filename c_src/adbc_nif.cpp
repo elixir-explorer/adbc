@@ -40,7 +40,8 @@ static ERL_NIF_TERM nif_error_from_adbc_error(ErlNifEnv *env, struct AdbcError *
 static ERL_NIF_TERM adbc_database_new(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
     using res_type = NifRes<struct AdbcDatabase>;
 
-    ERL_NIF_TERM ret, error;
+    ERL_NIF_TERM ret{};
+    ERL_NIF_TERM error{};
     res_type * database = nullptr;
     if ((database = res_type::allocate_resource(env, error)) == nullptr) {
         return error;
@@ -66,7 +67,8 @@ static ERL_NIF_TERM adbc_database_new(ErlNifEnv *env, int argc, const ERL_NIF_TE
 static ERL_NIF_TERM adbc_database_set_option(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
     using res_type = NifRes<struct AdbcDatabase>;
 
-    ERL_NIF_TERM ret, error;
+    ERL_NIF_TERM ret{};
+    ERL_NIF_TERM error{};
     res_type * database = nullptr;
     if ((database = res_type::get_resource(env, argv[0], error)) == nullptr) {
         return error;
@@ -97,7 +99,8 @@ static ERL_NIF_TERM adbc_database_set_option(ErlNifEnv *env, int argc, const ERL
 static ERL_NIF_TERM adbc_database_init(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
     using res_type = NifRes<struct AdbcDatabase>;
     
-    ERL_NIF_TERM ret, error;
+    ERL_NIF_TERM ret{};
+    ERL_NIF_TERM error{};
     res_type * database = nullptr;
     if ((database = res_type::get_resource(env, argv[0], error)) == nullptr) {
         return error;
@@ -120,7 +123,8 @@ static ERL_NIF_TERM adbc_database_init(ErlNifEnv *env, int argc, const ERL_NIF_T
 static ERL_NIF_TERM adbc_database_release(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
     using res_type = NifRes<struct AdbcDatabase>;
 
-    ERL_NIF_TERM ret, error;
+    ERL_NIF_TERM ret{};
+    ERL_NIF_TERM error{};
     res_type * database = nullptr;
     if ((database = res_type::get_resource(env, argv[0], error)) == nullptr) {
         return error;
@@ -147,7 +151,8 @@ static ERL_NIF_TERM adbc_database_release(ErlNifEnv *env, int argc, const ERL_NI
 static ERL_NIF_TERM adbc_connection_new(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
     using res_type = NifRes<struct AdbcConnection>;
 
-    ERL_NIF_TERM ret, error;
+    ERL_NIF_TERM ret{};
+    ERL_NIF_TERM error{};
     res_type * connection = nullptr;
     if ((connection = res_type::allocate_resource(env, error)) == nullptr) {
         return error;
@@ -173,7 +178,8 @@ static ERL_NIF_TERM adbc_connection_new(ErlNifEnv *env, int argc, const ERL_NIF_
 static ERL_NIF_TERM adbc_connection_set_option(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
     using res_type = NifRes<struct AdbcConnection>;
 
-    ERL_NIF_TERM ret, error;
+    ERL_NIF_TERM ret{};
+    ERL_NIF_TERM error{};
     res_type * connection = nullptr;
     if ((connection = res_type::get_resource(env, argv[0], error)) == nullptr) {
         return error;
@@ -205,7 +211,8 @@ static ERL_NIF_TERM adbc_connection_init(ErlNifEnv *env, int argc, const ERL_NIF
     using res_type = NifRes<struct AdbcConnection>;
     using db_type = NifRes<struct AdbcDatabase>;
 
-    ERL_NIF_TERM ret, error;
+    ERL_NIF_TERM ret{};
+    ERL_NIF_TERM error{};
     res_type * connection = nullptr;
     db_type * db = nullptr;
     if ((connection = res_type::get_resource(env, argv[0], error)) == nullptr) {
@@ -232,7 +239,8 @@ static ERL_NIF_TERM adbc_connection_init(ErlNifEnv *env, int argc, const ERL_NIF
 static ERL_NIF_TERM adbc_connection_release(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
     using res_type = NifRes<struct AdbcConnection>;
 
-    ERL_NIF_TERM ret, error;
+    ERL_NIF_TERM ret{};
+    ERL_NIF_TERM error{};
     res_type * connection = nullptr;
     if ((connection = res_type::get_resource(env, argv[0], error)) == nullptr) {
         return error;
@@ -260,7 +268,8 @@ static ERL_NIF_TERM adbc_connection_get_info(ErlNifEnv *env, int argc, const ERL
     using res_type = NifRes<struct AdbcConnection>;
     using array_stream_type = NifRes<struct ArrowArrayStream>;
 
-    ERL_NIF_TERM ret, error;
+    ERL_NIF_TERM ret{};
+    ERL_NIF_TERM error{};
     res_type * connection = nullptr;
     if ((connection = res_type::get_resource(env, argv[0], error)) == nullptr) {
         return error;
@@ -308,7 +317,8 @@ static ERL_NIF_TERM adbc_connection_get_objects(ErlNifEnv *env, int argc, const 
     using res_type = NifRes<struct AdbcConnection>;
     using array_stream_type = NifRes<struct ArrowArrayStream>;
 
-    ERL_NIF_TERM ret, error;
+    ERL_NIF_TERM ret{};
+    ERL_NIF_TERM error{};
     res_type * connection = nullptr;
     if ((connection = res_type::get_resource(env, argv[0], error)) == nullptr) {
         return error;
@@ -427,7 +437,8 @@ static ERL_NIF_TERM adbc_connection_get_table_schema(ErlNifEnv *env, int argc, c
     using res_type = NifRes<struct AdbcConnection>;
     using schema_type = NifRes<struct ArrowSchema>;
 
-    ERL_NIF_TERM ret, error;
+    ERL_NIF_TERM ret{};
+    ERL_NIF_TERM error{};
     res_type * connection = nullptr;
     if ((connection = res_type::get_resource(env, argv[0], error)) == nullptr) {
         return error;
@@ -491,7 +502,8 @@ static ERL_NIF_TERM adbc_connection_get_table_types(ErlNifEnv *env, int argc, co
     using res_type = NifRes<struct AdbcConnection>;
     using array_stream_type = NifRes<struct ArrowArrayStream>;
 
-    ERL_NIF_TERM ret, error;
+    ERL_NIF_TERM ret{};
+    ERL_NIF_TERM error{};
     res_type * connection = nullptr;
     if ((connection = res_type::get_resource(env, argv[0], error)) == nullptr) {
         return error;
@@ -529,7 +541,8 @@ static ERL_NIF_TERM adbc_connection_read_partition(ErlNifEnv *env, int argc, con
     using res_type = NifRes<struct AdbcConnection>;
     using array_stream_type = NifRes<struct ArrowArrayStream>;
 
-    ERL_NIF_TERM ret, error;
+    ERL_NIF_TERM ret{};
+    ERL_NIF_TERM error{};
     res_type * connection = nullptr;
     if ((connection = res_type::get_resource(env, argv[0], error)) == nullptr) {
         return error;
@@ -586,7 +599,8 @@ static ERL_NIF_TERM adbc_connection_read_partition(ErlNifEnv *env, int argc, con
 static ERL_NIF_TERM adbc_connection_commit(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
     using res_type = NifRes<struct AdbcConnection>;
 
-    ERL_NIF_TERM ret, error;
+    ERL_NIF_TERM ret{};
+    ERL_NIF_TERM error{};
     res_type * connection = nullptr;
     if ((connection = res_type::get_resource(env, argv[0], error)) == nullptr) {
         return error;
@@ -609,7 +623,8 @@ static ERL_NIF_TERM adbc_connection_commit(ErlNifEnv *env, int argc, const ERL_N
 static ERL_NIF_TERM adbc_connection_rollback(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
     using res_type = NifRes<struct AdbcConnection>;
 
-    ERL_NIF_TERM ret, error;
+    ERL_NIF_TERM ret{};
+    ERL_NIF_TERM  error{};
     res_type * connection = nullptr;
     if ((connection = res_type::get_resource(env, argv[0], error)) == nullptr) {
         return error;
@@ -631,7 +646,7 @@ static ERL_NIF_TERM adbc_connection_rollback(ErlNifEnv *env, int argc, const ERL
 
 static ERL_NIF_TERM adbc_statement_get_pointer(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
     using res_type = NifRes<struct AdbcStatement>;
-    ERL_NIF_TERM error;
+    ERL_NIF_TERM error{};
 
     res_type * res = nullptr;
     if ((res = res_type::get_resource(env, argv[0], error)) == nullptr) {
@@ -643,7 +658,7 @@ static ERL_NIF_TERM adbc_statement_get_pointer(ErlNifEnv *env, int argc, const E
 
 static ERL_NIF_TERM adbc_arrow_schema_get_pointer(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
     using res_type = NifRes<struct ArrowSchema>;
-    ERL_NIF_TERM error;
+    ERL_NIF_TERM error{};
 
     res_type * res = nullptr;
     if ((res = res_type::get_resource(env, argv[0], error)) == nullptr) {
@@ -655,7 +670,7 @@ static ERL_NIF_TERM adbc_arrow_schema_get_pointer(ErlNifEnv *env, int argc, cons
 
 static ERL_NIF_TERM adbc_arrow_array_get_pointer(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
     using res_type = NifRes<struct ArrowArray>;
-    ERL_NIF_TERM error;
+    ERL_NIF_TERM error{};
 
     res_type * res = nullptr;
     if ((res = res_type::get_resource(env, argv[0], error)) == nullptr) {
@@ -667,7 +682,7 @@ static ERL_NIF_TERM adbc_arrow_array_get_pointer(ErlNifEnv *env, int argc, const
 
 static ERL_NIF_TERM adbc_arrow_array_stream_get_pointer(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
     using res_type = NifRes<struct ArrowArrayStream>;
-    ERL_NIF_TERM error;
+    ERL_NIF_TERM error{};
 
     res_type * res = nullptr;
     if ((res = res_type::get_resource(env, argv[0], error)) == nullptr) {
@@ -679,7 +694,8 @@ static ERL_NIF_TERM adbc_arrow_array_stream_get_pointer(ErlNifEnv *env, int argc
 
 static ERL_NIF_TERM adbc_arrow_array_stream_new(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
     using res_type = NifRes<struct ArrowArrayStream>;
-    ERL_NIF_TERM ret, error;
+    ERL_NIF_TERM ret{};
+    ERL_NIF_TERM error{};
 
     res_type * res = nullptr;
     if ((res = res_type::allocate_resource(env, error)) == nullptr) {
@@ -700,7 +716,8 @@ static ERL_NIF_TERM adbc_arrow_array_stream_new(ErlNifEnv *env, int argc, const 
 
 static ERL_NIF_TERM adbc_arrow_array_stream_reset(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
     using res_type = NifRes<struct ArrowArrayStream>;
-    ERL_NIF_TERM ret, error;
+    ERL_NIF_TERM ret{};
+    ERL_NIF_TERM error{};
 
     res_type * res = nullptr;
     if ((res = res_type::get_resource(env, argv[0], error)) == nullptr) {
@@ -718,7 +735,8 @@ static ERL_NIF_TERM adbc_arrow_array_stream_reset(ErlNifEnv *env, int argc, cons
 
 static ERL_NIF_TERM adbc_error_new(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
     using res_type = NifRes<struct AdbcError>;
-    ERL_NIF_TERM ret, error;
+    ERL_NIF_TERM ret{};
+    ERL_NIF_TERM error{};
 
     res_type * res = nullptr;
     if ((res = res_type::allocate_resource(env, error)) == nullptr) {
@@ -739,7 +757,8 @@ static ERL_NIF_TERM adbc_error_new(ErlNifEnv *env, int argc, const ERL_NIF_TERM 
 
 static ERL_NIF_TERM adbc_error_reset(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
     using res_type = NifRes<struct AdbcError>;
-    ERL_NIF_TERM ret, error;
+    ERL_NIF_TERM ret{};
+    ERL_NIF_TERM error{};
 
     res_type * res = nullptr;
     if ((res = res_type::get_resource(env, argv[0], error)) == nullptr) {
@@ -757,7 +776,8 @@ static ERL_NIF_TERM adbc_error_reset(ErlNifEnv *env, int argc, const ERL_NIF_TER
 
 static ERL_NIF_TERM adbc_error_to_term(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
     using res_type = NifRes<struct AdbcError>;
-    ERL_NIF_TERM ret, error;
+    ERL_NIF_TERM ret{};
+    ERL_NIF_TERM error{};
 
     res_type * res = nullptr;
     if ((res = res_type::get_resource(env, argv[0], error)) == nullptr) {
@@ -776,7 +796,8 @@ static ERL_NIF_TERM adbc_statement_new(ErlNifEnv *env, int argc, const ERL_NIF_T
     using res_type = NifRes<struct AdbcStatement>;
     using connection_type = NifRes<struct AdbcConnection>;
 
-    ERL_NIF_TERM ret, error;
+    ERL_NIF_TERM ret{};
+    ERL_NIF_TERM error{};
 
     connection_type * connection = nullptr;
     if ((connection = connection_type::get_resource(env, argv[0], error)) == nullptr) {
@@ -810,7 +831,8 @@ static ERL_NIF_TERM adbc_statement_new(ErlNifEnv *env, int argc, const ERL_NIF_T
 static ERL_NIF_TERM adbc_statement_release(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
     using res_type = NifRes<struct AdbcStatement>;
 
-    ERL_NIF_TERM ret, error;
+    ERL_NIF_TERM ret{};
+    ERL_NIF_TERM error{};
 
     res_type * statement = nullptr;
     if ((statement = res_type::get_resource(env, argv[0], error)) == nullptr) {
@@ -839,7 +861,8 @@ static ERL_NIF_TERM adbc_statement_execute_query(ErlNifEnv *env, int argc, const
     using res_type = NifRes<struct AdbcStatement>;
     using array_stream_type = NifRes<struct ArrowArrayStream>;
 
-    ERL_NIF_TERM ret, error;
+    ERL_NIF_TERM ret{};
+    ERL_NIF_TERM error{};
 
     res_type * statement = nullptr;
     if ((statement = res_type::get_resource(env, argv[0], error)) == nullptr) {
@@ -878,7 +901,8 @@ static ERL_NIF_TERM adbc_statement_execute_query(ErlNifEnv *env, int argc, const
 static ERL_NIF_TERM adbc_statement_prepare(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
     using res_type = NifRes<struct AdbcStatement>;
 
-    ERL_NIF_TERM ret, error;
+    ERL_NIF_TERM ret{};
+    ERL_NIF_TERM error{};
 
     res_type * statement = nullptr;
     if ((statement = res_type::get_resource(env, argv[0], error)) == nullptr) {
@@ -902,7 +926,8 @@ static ERL_NIF_TERM adbc_statement_prepare(ErlNifEnv *env, int argc, const ERL_N
 static ERL_NIF_TERM adbc_statement_set_sql_query(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
     using res_type = NifRes<struct AdbcStatement>;
 
-    ERL_NIF_TERM ret, error;
+    ERL_NIF_TERM ret{};
+    ERL_NIF_TERM error{};
 
     res_type * statement = nullptr;
     if ((statement = res_type::get_resource(env, argv[0], error)) == nullptr) {
@@ -931,7 +956,8 @@ static ERL_NIF_TERM adbc_statement_set_sql_query(ErlNifEnv *env, int argc, const
 static ERL_NIF_TERM adbc_statement_set_substrait_plan(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
     using res_type = NifRes<struct AdbcStatement>;
 
-    ERL_NIF_TERM ret, error;
+    ERL_NIF_TERM ret{};
+    ERL_NIF_TERM error{};
 
     res_type * statement = nullptr;
     if ((statement = res_type::get_resource(env, argv[0], error)) == nullptr) {
@@ -970,7 +996,8 @@ static ERL_NIF_TERM adbc_statement_bind(ErlNifEnv *env, int argc, const ERL_NIF_
     using array_type = NifRes<struct ArrowArray>;
     using schema_type = NifRes<struct ArrowSchema>;
 
-    ERL_NIF_TERM ret, error;
+    ERL_NIF_TERM ret{};
+    ERL_NIF_TERM error{};
 
     res_type * statement = nullptr;
     if ((statement = res_type::get_resource(env, argv[0], error)) == nullptr) {
@@ -1005,7 +1032,8 @@ static ERL_NIF_TERM adbc_statement_bind_stream(ErlNifEnv *env, int argc, const E
     using res_type = NifRes<struct AdbcStatement>;
     using array_stream_type = NifRes<struct ArrowArrayStream>;
 
-    ERL_NIF_TERM ret, error;
+    ERL_NIF_TERM ret{};
+    ERL_NIF_TERM error{};
 
     res_type * statement = nullptr;
     if ((statement = res_type::get_resource(env, argv[0], error)) == nullptr) {
@@ -1034,7 +1062,8 @@ static ERL_NIF_TERM adbc_statement_get_parameter_schema(ErlNifEnv *env, int argc
     using res_type = NifRes<struct AdbcStatement>;
     using schema_type = NifRes<struct ArrowSchema>;
 
-    ERL_NIF_TERM ret, error;
+    ERL_NIF_TERM ret{};
+    ERL_NIF_TERM error{};
 
     res_type * statement = nullptr;
     if ((statement = res_type::get_resource(env, argv[0], error)) == nullptr) {
@@ -1066,7 +1095,7 @@ static ERL_NIF_TERM adbc_statement_get_parameter_schema(ErlNifEnv *env, int argc
 }
 
 static ERL_NIF_TERM adbc_get_all_function_pointers(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
-    ERL_NIF_TERM ret;
+    ERL_NIF_TERM ret{};
     std::map<std::string, uint64_t> fptr = {
         {"AdbcDatabaseNew", (uint64_t)(uint64_t *)&AdbcDatabaseNew},
         {"AdbcDatabaseSetOption", (uint64_t)(uint64_t *)&AdbcDatabaseSetOption},

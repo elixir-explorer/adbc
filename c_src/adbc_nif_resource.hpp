@@ -14,7 +14,6 @@ struct NifRes {
     using res_type = NifRes<T>;
 
     val_type val;
-    std::atomic_bool released{false};
 
     static ErlNifResourceType * type;
     static res_type * allocate_resource(ErlNifEnv * env, ERL_NIF_TERM &error) {
@@ -24,7 +23,6 @@ struct NifRes {
             return res;
         }
         memset(&res->val, 0, sizeof(val_type));
-        res->released = false;
         return res;
     }
 
@@ -32,11 +30,6 @@ struct NifRes {
         res_type * self_res = nullptr;
         if (!enif_get_resource(env, term, res_type::type, (void **)&self_res) || self_res == nullptr) {
             error = erlang::nif::error(env, "cannot access Nif resource");
-        }
-
-        if (self_res->released) {
-            self_res = nullptr;
-            error = enif_make_badarg(env);
         }
 
         return self_res;
@@ -47,19 +40,15 @@ struct NifRes {
 
 template <typename T>
 void NifRes<T>::destruct_resource(ErlNifEnv *env, void *args) {
-    auto res = (NifRes<T> *)args;
-    res->released = true;
-    return;
 }
 
 template <>
 void NifRes<struct AdbcError>::destruct_resource(ErlNifEnv *env, void *args) {
     auto res = (NifRes<struct AdbcError> *)args;
     if (res) {
-        if (!res->released && res->val.release) {
+        if (res->val.release) {
             res->val.release(&res->val);
         }
-        res->released = true;
     }
 }
 
@@ -67,10 +56,9 @@ template <>
 void NifRes<struct ArrowArrayStream>::destruct_resource(ErlNifEnv *env, void *args) {
     auto res = (NifRes<struct ArrowArrayStream> *)args;
     if (res) {
-        if (!res->released && res->val.release) {
+        if (res->val.release) {
             res->val.release(&res->val);
         }
-        res->released = true;
     }
 }
 

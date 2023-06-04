@@ -1,6 +1,6 @@
 #include <erl_nif.h>
-#include <stdbool.h>
-#include <stdio.h>
+#include <cstdbool>
+#include <cstdio>
 #include <climits>
 #include "nif_utils.hpp"
 #include <adbc.h>
@@ -309,7 +309,7 @@ static ERL_NIF_TERM adbc_connection_get_info(ErlNifEnv *env, int argc, const ERL
     return enif_make_tuple3(env,
         erlang::nif::ok(env),
         ret,
-        enif_make_uint64(env, (uint64_t)(uint64_t *)&array_stream->val)
+        enif_make_uint64(env, reinterpret_cast<uint64_t>(&array_stream->val))
     );
 }
 

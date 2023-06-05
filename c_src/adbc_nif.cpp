@@ -415,7 +415,7 @@ static ERL_NIF_TERM adbc_connection_get_objects(ErlNifEnv *env, int argc, const 
     return enif_make_tuple3(env,
         erlang::nif::ok(env),
         ret,
-        enif_make_uint64(env, (uint64_t)(uint64_t *)&array_stream->val)
+        enif_make_uint64(env, reinterpret_cast<uint64_t>(&array)_stream->val)
     );
 }
 
@@ -514,7 +514,7 @@ static ERL_NIF_TERM adbc_connection_get_table_types(ErlNifEnv *env, int argc, co
     return enif_make_tuple3(env,
         erlang::nif::ok(env),
         ret,
-        enif_make_uint64(env, (uint64_t)(uint64_t *)&array_stream->val)
+        enif_make_uint64(env, reinterpret_cast<uint64_t>(&array)_stream->val)
     );
 }
 
@@ -570,7 +570,7 @@ static ERL_NIF_TERM adbc_connection_read_partition(ErlNifEnv *env, int argc, con
     return enif_make_tuple3(env,
         erlang::nif::ok(env),
         ret,
-        enif_make_uint64(env, (uint64_t)(uint64_t *)&array_stream->val)
+        enif_make_uint64(env, reinterpret_cast<uint64_t>(&array)_stream->val)
     );
 }
 
@@ -629,7 +629,7 @@ static ERL_NIF_TERM adbc_statement_get_pointer(ErlNifEnv *env, int argc, const E
         return error;
     }
 
-    return enif_make_uint64(env, (uint64_t)(uint64_t *)&res->val);
+    return enif_make_uint64(env, reinterpret_cast<uint64_t>(&res)->val);
 }
 
 static ERL_NIF_TERM adbc_arrow_schema_get_pointer(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
@@ -641,7 +641,7 @@ static ERL_NIF_TERM adbc_arrow_schema_get_pointer(ErlNifEnv *env, int argc, cons
         return error;
     }
 
-    return enif_make_uint64(env, (uint64_t)(uint64_t *)&res->val);
+    return enif_make_uint64(env, reinterpret_cast<uint64_t>(&res)->val);
 }
 
 static ERL_NIF_TERM adbc_arrow_array_get_pointer(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
@@ -653,7 +653,7 @@ static ERL_NIF_TERM adbc_arrow_array_get_pointer(ErlNifEnv *env, int argc, const
         return error;
     }
 
-    return enif_make_uint64(env, (uint64_t)(uint64_t *)&res->val);
+    return enif_make_uint64(env, reinterpret_cast<uint64_t>(&res)->val);
 }
 
 static ERL_NIF_TERM adbc_arrow_array_stream_get_pointer(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
@@ -665,7 +665,7 @@ static ERL_NIF_TERM adbc_arrow_array_stream_get_pointer(ErlNifEnv *env, int argc
         return error;
     }
 
-    return enif_make_uint64(env, (uint64_t)(uint64_t *)&res->val);
+    return enif_make_uint64(env, reinterpret_cast<uint64_t>(&res)->val);
 }
 
 static ERL_NIF_TERM adbc_arrow_array_stream_new(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
@@ -684,7 +684,7 @@ static ERL_NIF_TERM adbc_arrow_array_stream_new(ErlNifEnv *env, int argc, const 
     return enif_make_tuple3(env, 
         erlang::nif::ok(env), 
         ret, 
-        enif_make_uint64(env, (uint64_t)(uint64_t *)&res->val)
+        enif_make_uint64(env, reinterpret_cast<uint64_t>(&res)->val)
     );
 }
 
@@ -721,7 +721,7 @@ static ERL_NIF_TERM adbc_error_new(ErlNifEnv *env, int argc, const ERL_NIF_TERM 
     return enif_make_tuple3(env, 
         erlang::nif::ok(env), 
         ret, 
-        enif_make_uint64(env, (uint64_t)(uint64_t *)&res->val)
+        enif_make_uint64(env, reinterpret_cast<uint64_t>(&res)->val)
     );
 }
 
@@ -1050,34 +1050,34 @@ static ERL_NIF_TERM adbc_statement_get_parameter_schema(ErlNifEnv *env, int argc
 static ERL_NIF_TERM adbc_get_all_function_pointers(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
     ERL_NIF_TERM ret{};
     std::map<std::string, uint64_t> fptr = {
-        {"AdbcDatabaseNew", (uint64_t)(uint64_t *)&AdbcDatabaseNew},
-        {"AdbcDatabaseSetOption", (uint64_t)(uint64_t *)&AdbcDatabaseSetOption},
-        {"AdbcDatabaseInit", (uint64_t)(uint64_t *)&AdbcDatabaseInit},
-        {"AdbcDatabaseRelease", (uint64_t)(uint64_t *)&AdbcDatabaseRelease},
+        {"AdbcDatabaseNew", reinterpret_cast<uint64_t>(&AdbcDatabaseNew)},
+        {"AdbcDatabaseSetOption", reinterpret_cast<uint64_t>(&AdbcDatabaseSetOption)},
+        {"AdbcDatabaseInit", reinterpret_cast<uint64_t>(&AdbcDatabaseInit)},
+        {"AdbcDatabaseRelease", reinterpret_cast<uint64_t>(&AdbcDatabaseRelease)},
         
-        {"AdbcConnectionNew", (uint64_t)(uint64_t *)&AdbcConnectionNew},
-        {"AdbcConnectionSetOption", (uint64_t)(uint64_t *)&AdbcConnectionSetOption},
-        {"AdbcConnectionInit", (uint64_t)(uint64_t *)&AdbcConnectionInit},
-        {"AdbcConnectionRelease", (uint64_t)(uint64_t *)&AdbcConnectionRelease},
-        {"AdbcConnectionGetInfo", (uint64_t)(uint64_t *)&AdbcConnectionGetInfo},
-        {"AdbcConnectionGetObjects", (uint64_t)(uint64_t *)&AdbcConnectionGetObjects},
-        {"AdbcConnectionGetTableSchema", (uint64_t)(uint64_t *)&AdbcConnectionGetTableSchema},
-        {"AdbcConnectionGetTableTypes", (uint64_t)(uint64_t *)&AdbcConnectionGetTableTypes},
-        {"AdbcConnectionReadPartition", (uint64_t)(uint64_t *)&AdbcConnectionReadPartition},
-        {"AdbcConnectionCommit", (uint64_t)(uint64_t *)&AdbcConnectionCommit},
-        {"AdbcConnectionRollback", (uint64_t)(uint64_t *)&AdbcConnectionRollback},
+        {"AdbcConnectionNew", reinterpret_cast<uint64_t>(&AdbcConnectionNew)},
+        {"AdbcConnectionSetOption", reinterpret_cast<uint64_t>(&AdbcConnectionSetOption)},
+        {"AdbcConnectionInit", reinterpret_cast<uint64_t>(&AdbcConnectionInit)},
+        {"AdbcConnectionRelease", reinterpret_cast<uint64_t>(&AdbcConnectionRelease)},
+        {"AdbcConnectionGetInfo", reinterpret_cast<uint64_t>(&AdbcConnectionGetInfo)},
+        {"AdbcConnectionGetObjects", reinterpret_cast<uint64_t>(&AdbcConnectionGetObjects)},
+        {"AdbcConnectionGetTableSchema", reinterpret_cast<uint64_t>(&AdbcConnectionGetTableSchema)},
+        {"AdbcConnectionGetTableTypes", reinterpret_cast<uint64_t>(&AdbcConnectionGetTableTypes)},
+        {"AdbcConnectionReadPartition", reinterpret_cast<uint64_t>(&AdbcConnectionReadPartition)},
+        {"AdbcConnectionCommit", reinterpret_cast<uint64_t>(&AdbcConnectionCommit)},
+        {"AdbcConnectionRollback", reinterpret_cast<uint64_t>(&AdbcConnectionRollback)},
 
-        {"AdbcStatementNew", (uint64_t)(uint64_t *)&AdbcStatementNew},
-        {"AdbcStatementRelease", (uint64_t)(uint64_t *)&AdbcStatementRelease},
-        {"AdbcStatementExecuteQuery", (uint64_t)(uint64_t *)&AdbcStatementExecuteQuery},
-        {"AdbcStatementPrepare", (uint64_t)(uint64_t *)&AdbcStatementPrepare},
-        {"AdbcStatementSetSqlQuery", (uint64_t)(uint64_t *)&AdbcStatementSetSqlQuery},
-        {"AdbcStatementSetSubstraitPlan", (uint64_t)(uint64_t *)&AdbcStatementSetSubstraitPlan},
-        {"AdbcStatementBind", (uint64_t)(uint64_t *)&AdbcStatementBind},
-        {"AdbcStatementBindStream", (uint64_t)(uint64_t *)&AdbcStatementBindStream},
-        {"AdbcStatementGetParameterSchema", (uint64_t)(uint64_t *)&AdbcStatementGetParameterSchema},
-        {"AdbcStatementSetOption", (uint64_t)(uint64_t *)&AdbcStatementSetOption},
-        {"AdbcStatementExecutePartitions", (uint64_t)(uint64_t *)&AdbcStatementExecutePartitions}
+        {"AdbcStatementNew", reinterpret_cast<uint64_t>(&AdbcStatementNew)},
+        {"AdbcStatementRelease", reinterpret_cast<uint64_t>(&AdbcStatementRelease)},
+        {"AdbcStatementExecuteQuery", reinterpret_cast<uint64_t>(&AdbcStatementExecuteQuery)},
+        {"AdbcStatementPrepare", reinterpret_cast<uint64_t>(&AdbcStatementPrepare)},
+        {"AdbcStatementSetSqlQuery", reinterpret_cast<uint64_t>(&AdbcStatementSetSqlQuery)},
+        {"AdbcStatementSetSubstraitPlan", reinterpret_cast<uint64_t>(&AdbcStatementSetSubstraitPlan)},
+        {"AdbcStatementBind", reinterpret_cast<uint64_t>(&AdbcStatementBind)},
+        {"AdbcStatementBindStream", reinterpret_cast<uint64_t>(&AdbcStatementBindStream)},
+        {"AdbcStatementGetParameterSchema", reinterpret_cast<uint64_t>(&AdbcStatementGetParameterSchema)},
+        {"AdbcStatementSetOption", reinterpret_cast<uint64_t>(&AdbcStatementSetOption)},
+        {"AdbcStatementExecutePartitions", reinterpret_cast<uint64_t>(&AdbcStatementExecutePartitions)}
     };
     erlang::nif::make(env, fptr, ret, false);
     return ret;

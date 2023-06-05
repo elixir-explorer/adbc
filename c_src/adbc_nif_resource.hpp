@@ -5,6 +5,16 @@
 #include <atomic>
 #include <adbc.h>
 
+// Only for debugging:
+#include <cstdio>
+
+template<typename T> struct NoOpDeleter;
+
+/// A NifRes<T> wraps a `T` to allow it to be shared between C++, Erlang. and possibly NIFs written in other languages as well .
+///
+/// Because the in-memory representation of a `*NifRes<T>` is the same as a `*T`,
+/// the result from `my_nif_res->get_resource()` can be passed to a NIF
+/// written in other languages as well (as long as they know the memory representation of T).
 template <typename T>
 struct NifRes {
     using val_type_p = T *;
@@ -14,16 +24,28 @@ struct NifRes {
     val_type val;
 
     static ErlNifResourceType * type;
-    static res_type * allocate_resource(ErlNifEnv * env, ERL_NIF_TERM &error) {
-        res_type * res = (res_type *)enif_alloc_resource(res_type::type, sizeof(res_type));
+
+    /// Creates a new NifRes<T> using `enif_alloc_resource`, returning it as an owned pointer.
+    /// When this owned pointer leaves the scope, `enif_release_resource` is automatically called.
+    static auto allocate_resource(ErlNifEnv * env, ERL_NIF_TERM &error) -> std::unique_ptr<NifRes<T>, NoOpDeleter<res_type>> {
+        std::unique_ptr<NifRes<T>, NoOpDeleter<res_type>> res{static_cast<res_type *>(enif_alloc_resource(res_type::type, sizeof(res_type)))};
         if (res == nullptr) {
-            error = erlang::nif::error(env, "cannot allocate Nif resource");
+            error = erlang::nif::error(env, "cannot allocate Nif resource\n");
             return res;
         }
         memset(&res->val, 0, sizeof(val_type));
+
+        printf("%p: Allocating resource (and setting refcount to 1)\n", &*res);
+
         return res;
     }
 
+    /// Given a `term` that should be a NifRes<T>,
+    /// Obtain a pointer to the contained `val`
+    /// which is guaranteed to be valid for at least the lifetime of `env`.
+    ///
+    /// In the case something which is not a NifRes<T> is passed,
+    /// `nullptr` is returned and the output-parameter `error` filled.
     static res_type * get_resource(ErlNifEnv * env, ERL_NIF_TERM term, ERL_NIF_TERM &error) {
         res_type * self_res = nullptr;
         if (!enif_get_resource(env, term, res_type::type, reinterpret_cast<void **>(&self_res)) || self_res == nullptr) {
@@ -33,16 +55,42 @@ struct NifRes {
         return self_res;
     }
 
+    /// Creates another reference to the same underlying NifRes to be used in Erlang.
+    /// (uses `enif_make_resource`)
+    ERL_NIF_TERM make_resource(ErlNifEnv *env) {
+        return enif_make_resource(env, this);
+    }
+
+    /// Creates another reference to the same underlying NifRes to be used in C++.
+    /// (Increments the reference count on the C++ side).
+    auto clone_ref() const -> std::unique_ptr<NifRes<T>, NoOpDeleter<res_type>> {
+        printf("%p: Incrementing resource refcount\n", &*this);
+        enif_keep_resource(this);
+        return std::unique_ptr<NifRes<T>>{this};
+    }
+
+    // Called whenever a _single_ reference to the resource goes out of scope.
+    // Decrements the reference count on the C++ side.
+    ~NifRes() {
+      printf("%p: Decrementing resource count\n", this);
+      enif_release_resource(this);
+    }
+
+    // Callback which is called by the Erlang GC when the _last_ reference to the NifRes goes out of scope.
+    // If there is special cleanup that should happen for a particular child-class,
+    // create a template specialization for it.
     static void destruct_resource(ErlNifEnv *env, void *args);
 };
 
 template <typename T>
 void NifRes<T>::destruct_resource(ErlNifEnv *env, void *args) {
+  printf("%p: Destructing resource\n", args);
 }
 
 template <>
 void NifRes<struct AdbcError>::destruct_resource(ErlNifEnv *env, void *args) {
     auto res = (NifRes<struct AdbcError> *)args;
+    printf("%p: Destructing resource\n", res);
     if (res) {
         if (res->val.release) {
             res->val.release(&res->val);
@@ -53,11 +101,24 @@ void NifRes<struct AdbcError>::destruct_resource(ErlNifEnv *env, void *args) {
 template <>
 void NifRes<struct ArrowArrayStream>::destruct_resource(ErlNifEnv *env, void *args) {
     auto res = (NifRes<struct ArrowArrayStream> *)args;
+    printf("%p: Destructing resource\n", res);
     if (res) {
         if (res->val.release) {
             res->val.release(&res->val);
         }
     }
 }
+
+// Used to construct a unique_ptr wrapping memory that is managed remotely.
+// The value in this memory *does* need to be destructed
+// but *should not* be deallocated using `delete`.
+template<typename T>
+struct NoOpDeleter {
+  void operator()(T* val) {
+    // Do destruct
+    val->~T();
+    // Do not delete; we do not own the memory
+  }
+};
 
 #endif  /* ADBC_NIF_RESOURCE_HPP */

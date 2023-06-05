@@ -21,19 +21,24 @@ template<> ErlNifResourceType * NifRes<struct ArrowArrayStream>::type = nullptr;
 template<> ErlNifResourceType * NifRes<struct ArrowArray>::type = nullptr;
 template<> ErlNifResourceType * NifRes<struct ArrowSchema>::type = nullptr;
 
-static ERL_NIF_TERM nif_error_from_adbc_error(ErlNifEnv *env, struct AdbcError * error) {
-    char const* message = (error->message == nullptr) ? "unknown error" : error->message;
-    return erlang::nif::error(env, enif_make_tuple3(env,
+static ERL_NIF_TERM nif_error_from_adbc_error(ErlNifEnv *env, struct AdbcError * adbc_error) {
+    char const* message = (adbc_error->message == nullptr) ? "unknown error" : adbc_error->message;
+    ERL_NIF_TERM nif_error = erlang::nif::error(env, enif_make_tuple3(env,
         erlang::nif::make_binary(env, message),
-        enif_make_int(env, error->vendor_code),
-        erlang::nif::make_binary(env, error->sqlstate, 5)
+        enif_make_int(env, adbc_error->vendor_code),
+        erlang::nif::make_binary(env, adbc_error->sqlstate, 5)
     ));
+
+    if (adbc_error->release != nullptr) {
+        adbc_error->release(adbc_error);
+    }
+
+    return nif_error;
 }
 
 static ERL_NIF_TERM adbc_database_new(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
     using res_type = NifRes<struct AdbcDatabase>;
 
-    ERL_NIF_TERM ret{};
     ERL_NIF_TERM error{};
     res_type * database = nullptr;
     if ((database = res_type::allocate_resource(env, error)) == nullptr) {
@@ -44,14 +49,10 @@ static ERL_NIF_TERM adbc_database_new(ErlNifEnv *env, int argc, const ERL_NIF_TE
     AdbcStatusCode code = AdbcDatabaseNew(&database->val, &adbc_error);
     if (code != ADBC_STATUS_OK) {
         enif_release_resource(database);
-        ret = nif_error_from_adbc_error(env, &adbc_error);
-        if (adbc_error.release != nullptr) {
-            adbc_error.release(&adbc_error);
-        }
-        return ret;
+        return nif_error_from_adbc_error(env, &adbc_error);
     }
 
-    ret = enif_make_resource(env, database);
+    ERL_NIF_TERM ret = enif_make_resource(env, database);
     enif_release_resource(database);
     return erlang::nif::ok(env, ret);
 }
@@ -77,11 +78,7 @@ static ERL_NIF_TERM adbc_database_set_option(ErlNifEnv *env, int argc, const ERL
     struct AdbcError adbc_error{};
     AdbcStatusCode code = AdbcDatabaseSetOption(&database->val, key.c_str(), value.c_str(), &adbc_error);
     if (code != ADBC_STATUS_OK) {
-        ret = nif_error_from_adbc_error(env, &adbc_error);
-        if (adbc_error.release != nullptr) {
-            adbc_error.release(&adbc_error);
-        }
-        return ret;
+        return nif_error_from_adbc_error(env, &adbc_error);
     }
 
     return erlang::nif::ok(env);
@@ -100,11 +97,7 @@ static ERL_NIF_TERM adbc_database_init(ErlNifEnv *env, int argc, const ERL_NIF_T
     struct AdbcError adbc_error{};
     AdbcStatusCode code = AdbcDatabaseInit(&database->val, &adbc_error);
     if (code != ADBC_STATUS_OK) {
-        ret = nif_error_from_adbc_error(env, &adbc_error);
-        if (adbc_error.release != nullptr) {
-            adbc_error.release(&adbc_error);
-        }
-        return ret;
+        return nif_error_from_adbc_error(env, &adbc_error);
     }
 
     return erlang::nif::ok(env);
@@ -124,14 +117,10 @@ static ERL_NIF_TERM adbc_database_release(ErlNifEnv *env, int argc, const ERL_NI
     AdbcStatusCode code = AdbcDatabaseRelease(&database->val, &adbc_error);
     if (code != ADBC_STATUS_OK) {
         if (code == ADBC_STATUS_INVALID_STATE) {
-            ret = erlang::nif::error(env, "invalid state");
+            return erlang::nif::error(env, "invalid state");
         } else {
-            ret = nif_error_from_adbc_error(env, &adbc_error);
-            if (adbc_error.release != nullptr) {
-                adbc_error.release(&adbc_error);
-            }
+            return nif_error_from_adbc_error(env, &adbc_error);
         }
-        return ret;
     }
 
     return erlang::nif::ok(env);
@@ -151,11 +140,7 @@ static ERL_NIF_TERM adbc_connection_new(ErlNifEnv *env, int argc, const ERL_NIF_
     AdbcStatusCode code = AdbcConnectionNew(&connection->val, &adbc_error);
     if (code != ADBC_STATUS_OK) {
         enif_release_resource(connection);
-        ret = nif_error_from_adbc_error(env, &adbc_error);
-        if (adbc_error.release != nullptr) {
-            adbc_error.release(&adbc_error);
-        }
-        return ret;
+        return nif_error_from_adbc_error(env, &adbc_error);
     }
 
     ret = enif_make_resource(env, connection);
@@ -184,11 +169,7 @@ static ERL_NIF_TERM adbc_connection_set_option(ErlNifEnv *env, int argc, const E
     struct AdbcError adbc_error{};
     AdbcStatusCode code = AdbcConnectionSetOption(&connection->val, key.c_str(), value.c_str(), &adbc_error);
     if (code != ADBC_STATUS_OK) {
-        ret = nif_error_from_adbc_error(env, &adbc_error);
-        if (adbc_error.release != nullptr) {
-            adbc_error.release(&adbc_error);
-        }
-        return ret;
+        return nif_error_from_adbc_error(env, &adbc_error);
     }
 
     return erlang::nif::ok(env);
@@ -212,11 +193,7 @@ static ERL_NIF_TERM adbc_connection_init(ErlNifEnv *env, int argc, const ERL_NIF
     struct AdbcError adbc_error{};
     AdbcStatusCode code = AdbcConnectionInit(&connection->val, &db->val, &adbc_error);
     if (code != ADBC_STATUS_OK) {
-        ret = nif_error_from_adbc_error(env, &adbc_error);
-        if (adbc_error.release != nullptr) {
-            adbc_error.release(&adbc_error);
-        }
-        return ret;
+        return nif_error_from_adbc_error(env, &adbc_error);
     }
 
     return erlang::nif::ok(env);
@@ -236,14 +213,10 @@ static ERL_NIF_TERM adbc_connection_release(ErlNifEnv *env, int argc, const ERL_
     AdbcStatusCode code = AdbcConnectionRelease(&connection->val, &adbc_error);
     if (code != ADBC_STATUS_OK) {
         if (code == ADBC_STATUS_INVALID_STATE) {
-            ret = erlang::nif::error(env, "invalid state");
+            return erlang::nif::error(env, "invalid state");
         } else {
-            ret = nif_error_from_adbc_error(env, &adbc_error);
-            if (adbc_error.release != nullptr) {
-                adbc_error.release(&adbc_error);
-            }
+            return nif_error_from_adbc_error(env, &adbc_error);
         }
-        return ret;
     }
 
     return erlang::nif::ok(env);
@@ -278,12 +251,8 @@ static ERL_NIF_TERM adbc_connection_get_info(ErlNifEnv *env, int argc, const ERL
     struct AdbcError adbc_error{};
     AdbcStatusCode code = AdbcConnectionGetInfo(&connection->val, ptr, info_codes_length, &array_stream->val, &adbc_error);
     if (code != ADBC_STATUS_OK) {
-        ret = nif_error_from_adbc_error(env, &adbc_error);
         enif_release_resource(array_stream);
-        if (adbc_error.release != nullptr) {
-            adbc_error.release(&adbc_error);
-        }
-        return ret;
+        return nif_error_from_adbc_error(env, &adbc_error);
     }
 
     ret = enif_make_resource(env, array_stream);
@@ -388,15 +357,11 @@ static ERL_NIF_TERM adbc_connection_get_objects(ErlNifEnv *env, int argc, const 
         &array_stream->val,
         &adbc_error);
     if (code != ADBC_STATUS_OK) {
-        ret = nif_error_from_adbc_error(env, &adbc_error);
         enif_release_resource(array_stream);
-        if (adbc_error.release != nullptr) {
-            adbc_error.release(&adbc_error);
-        }
         for (auto& at : table_types) {
             if (at) enif_free((void *)at);
         }
-        return ret;
+        return nif_error_from_adbc_error(env, &adbc_error);
     }
 
     ret = enif_make_resource(env, array_stream);
@@ -461,12 +426,8 @@ static ERL_NIF_TERM adbc_connection_get_table_schema(ErlNifEnv *env, int argc, c
         &schema->val,
         &adbc_error);
     if (code != ADBC_STATUS_OK) {
-        ret = nif_error_from_adbc_error(env, &adbc_error);
         enif_release_resource(schema);
-        if (adbc_error.release != nullptr) {
-            adbc_error.release(&adbc_error);
-        }
-        return ret;
+        return nif_error_from_adbc_error(env, &adbc_error);
     }
 
     ret = enif_make_resource(env, schema);
@@ -493,12 +454,8 @@ static ERL_NIF_TERM adbc_connection_get_table_types(ErlNifEnv *env, int argc, co
     struct AdbcError adbc_error{};
     AdbcStatusCode code = AdbcConnectionGetTableTypes(&connection->val, &array_stream->val, &adbc_error);
     if (code != ADBC_STATUS_OK) {
-        ret = nif_error_from_adbc_error(env, &adbc_error);
         enif_release_resource(array_stream);
-        if (adbc_error.release != nullptr) {
-            adbc_error.release(&adbc_error);
-        }
-        return ret;
+        return nif_error_from_adbc_error(env, &adbc_error);
     }
 
     ret = enif_make_resource(env, array_stream);
@@ -549,12 +506,8 @@ static ERL_NIF_TERM adbc_connection_read_partition(ErlNifEnv *env, int argc, con
         &adbc_error
     );
     if (code != ADBC_STATUS_OK) {
-        ret = nif_error_from_adbc_error(env, &adbc_error);
         enif_release_resource(array_stream);
-        if (adbc_error.release != nullptr) {
-            adbc_error.release(&adbc_error);
-        }
-        return ret;
+        return nif_error_from_adbc_error(env, &adbc_error);
     }
 
     ret = enif_make_resource(env, array_stream);
@@ -580,11 +533,7 @@ static ERL_NIF_TERM adbc_connection_commit(ErlNifEnv *env, int argc, const ERL_N
     struct AdbcError adbc_error{};
     AdbcStatusCode code = AdbcConnectionCommit(&connection->val, &adbc_error);
     if (code != ADBC_STATUS_OK) {
-        ret = nif_error_from_adbc_error(env, &adbc_error);
-        if (adbc_error.release != nullptr) {
-            adbc_error.release(&adbc_error);
-        }
-        return ret;
+        return nif_error_from_adbc_error(env, &adbc_error);
     }
 
     return erlang::nif::ok(env);
@@ -603,11 +552,7 @@ static ERL_NIF_TERM adbc_connection_rollback(ErlNifEnv *env, int argc, const ERL
     struct AdbcError adbc_error{};
     AdbcStatusCode code = AdbcConnectionRollback(&connection->val, &adbc_error);
     if (code != ADBC_STATUS_OK) {
-        ret = nif_error_from_adbc_error(env, &adbc_error);
-        if (adbc_error.release != nullptr) {
-            adbc_error.release(&adbc_error);
-        }
-        return ret;
+        return nif_error_from_adbc_error(env, &adbc_error);
     }
 
     return erlang::nif::ok(env);
@@ -774,11 +719,7 @@ static ERL_NIF_TERM adbc_statement_new(ErlNifEnv *env, int argc, const ERL_NIF_T
     AdbcStatusCode code = AdbcStatementNew(&connection->val, &statement->val, &adbc_error);
     if (code != ADBC_STATUS_OK) {
         enif_release_resource(statement);
-        ret = nif_error_from_adbc_error(env, &adbc_error);
-        if (adbc_error.release != nullptr) {
-            adbc_error.release(&adbc_error);
-        }
-        return ret;
+        return nif_error_from_adbc_error(env, &adbc_error);
     }
 
     ret = enif_make_resource(env, statement);
@@ -801,14 +742,10 @@ static ERL_NIF_TERM adbc_statement_release(ErlNifEnv *env, int argc, const ERL_N
     AdbcStatusCode code = AdbcStatementRelease(&statement->val, &adbc_error);
     if (code != ADBC_STATUS_OK) {
         if (code == ADBC_STATUS_INVALID_STATE) {
-            ret = erlang::nif::error(env, "invalid state");
+            return erlang::nif::error(env, "invalid state");
         } else {
-            ret = nif_error_from_adbc_error(env, &adbc_error);
-            if (adbc_error.release != nullptr) {
-                adbc_error.release(&adbc_error);
-            }
+            return nif_error_from_adbc_error(env, &adbc_error);
         }
-        return ret;
     }
 
     return erlang::nif::ok(env);
@@ -835,12 +772,8 @@ static ERL_NIF_TERM adbc_statement_execute_query(ErlNifEnv *env, int argc, const
     struct AdbcError adbc_error{};
     AdbcStatusCode code = AdbcStatementExecuteQuery(&statement->val, &array_stream->val, &rows_affected, &adbc_error);
     if (code != ADBC_STATUS_OK) {
-        ret = nif_error_from_adbc_error(env, &adbc_error);
         enif_release_resource(array_stream);
-        if (adbc_error.release != nullptr) {
-            adbc_error.release(&adbc_error);
-        }
-        return ret;
+        return nif_error_from_adbc_error(env, &adbc_error);
     }
 
     ret = enif_make_resource(env, array_stream);
@@ -866,11 +799,7 @@ static ERL_NIF_TERM adbc_statement_prepare(ErlNifEnv *env, int argc, const ERL_N
     struct AdbcError adbc_error{};
     AdbcStatusCode code = AdbcStatementPrepare(&statement->val, &adbc_error);
     if (code != ADBC_STATUS_OK) {
-        ret = nif_error_from_adbc_error(env, &adbc_error);
-        if (adbc_error.release != nullptr) {
-            adbc_error.release(&adbc_error);
-        }
-        return ret;
+        return nif_error_from_adbc_error(env, &adbc_error);
     }
 
     return erlang::nif::ok(env);
@@ -895,11 +824,7 @@ static ERL_NIF_TERM adbc_statement_set_sql_query(ErlNifEnv *env, int argc, const
     struct AdbcError adbc_error{};
     AdbcStatusCode code = AdbcStatementSetSqlQuery(&statement->val, query.c_str(), &adbc_error);
     if (code != ADBC_STATUS_OK) {
-        ret = nif_error_from_adbc_error(env, &adbc_error);
-        if (adbc_error.release != nullptr) {
-            adbc_error.release(&adbc_error);
-        }
-        return ret;
+        return nif_error_from_adbc_error(env, &adbc_error);
     }
 
     return erlang::nif::ok(env);
@@ -932,11 +857,7 @@ static ERL_NIF_TERM adbc_statement_set_substrait_plan(ErlNifEnv *env, int argc, 
     struct AdbcError adbc_error{};
     AdbcStatusCode code = AdbcStatementSetSubstraitPlan(&statement->val, (const uint8_t *)plan.data, length, &adbc_error);
     if (code != ADBC_STATUS_OK) {
-        ret = nif_error_from_adbc_error(env, &adbc_error);
-        if (adbc_error.release != nullptr) {
-            adbc_error.release(&adbc_error);
-        }
-        return ret;
+        return nif_error_from_adbc_error(env, &adbc_error);
     }
 
     return erlang::nif::ok(env);
@@ -968,11 +889,7 @@ static ERL_NIF_TERM adbc_statement_bind(ErlNifEnv *env, int argc, const ERL_NIF_
     struct AdbcError adbc_error{};
     AdbcStatusCode code = AdbcStatementBind(&statement->val, &values->val, &schema->val, &adbc_error);
     if (code != ADBC_STATUS_OK) {
-        ret = nif_error_from_adbc_error(env, &adbc_error);
-        if (adbc_error.release != nullptr) {
-            adbc_error.release(&adbc_error);
-        }
-        return ret;
+        return nif_error_from_adbc_error(env, &adbc_error);
     }
 
     return erlang::nif::ok(env);
@@ -997,11 +914,7 @@ static ERL_NIF_TERM adbc_statement_bind_stream(ErlNifEnv *env, int argc, const E
     struct AdbcError adbc_error{};
     AdbcStatusCode code = AdbcStatementBindStream(&statement->val, &stream->val, &adbc_error);
     if (code != ADBC_STATUS_OK) {
-        ret = nif_error_from_adbc_error(env, &adbc_error);
-        if (adbc_error.release != nullptr) {
-            adbc_error.release(&adbc_error);
-        }
-        return ret;
+        return nif_error_from_adbc_error(env, &adbc_error);
     }
 
     return erlang::nif::ok(env);
@@ -1027,12 +940,8 @@ static ERL_NIF_TERM adbc_statement_get_parameter_schema(ErlNifEnv *env, int argc
     struct AdbcError adbc_error{};
     AdbcStatusCode code = AdbcStatementGetParameterSchema(&statement->val, &schema->val, &adbc_error);
     if (code != ADBC_STATUS_OK) {
-        ret = nif_error_from_adbc_error(env, &adbc_error);
         enif_release_resource(schema);
-        if (adbc_error.release != nullptr) {
-            adbc_error.release(&adbc_error);
-        }
-        return ret;
+        return nif_error_from_adbc_error(env, &adbc_error);
     }
 
     ret = enif_make_resource(env, schema);

@@ -10,11 +10,16 @@
 
 template<typename T> struct NoOpDeleter;
 
-/// A NifRes<T> wraps a `T` to allow it to be shared between C++, Erlang. and possibly NIFs written in other languages as well .
+/// A NifRes<T> wraps a `T` to allow it to be shared between C++ and Erlang while managing its lifetime properly.
 ///
 /// Because the in-memory representation of a `*NifRes<T>` is the same as a `*T`,
 /// the result from `my_nif_res->get_resource()` can be passed to a NIF
 /// written in other languages as well (as long as they know the memory representation of T).
+///
+/// Lifetime is managed automatically by:
+/// - Returning an owned pointer from `allocate_resource` and `clone_ref`. Behind the scenes, these calls manipulate Erlang's refcount of the resource object.
+/// - Whenever one of these owned pointers leaves the scope, the refcount is decremented.
+/// - Separately, a `destruct_resource` callback is provided to Erlang which will be called by the GC when there are no references (from either Erlang or C++ side) remaining.
 template <typename T>
 struct NifRes {
     using val_type_p = T *;

@@ -36,8 +36,8 @@ build: $(NIF_SO_REL)
 
 priv_dir:
 	@ if [ ! -e "$(PRIV_DIR)" ]; then \
- 		mkdir -p "$(PRIV_DIR)" ; \
- 	fi
+		mkdir -p "$(PRIV_DIR)" ; \
+	fi
 
 adbc: priv_dir
 	@ if [ ! -f "$(ADBC_DRIVER_COMMON_LIB)" ]; then \
@@ -58,7 +58,7 @@ adbc: priv_dir
 			-DCMAKE_INSTALL_PREFIX="$(PRIV_DIR)" \
 			-DADBC_DEPENDENCY_SOURCE=BUNDLED \
 			$(CMAKE_CONFIGURE_FLAGS) $(CMAKE_ADBC_OPTIONS) "$(ADBC_C_SRC)" && \
-    	cmake --build . --target install -j ; \
+		cmake --build . --target install -j ; \
 	fi
 
 $(NIF_SO_REL): priv_dir adbc $(C_SRC_REL)/adbc_nif_resource.hpp $(C_SRC_REL)/adbc_nif.cpp $(C_SRC_REL)/nif_utils.hpp $(C_SRC_REL)/nif_utils.cpp

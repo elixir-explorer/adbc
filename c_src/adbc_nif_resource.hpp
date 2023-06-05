@@ -26,7 +26,7 @@ struct NifRes {
 
     static res_type * get_resource(ErlNifEnv * env, ERL_NIF_TERM term, ERL_NIF_TERM &error) {
         res_type * self_res = nullptr;
-        if (!enif_get_resource(env, term, res_type::type, static_cast<void **>(&self_res)) || self_res == nullptr) {
+        if (!enif_get_resource(env, term, res_type::type, reinterpret_cast<void **>(&self_res)) || self_res == nullptr) {
             error = erlang::nif::error(env, "cannot access Nif resource");
         }
 

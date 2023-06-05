@@ -22,19 +22,12 @@ template<> ErlNifResourceType * NifRes<struct ArrowArray>::type = nullptr;
 template<> ErlNifResourceType * NifRes<struct ArrowSchema>::type = nullptr;
 
 static ERL_NIF_TERM nif_error_from_adbc_error(ErlNifEnv *env, struct AdbcError * error) {
-    if (error->message == nullptr) {
-        return erlang::nif::error(env, enif_make_tuple3(env,
-            erlang::nif::make_binary(env, "unknown error"),
-            enif_make_int(env, error->vendor_code),
-            erlang::nif::make_binary(env, error->sqlstate, 5)
-        ));
-    } else {
-        return erlang::nif::error(env, enif_make_tuple3(env,
-            erlang::nif::make_binary(env, error->message),
-            enif_make_int(env, error->vendor_code),
-            erlang::nif::make_binary(env, error->sqlstate, 5)
-        ));
-    }
+    char const* message = (error->message == nullptr) ? "unknown error" : error->message;
+    return erlang::nif::error(env, enif_make_tuple3(env,
+        erlang::nif::make_binary(env, message),
+        enif_make_int(env, error->vendor_code),
+        erlang::nif::make_binary(env, error->sqlstate, 5)
+    ));
 }
 
 static ERL_NIF_TERM adbc_database_new(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
@@ -415,7 +408,7 @@ static ERL_NIF_TERM adbc_connection_get_objects(ErlNifEnv *env, int argc, const 
     return enif_make_tuple3(env,
         erlang::nif::ok(env),
         ret,
-        enif_make_uint64(env, reinterpret_cast<uint64_t>(&array)_stream->val)
+        enif_make_uint64(env, reinterpret_cast<uint64_t>(&array_stream->val))
     );
 }
 
@@ -514,7 +507,7 @@ static ERL_NIF_TERM adbc_connection_get_table_types(ErlNifEnv *env, int argc, co
     return enif_make_tuple3(env,
         erlang::nif::ok(env),
         ret,
-        enif_make_uint64(env, reinterpret_cast<uint64_t>(&array)_stream->val)
+        enif_make_uint64(env, reinterpret_cast<uint64_t>(&array_stream->val))
     );
 }
 
@@ -570,7 +563,7 @@ static ERL_NIF_TERM adbc_connection_read_partition(ErlNifEnv *env, int argc, con
     return enif_make_tuple3(env,
         erlang::nif::ok(env),
         ret,
-        enif_make_uint64(env, reinterpret_cast<uint64_t>(&array)_stream->val)
+        enif_make_uint64(env, reinterpret_cast<uint64_t>(&array_stream->val))
     );
 }
 
@@ -629,7 +622,7 @@ static ERL_NIF_TERM adbc_statement_get_pointer(ErlNifEnv *env, int argc, const E
         return error;
     }
 
-    return enif_make_uint64(env, reinterpret_cast<uint64_t>(&res)->val);
+    return enif_make_uint64(env, reinterpret_cast<uint64_t>(&res->val));
 }
 
 static ERL_NIF_TERM adbc_arrow_schema_get_pointer(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
@@ -641,7 +634,7 @@ static ERL_NIF_TERM adbc_arrow_schema_get_pointer(ErlNifEnv *env, int argc, cons
         return error;
     }
 
-    return enif_make_uint64(env, reinterpret_cast<uint64_t>(&res)->val);
+    return enif_make_uint64(env, reinterpret_cast<uint64_t>(&res->val));
 }
 
 static ERL_NIF_TERM adbc_arrow_array_get_pointer(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
@@ -653,7 +646,7 @@ static ERL_NIF_TERM adbc_arrow_array_get_pointer(ErlNifEnv *env, int argc, const
         return error;
     }
 
-    return enif_make_uint64(env, reinterpret_cast<uint64_t>(&res)->val);
+    return enif_make_uint64(env, reinterpret_cast<uint64_t>(&res->val));
 }
 
 static ERL_NIF_TERM adbc_arrow_array_stream_get_pointer(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
@@ -665,7 +658,7 @@ static ERL_NIF_TERM adbc_arrow_array_stream_get_pointer(ErlNifEnv *env, int argc
         return error;
     }
 
-    return enif_make_uint64(env, reinterpret_cast<uint64_t>(&res)->val);
+    return enif_make_uint64(env, reinterpret_cast<uint64_t>(&res->val));
 }
 
 static ERL_NIF_TERM adbc_arrow_array_stream_new(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
@@ -684,7 +677,7 @@ static ERL_NIF_TERM adbc_arrow_array_stream_new(ErlNifEnv *env, int argc, const 
     return enif_make_tuple3(env, 
         erlang::nif::ok(env), 
         ret, 
-        enif_make_uint64(env, reinterpret_cast<uint64_t>(&res)->val)
+        enif_make_uint64(env, reinterpret_cast<uint64_t>(&res->val))
     );
 }
 
@@ -721,7 +714,7 @@ static ERL_NIF_TERM adbc_error_new(ErlNifEnv *env, int argc, const ERL_NIF_TERM 
     return enif_make_tuple3(env, 
         erlang::nif::ok(env), 
         ret, 
-        enif_make_uint64(env, reinterpret_cast<uint64_t>(&res)->val)
+        enif_make_uint64(env, reinterpret_cast<uint64_t>(&res->val))
     );
 }
 

@@ -22,5 +22,6 @@ if (-Not(Test-Path -Path $dst_filename -PathType Leaf))
         }
         Expand-Archive -Path $save_as -DestinationPath $unarchive_dir
     }
+    New-Item -Path $priv_lib_dir -ItemType Container -Force
     Copy-Item -Path "$unarchive_dir/adbc_driver_${driver_name}/libadbc_driver_${driver_name}.so" -Destination $dst_filename -Force
 }

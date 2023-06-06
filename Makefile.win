@@ -53,7 +53,7 @@ cache_dir:
 
 download_adbc_driver: cache_dir
 !IF "$(ABDC_DRIVER_SQLITE)" == "true"
-	@ powershell scripts/download_driver.ps1 "sqlite" "$(CACHE_DIR)" "$(PRIV_DIR)/lib"
+	@ powershell scripts/download_driver.ps1 "sqlite" "$(CACHE_DIR)" "$(PRIV_DIR)/bin"
 !ENDIF
 !IF "$(ABDC_DRIVER_POSTGRESQL)" == "true"
 	@ powershell scripts/download_driver.ps1 "postgresql" "$(CACHE_DIR)" "$(PRIV_DIR)/bin"

@@ -13,36 +13,41 @@ defmodule Adbc.Driver do
 
     case Helper.get_current_triplet() do
       {:ok, triplet} ->
-        url =
+        {status, info} =
           case triplet do
             "aarch64-apple-darwin" ->
-              base_url <>
-                "#{version}/adbc_driver_#{official_driver}-#{version}-py3-none-macosx_11_0_arm64.whl"
+              {:ok,
+               base_url <>
+                 "#{version}/adbc_driver_#{official_driver}-#{version}-py3-none-macosx_11_0_arm64.whl"}
 
             "x86_64-apple-darwin" ->
-              base_url <>
-                "#{version}/adbc_driver_#{official_driver}-#{version}-py3-none-macosx_10_9_x86_64.whl"
+              {:ok,
+               base_url <>
+                 "#{version}/adbc_driver_#{official_driver}-#{version}-py3-none-macosx_10_9_x86_64.whl"}
 
             "aarch64-linux-gnu" ->
-              base_url <>
-                "#{version}/adbc_driver_#{official_driver}-#{version}-py3-none-manylinux_2_17_aarch64.manylinux2014_aarch64.whl"
+              {:ok,
+               base_url <>
+                 "#{version}/adbc_driver_#{official_driver}-#{version}-py3-none-manylinux_2_17_aarch64.manylinux2014_aarch64.whl"}
 
             "x86_64-linux-gnu" ->
-              base_url <>
-                "#{version}/adbc_driver_#{official_driver}-#{version}-py3-none-manylinux_2_17_x86_64.manylinux2014_x86_64.whl"
+              {:ok,
+               base_url <>
+                 "#{version}/adbc_driver_#{official_driver}-#{version}-py3-none-manylinux_2_17_x86_64.manylinux2014_x86_64.whl"}
 
             "x86_64-windows-msvc" ->
-              base_url <>
-                "#{version}/adbc_driver_#{official_driver}-#{version}-py3-none-win_amd64.whl"
+              {:ok,
+               base_url <>
+                 "#{version}/adbc_driver_#{official_driver}-#{version}-py3-none-win_amd64.whl"}
 
             _ ->
               {:error, "offifical driver does not have a precompiled version for `#{triplet}`"}
           end
 
-        if is_binary(url) do
-          do_download(url, ignore_proxy, official_driver)
+        if status == :ok do
+          do_download(info, triplet, ignore_proxy, official_driver)
         else
-          url
+          {:error, info}
         end
 
       {:error, reason} ->
@@ -50,7 +55,7 @@ defmodule Adbc.Driver do
     end
   end
 
-  defp do_download(url, ignore_proxy, driver_name) do
+  defp do_download(url, triplet, ignore_proxy, driver_name) do
     with {:ok, zip_data} <- Helper.download(url, ignore_proxy),
          {:ok, zip_handle} <- :zip.zip_open(zip_data, [:cooked, :memory]),
          {:ok, files} <- :zip.table(zip_data, [:cooked]),
@@ -63,13 +68,27 @@ defmodule Adbc.Driver do
       Enum.each(so_files, fn so_file ->
         with {:ok, {filename, file_data}} <- :zip.zip_get(so_file, zip_handle),
              filename =
-               String.replace_leading(to_string(filename), "adbc_driver_#{driver_name}/", ""),
+               String.replace_leading(
+                 to_string(filename),
+                 "adbc_driver_#{driver_name}/",
+                 "#{triplet}-"
+               ),
              filepath = Path.join(Helper.driver_directory(), filename),
              :ok <- File.write(filepath, file_data) do
           :ok
         end
       end)
     else
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
+  def driver_filepath(driver_name) do
+    case Helper.get_current_triplet() do
+      {:ok, triplet} ->
+        {:ok, Path.join(Helper.driver_directory(), "#{triplet}-libadbc_driver_#{driver_name}.so")}
+
       {:error, reason} ->
         {:error, reason}
     end

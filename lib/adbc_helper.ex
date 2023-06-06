@@ -105,19 +105,7 @@ defmodule Adbc.Helper do
   end
 
   def shared_driver_path(driver) do
-    {subdir, extension} =
-      case :os.type() do
-        {:unix, :darwin} ->
-          {"lib", "dylib"}
-
-        {:unix, _} ->
-          {"lib", "so"}
-
-        {:win32, _} ->
-          {"bin", "dll"}
-      end
-
-    "#{:code.priv_dir(:adbc)}/#{subdir}/libadbc_driver_#{driver}.#{extension}"
+    Adbc.Driver.driver_filepath(driver)
   end
 
   def get_current_triplet do
@@ -301,4 +289,8 @@ defmodule Adbc.Helper do
         "#{:code.priv_dir(:adbc)}/lib"
     end
   end
+end
+
+for driver <- Application.compile_env(:adbc, :drivers, [:sqlite, :postgresql]) do
+  Adbc.Driver.download_driver(driver)
 end

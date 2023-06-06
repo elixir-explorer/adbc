@@ -10,7 +10,7 @@ CACHE_DIR = $(THIRD_PARTY_DIR)/cache
 ADBC_SRC = $(THIRD_PARTY_DIR)/apache-arrow-adbc
 ADBC_C_SRC = $(ADBC_SRC)/c
 UNAME_S := $(shell uname -s)
-ABDC_DRIVER_SQLITE ?= true
+ABDC_DRIVER_SQLITE ?= "true"
 ifeq ($(UNAME_S),Linux)
 	ADBC_DRIVER_COMMON_LIB = $(PRIV_DIR)/lib/libadbc_driver_manager.so
 endif

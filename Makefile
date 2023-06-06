@@ -48,8 +48,11 @@ cache_dir:
 	fi
 
 download_adbc_driver: cache_dir
+	@ echo "before this"
 	@ if [ "$(ABDC_DRIVER_SQLITE)" == "true" ]; then \
+		echo "after if in Makefile"
 		bash ./scripts/download_driver.sh sqlite "$(CACHE_DIR)" "$(PRIV_DIR)/lib" ; \
+		echo "after calling bash Makefile"
 	fi
 	@ if [ "$(ABDC_DRIVER_POSTGRESQL)" == "true" ]; then \
 		bash ./scripts/download_driver.sh postgresql "$(CACHE_DIR)" "$(PRIV_DIR)/lib" ; \

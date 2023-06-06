@@ -27,6 +27,7 @@ case "${DRIVER_NAME}" in
 esac
 
 get_triplet() {
+  echo "here?"
   if [[ -n "${TARGET_ARCH}" && -n "${TARGET_OS}" && -n "${TARGET_ABI}" ]]; then
     if [ "${TARGET_ARCH}" = "arm" ]; then
       case "${TARGET_CPU}" in

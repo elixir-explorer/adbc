@@ -26,7 +26,7 @@ defmodule ADBC.MixProject do
 
   def application do
     [
-      extra_applications: [:logger]
+      extra_applications: [:logger, :public_key, :inets]
     ]
   end
 
@@ -38,6 +38,7 @@ defmodule ADBC.MixProject do
 
       # runtime
       {:dll_loader_helper, "~> 0.1"},
+      {:castore, "~> 0.1 or ~> 1.0"},
 
       # docs
       {:ex_doc, "~> 0.29", only: :docs, runtime: false}
@@ -55,7 +56,8 @@ defmodule ADBC.MixProject do
   defp package() do
     [
       name: "adbc",
-      files: ~w(3rd_party/apache-arrow-adbc c_src lib mix.exs README* LICENSE* Makefile checksum.exs),
+      files:
+        ~w(3rd_party/apache-arrow-adbc c_src lib mix.exs README* LICENSE* Makefile checksum.exs),
       licenses: ["Apache-2.0"],
       links: %{"GitHub" => @github_url}
     ]

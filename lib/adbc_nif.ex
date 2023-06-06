@@ -8,8 +8,10 @@ defmodule Adbc.Nif do
     :ok =
       case :os.type() do
         {:win32, _} ->
-            DLLLoaderHelper.addDLLDirectory("#{:code.priv_dir(:adbc)}/bin")
-        _ -> :ok
+          DLLLoaderHelper.addDLLDirectory("#{:code.priv_dir(:adbc)}/bin")
+
+        _ ->
+          :ok
       end
 
     case :erlang.load_nif(nif_file, 0) do

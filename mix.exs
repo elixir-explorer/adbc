@@ -36,6 +36,9 @@ defmodule ADBC.MixProject do
       {:cc_precompiler, "~> 0.1.0", runtime: false},
       {:elixir_make, "~> 0.7.0", runtime: false},
 
+      # runtime
+      {:dll_loader_helper, "~> 0.1"},
+
       # docs
       {:ex_doc, "~> 0.29", only: :docs, runtime: false}
     ]

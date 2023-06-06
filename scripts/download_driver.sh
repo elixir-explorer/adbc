@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 DRIVER_NAME=$1
 SAVE_TO=$2

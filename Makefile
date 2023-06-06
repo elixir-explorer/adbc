@@ -49,10 +49,10 @@ cache_dir:
 
 download_adbc_driver: cache_dir
 	@ if [ "$(ABDC_DRIVER_SQLITE)" == "true" ]; then \
-		./scripts/download_driver.sh sqlite "$(CACHE_DIR)" "$(PRIV_DIR)/lib" ; \
+		bash ./scripts/download_driver.sh sqlite "$(CACHE_DIR)" "$(PRIV_DIR)/lib" ; \
 	fi
 	@ if [ "$(ABDC_DRIVER_POSTGRESQL)" == "true" ]; then \
-		./scripts/download_driver.sh postgresql "$(CACHE_DIR)" "$(PRIV_DIR)/lib" ; \
+		bash ./scripts/download_driver.sh postgresql "$(CACHE_DIR)" "$(PRIV_DIR)/lib" ; \
 	fi
 
 adbc: priv_dir download_adbc_driver

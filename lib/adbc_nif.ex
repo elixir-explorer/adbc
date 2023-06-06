@@ -8,7 +8,7 @@ defmodule Adbc.Nif do
     :ok =
       case :os.type() do
         {:win32, _} ->
-            DLLLoaderHelper.addDLLDirectory("#{:code.priv_dir(:adbc)}/lib")
+            DLLLoaderHelper.addDLLDirectory("#{:code.priv_dir(:adbc)}/bin")
         _ -> :ok
       end
 

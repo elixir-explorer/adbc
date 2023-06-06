@@ -56,7 +56,7 @@ download_adbc_driver: cache_dir
 	@ powershell scripts/download_driver.ps1 "sqlite" "$(CACHE_DIR)" "$(PRIV_DIR)/lib"
 !ENDIF
 !IF "$(ABDC_DRIVER_POSTGRESQL)" == "true"
-	@ powershell scripts/download_driver.ps1 "postgresql" "$(CACHE_DIR)" "$(PRIV_DIR)/lib"
+	@ powershell scripts/download_driver.ps1 "postgresql" "$(CACHE_DIR)" "$(PRIV_DIR)/bin"
 !ENDIF
 
 adbc: priv_dir download_adbc_driver
@@ -84,7 +84,7 @@ adbc: priv_dir download_adbc_driver
 
 $(NIF_SO): adbc priv_dir c_src\adbc_nif_resource.hpp c_src\adbc_nif.cpp c_src\nif_utils.cpp c_src\nif_utils.hpp
 	@ if not exist "$(CMAKE_ADBC_NIF_BUILD_DIR)" mkdir "$(CMAKE_ADBC_NIF_BUILD_DIR)" && \
-    cd "$(CMAKE_HNSWLIB_BUILD_DIR)" && \
+    cd "$(CMAKE_ADBC_NIF_BUILD_DIR)" && \
     cmake -G "$(CMAKE_GENERATOR_TYPE)" \
         --no-warn-unused-cli \
         -D C_SRC="$(C_SRC)" \

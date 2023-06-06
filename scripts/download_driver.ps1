@@ -1,6 +1,6 @@
 $driver_name=$args[0]
 $save_to=$args[1]
-$priv_lib_dir=$args[2]
+$priv_bin_dir=$args[2]
 
 $ADBC_VERSION = "0.4.0"
 $ADBC_DRIVER_BASE_URL = "https://github.com/apache/arrow-adbc/releases/download/apache-arrow-adbc-$ADBC_VERSION"
@@ -9,7 +9,7 @@ $ADBC_DRIVER_WINDOWS_AMD64_URL = "$ADBC_DRIVER_BASE_URL/adbc_driver_$DRIVER_NAME
 $driver_triplet = "x86_64-windows-msvc"
 $save_as = Join-Path $save_to "$driver_name-$ADBC_VERSION-$driver_triplet.zip"
 $unarchive_dir = Join-Path $save_to "$driver_name-$ADBC_VERSION-$driver_triplet"
-$dst_filename = Join-Path $priv_lib_dir "libadbc_driver_${driver_name}.dll"
+$dst_filename = Join-Path $priv_bin_dir "libadbc_driver_${driver_name}.dll"
 
 if (-Not(Test-Path -Path $dst_filename -PathType Leaf))
 {

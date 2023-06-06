@@ -13,11 +13,11 @@ $dst_filename = Join-Path $priv_lib_dir "libadbc_driver_${driver_name}.dll"
 
 if (-Not(Test-Path -Path $dst_filename -PathType Leaf))
 {
-    if(-Not(Test-Path -PathType Directory -Path $unarchive_dir))
+    if(-Not(Test-Path -PathType Container -Path $unarchive_dir))
     {
         if (-Not(Test-Path -Path $save_as -PathType Leaf))
         {
-            New-Item -Path $save_to -ItemType Directory -Force
+            New-Item -Path $save_to -ItemType Container -Force
             Invoke-WebRequest -Uri $ADBC_DRIVER_WINDOWS_AMD64_URL -OutFile $save_as
         }
         Expand-Archive -Path $save_as -DestinationPath $unarchive_dir

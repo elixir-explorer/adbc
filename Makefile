@@ -10,7 +10,7 @@ CACHE_DIR = $(THIRD_PARTY_DIR)/cache
 ADBC_SRC = $(THIRD_PARTY_DIR)/apache-arrow-adbc
 ADBC_C_SRC = $(ADBC_SRC)/c
 UNAME_S := $(shell uname -s)
-ABDC_DRIVER_SQLITE ?= "true"
+ABDC_DRIVER_SQLITE ?= true
 ifeq ($(UNAME_S),Linux)
 	ADBC_DRIVER_COMMON_LIB = $(PRIV_DIR)/lib/libadbc_driver_manager.so
 endif
@@ -49,12 +49,12 @@ cache_dir:
 
 download_adbc_driver: cache_dir
 	@ echo "before this"
-	@ if [ "$(ABDC_DRIVER_SQLITE)" == "true" ]; then \
+	@ if [ "$(ABDC_DRIVER_SQLITE)" = "true" ]; then \
 		echo "after if in Makefile" && \
 		bash ./scripts/download_driver.sh sqlite "$(CACHE_DIR)" "$(PRIV_DIR)/lib" && \
 		echo "after calling bash Makefile" ; \
 	fi
-	@ if [ "$(ABDC_DRIVER_POSTGRESQL)" == "true" ]; then \
+	@ if [ "$(ABDC_DRIVER_POSTGRESQL)" = "true" ]; then \
 		bash ./scripts/download_driver.sh postgresql "$(CACHE_DIR)" "$(PRIV_DIR)/lib" ; \
 	fi
 

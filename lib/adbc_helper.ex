@@ -105,18 +105,18 @@ defmodule Adbc.Helper do
   end
 
   def shared_driver_path(driver) do
-    extension =
+    {subdir, extension} =
       case :os.type() do
         {:unix, :darwin} ->
-          "dylib"
+          {"lib", "dylib"}
 
         {:unix, _} ->
-          "so"
+          {"lib", "so"}
 
         {:win32, _} ->
-          "dll"
+          {"bin", "dll"}
       end
 
-      "#{:code.priv_dir(:adbc)}/lib/libadbc_driver_#{driver}.#{extension}"
+      "#{:code.priv_dir(:adbc)}/#{subdir}/libadbc_driver_#{driver}.#{extension}"
   end
 end

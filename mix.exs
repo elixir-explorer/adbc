@@ -1,12 +1,13 @@
 defmodule ADBC.MixProject do
   use Mix.Project
 
+  @app :adbc
   @version "0.1.0"
   @github_url "https://github.com/cocoa-xu/adbc"
 
   def project do
     [
-      app: :adbc,
+      app: @app,
       version: @version,
       elixir: "~> 1.12",
       start_permanent: Mix.env() == :prod,
@@ -14,6 +15,9 @@ defmodule ADBC.MixProject do
       package: package(),
       docs: docs(),
       compilers: [:elixir_make] ++ Mix.compilers(),
+      make_env: %{
+        "ABDC_DRIVER_SQLITE" => "true"
+      },
       make_precompiler: {:nif, CCPrecompiler},
       make_precompiler_url: "#{@github_url}/releases/download/v#{@version}/@{artefact_filename}",
       make_precompiler_filename: "adbc_nif"
@@ -48,7 +52,7 @@ defmodule ADBC.MixProject do
   defp package() do
     [
       name: "adbc",
-      files: ~w(3rd_party c_src lib mix.exs README* LICENSE* Makefile checksum.exs),
+      files: ~w(3rd_party/apache-arrow-adbc c_src lib mix.exs README* LICENSE* Makefile checksum.exs),
       licenses: ["Apache-2.0"],
       links: %{"GitHub" => @github_url}
     ]

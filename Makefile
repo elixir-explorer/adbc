@@ -5,9 +5,12 @@ endif
 PRIV_DIR = $(MIX_APP_PATH)/priv
 NIF_SO = $(PRIV_DIR)/adbc_nif.so
 NIF_SO_REL = $(NIF_SO:$(shell pwd)/%=%)
-ADBC_SRC = $(shell pwd)/3rd_party/apache-arrow-adbc
-ADBC_C_SRC = $(shell pwd)/3rd_party/apache-arrow-adbc/c
+THIRD_PARTY_DIR = $(shell pwd)/3rd_party
+CACHE_DIR = $(THIRD_PARTY_DIR)/cache
+ADBC_SRC = $(THIRD_PARTY_DIR)/apache-arrow-adbc
+ADBC_C_SRC = $(ADBC_SRC)/c
 UNAME_S := $(shell uname -s)
+ABDC_DRIVER_SQLITE ?= true
 ifeq ($(UNAME_S),Linux)
 	ADBC_DRIVER_COMMON_LIB = $(PRIV_DIR)/lib/libadbc_driver_manager.so
 endif
@@ -39,7 +42,20 @@ priv_dir:
 		mkdir -p "$(PRIV_DIR)" ; \
 	fi
 
-adbc: priv_dir
+cache_dir:
+	@ if [ ! -e "$(CACHE_DIR)" ]; then \
+		mkdir -p "$(CACHE_DIR)" ; \
+	fi
+
+download_adbc_driver: cache_dir
+	@ if [ "$(ABDC_DRIVER_SQLITE)" == "true" ]; then \
+		./scripts/download_driver.sh sqlite "$(CACHE_DIR)" "$(PRIV_DIR)/lib" ; \
+	fi
+	@ if [ "$(ABDC_DRIVER_POSTGRESQL)" == "true" ]; then \
+		./scripts/download_driver.sh postgresql "$(CACHE_DIR)" "$(PRIV_DIR)/lib" ; \
+	fi
+
+adbc: priv_dir download_adbc_driver
 	@ if [ ! -f "$(ADBC_DRIVER_COMMON_LIB)" ]; then \
 		mkdir -p "$(CMAKE_ADBC_BUILD_DIR)" && \
 		cd "$(CMAKE_ADBC_BUILD_DIR)" && \
@@ -47,7 +63,7 @@ adbc: priv_dir
 			-DADBC_BUILD_SHARED="ON" \
 			-DADBC_DRIVER_MANAGER="ON" \
 			-DADBC_DRIVER_POSTGRESQL="OFF" \
-			-DADBC_DRIVER_SQLITE="ON" \
+			-DADBC_DRIVER_SQLITE="OFF" \
 			-DADBC_DRIVER_FLIGHTSQL="OFF" \
 			-DADBC_DRIVER_SNOWFLAKE="OFF" \
 			-DADBC_BUILD_STATIC="OFF" \

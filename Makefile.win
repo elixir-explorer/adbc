@@ -4,11 +4,16 @@ MIX_APP_PATH=$(MAKEDIR)
 
 PRIV_DIR = $(MIX_APP_PATH)/priv
 NIF_SO = $(PRIV_DIR)/adbc_nif.dll
-ADBC_SRC = $(MAKEDIR)\3rd_party\apache-arrow-adbc
+THIRD_PARTY_DIR = $(MAKEDIR)\3rd_party
+ADBC_SRC = $(THIRD_PARTY_DIR)\apache-arrow-adbc
 ADBC_C_SRC = $(ADBC_SRC)\c
+CACHE_DIR = $(THIRD_PARTY_DIR)\cache
 C_SRC = $(MAKEDIR)\c_src
 !IFDEF CMAKE_TOOLCHAIN_FILE
 CMAKE_CONFIGURE_FLAGS=-D CMAKE_TOOLCHAIN_FILE="$(CMAKE_TOOLCHAIN_FILE)"
+!ENDIF
+!IFDEF ABDC_DRIVER_SQLITE
+ABDC_DRIVER_SQLITE=true
 !ENDIF
 
 !IFNDEF CMAKE_BUILD_TYPE
@@ -43,7 +48,18 @@ build: $(NIF_SO)
 priv_dir:
     @ if not exist "$(PRIV_DIR)" mkdir "$(PRIV_DIR)"
 
-adbc: priv_dir
+cache_dir:
+    @ if not exist "$(CACHE_DIR)" mkdir "$(CACHE_DIR)"
+
+download_adbc_driver: cache_dir
+!IF "$(ABDC_DRIVER_SQLITE)" == "true"
+	@ powershell scripts/download_driver.ps1 "sqlite" "$(CACHE_DIR)" "$(PRIV_DIR)/lib"
+!ENDIF
+!IF "$(ABDC_DRIVER_POSTGRESQL)" == "true"
+	@ powershell scripts/download_driver.ps1 "postgresql" "$(CACHE_DIR)" "$(PRIV_DIR)/lib"
+!ENDIF
+
+adbc: priv_dir download_adbc_driver
     @ if not exist "$(ADBC_DRIVER_COMMON_LIB)" ( \
 		if not exist "$(CMAKE_ADBC_BUILD_DIR)" mkdir "$(CMAKE_ADBC_BUILD_DIR)" && \
 		cd "$(CMAKE_ADBC_BUILD_DIR)" && \
@@ -52,7 +68,7 @@ adbc: priv_dir
 			-DADBC_BUILD_SHARED="ON" \
 			-DADBC_DRIVER_MANAGER="ON" \
 			-DADBC_DRIVER_POSTGRESQL="OFF" \
-			-DADBC_DRIVER_SQLITE="ON" \
+			-DADBC_DRIVER_SQLITE="OFF" \
 			-DADBC_DRIVER_FLIGHTSQL="OFF" \
 			-DADBC_DRIVER_SNOWFLAKE="OFF" \
 			-DADBC_BUILD_STATIC="OFF" \

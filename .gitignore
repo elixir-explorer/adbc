@@ -30,3 +30,6 @@ adbc-*.tar
 
 # IDE
 .vscode
+
+# cache
+3rd_party/cache

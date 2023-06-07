@@ -57,30 +57,23 @@ defmodule Adbc.Driver do
 
   defp do_download(url, triplet, ignore_proxy, driver_name) do
     with {:ok, zip_data} <- Helper.download(url, ignore_proxy),
-         {:ok, zip_handle} <- :zip.zip_open(zip_data, [:cooked, :memory]),
-         {:ok, files} <- :zip.table(zip_data, [:cooked]),
-         files = Enum.reject(files, fn f -> elem(f, 0) != :zip_file end),
-         so_files =
-           Enum.reject(files, fn {:zip_file, filename, _, _, _, _} ->
-             !String.ends_with?(to_string(filename), ".so")
-           end),
-         so_files = Enum.map(so_files, fn so_file_entry -> elem(so_file_entry, 1) end) do
-      Enum.each(so_files, fn so_file ->
-        with {:ok, {filename, file_data}} <- :zip.zip_get(so_file, zip_handle),
-             filename =
-               String.replace_leading(
-                 to_string(filename),
-                 "adbc_driver_#{driver_name}/",
-                 "#{triplet}-"
-               ),
-             filepath = Path.join(Helper.driver_directory(), filename),
-             :ok <- File.write(filepath, file_data) do
-          :ok
+         {:ok, zip_handle} <- :zip.zip_open(zip_data, [:cooked, :memory]) do
+      for {:ok, zip_files} <- [:zip.table(zip_data, [:cooked])],
+          {:zip_file, filename, _, _, _, _} <- zip_files,
+          Path.extname(filename) == ".so" do
+        with {:ok, {filename, file_data}} <- :zip.zip_get(filename, zip_handle) do
+          filename =
+            String.replace_leading(
+              to_string(filename),
+              "adbc_driver_#{driver_name}/",
+              "#{triplet}-"
+            )
+          filepath = Path.join(Helper.driver_directory(), filename),
+          File.write(filepath, file_data)
         end
-      end)
-    else
-      {:error, reason} ->
-        {:error, reason}
+      end
+
+      :zip_close(zip_handle)
     end
   end
 

@@ -41,7 +41,7 @@ defmodule Adbc.Driver do
                  "#{version}/adbc_driver_#{official_driver}-#{version}-py3-none-win_amd64.whl"}
 
             _ ->
-              {:error, "offifical driver does not have a precompiled version for `#{triplet}`"}
+              {:error, "official driver does not have a precompiled version for `#{triplet}`"}
           end
 
         if status == :ok do

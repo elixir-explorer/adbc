@@ -3,6 +3,7 @@
 
 #include <erl_nif.h>
 #include <atomic>
+#include <memory>
 #include <adbc.h>
 
 // Only for debugging:

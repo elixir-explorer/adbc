@@ -1,14 +1,13 @@
 defmodule Adbc.Driver do
   alias Adbc.Helper
 
-  def official_driver_base_url,
-    do: "https://github.com/apache/arrow-adbc/releases/download/apache-arrow-adbc-"
+  @official_driver_base_url "https://github.com/apache/arrow-adbc/releases/download/apache-arrow-adbc-"
+  @version "0.4.0"
 
   def download_driver(official_driver, opts \\ [])
-      when official_driver == :sqlite or official_driver == :postgresql or
-             official_driver == :flightsql or official_driver == :snowflake do
-    base_url = opts[:base_url] || official_driver_base_url()
-    version = opts[:version] || "0.4.0"
+      when official_driver in [:sqlite, :postgresql, :flightsql, :snowflake] do
+    base_url = opts[:base_url] || @official_driver_base_url
+    version = opts[:version] || @version
     ignore_proxy = opts[:ignore_proxy] || false
 
     case Helper.get_current_triplet() do

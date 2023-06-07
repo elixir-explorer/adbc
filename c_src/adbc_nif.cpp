@@ -958,49 +958,49 @@ static int on_load(ErlNifEnv *env, void **, ERL_NIF_TERM) {
 
     {
         using res_type = NifRes<struct AdbcDatabase>;
-        rt = enif_open_resource_type(env, "Elixir.Adbc.Nif", "NifResAdbcDatabase", res_type::destruct_resource, ERL_NIF_RT_CREATE, NULL);
+        rt = enif_open_resource_type(env, "Elixir.Adbc.Nif", "NifResAdbcDatabase", adbc_destruct_resource<res_type::val_type>, ERL_NIF_RT_CREATE, NULL);
         if (!rt) return -1;
         res_type::type = rt;
     }
 
     {
         using res_type = NifRes<struct AdbcConnection>;
-        rt = enif_open_resource_type(env, "Elixir.Adbc.Nif", "NifResAdbcConnection", res_type::destruct_resource, ERL_NIF_RT_CREATE, NULL);
+        rt = enif_open_resource_type(env, "Elixir.Adbc.Nif", "NifResAdbcConnection", adbc_destruct_resource<res_type::val_type>, ERL_NIF_RT_CREATE, NULL);
         if (!rt) return -1;
         res_type::type = rt;
     }
 
     {
         using res_type = NifRes<struct AdbcStatement>;
-        rt = enif_open_resource_type(env, "Elixir.Adbc.Nif", "NifResAdbcStatement", res_type::destruct_resource, ERL_NIF_RT_CREATE, NULL);
+        rt = enif_open_resource_type(env, "Elixir.Adbc.Nif", "NifResAdbcStatement", adbc_destruct_resource<res_type::val_type>, ERL_NIF_RT_CREATE, NULL);
         if (!rt) return -1;
         res_type::type = rt;
     }
 
     {
         using res_type = NifRes<struct AdbcError>;
-        rt = enif_open_resource_type(env, "Elixir.Adbc.Nif", "NifResAdbcError", res_type::destruct_resource, ERL_NIF_RT_CREATE, NULL);
+        rt = enif_open_resource_type(env, "Elixir.Adbc.Nif", "NifResAdbcError", adbc_destruct_resource<res_type::val_type>, ERL_NIF_RT_CREATE, NULL);
         if (!rt) return -1;
         res_type::type = rt;
     }
 
     {
         using res_type = NifRes<struct ArrowArrayStream>;
-        rt = enif_open_resource_type(env, "Elixir.Adbc.Nif", "NifResArrowArrayStream", res_type::destruct_resource, ERL_NIF_RT_CREATE, NULL);
+        rt = enif_open_resource_type(env, "Elixir.Adbc.Nif", "NifResArrowArrayStream", adbc_destruct_resource<res_type::val_type>, ERL_NIF_RT_CREATE, NULL);
         if (!rt) return -1;
         res_type::type = rt;
     }
 
     {
         using res_type = NifRes<struct ArrowArray>;
-        rt = enif_open_resource_type(env, "Elixir.Adbc.Nif", "NifResArrowArray", res_type::destruct_resource, ERL_NIF_RT_CREATE, NULL);
+        rt = enif_open_resource_type(env, "Elixir.Adbc.Nif", "NifResArrowArray", adbc_destruct_resource<res_type::val_type>, ERL_NIF_RT_CREATE, NULL);
         if (!rt) return -1;
         res_type::type = rt;
     }
 
     {
         using res_type = NifRes<struct ArrowSchema>;
-        rt = enif_open_resource_type(env, "Elixir.Adbc.Nif", "NifResArrowSchema", res_type::destruct_resource, ERL_NIF_RT_CREATE, NULL);
+        rt = enif_open_resource_type(env, "Elixir.Adbc.Nif", "NifResArrowSchema", adbc_destruct_resource<res_type::val_type>, ERL_NIF_RT_CREATE, NULL);
         if (!rt) return -1;
         res_type::type = rt;
     }

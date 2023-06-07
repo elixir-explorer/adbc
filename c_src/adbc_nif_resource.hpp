@@ -4,12 +4,23 @@
 #include <erl_nif.h>
 #include <atomic>
 #include <memory>
+#include <type_traits>
 #include <adbc.h>
 
 // Only for debugging:
 #include <cstdio>
 
 template<typename T> struct NoOpDeleter;
+
+template <typename...>
+using void_t = void;
+
+// Check for the existence of member variable 'release' using SFINAE
+template <typename T, typename = void>
+struct release_guard : std::false_type {};
+
+template <typename T>
+struct release_guard<T, void_t<decltype(T::release)>> : std::true_type {};
 
 /// A NifRes<T> wraps a `T` to allow it to be shared between C++ and Erlang while managing its lifetime properly.
 ///
@@ -81,38 +92,25 @@ struct NifRes {
       printf("%p: Decrementing resource count\n", this);
       enif_release_resource(this);
     }
-
-    // Callback which is called by the Erlang GC when the _last_ reference to the NifRes goes out of scope.
-    // If there is special cleanup that should happen for a particular child-class,
-    // create a template specialization for it.
-    static void destruct_resource(ErlNifEnv *env, void *args);
 };
 
+// Callback which is called by the Erlang GC when the _last_ reference to the NifRes goes out of scope.
+// If there is special cleanup that should happen for a particular child-class,
+// create a template specialization for it.
 template <typename T>
-void NifRes<T>::destruct_resource(ErlNifEnv *env, void *args) {
-  printf("%p: Destructing resource\n", args);
-}
-
-template <>
-void NifRes<struct AdbcError>::destruct_resource(ErlNifEnv *env, void *args) {
-    auto res = (NifRes<struct AdbcError> *)args;
+static typename std::enable_if<release_guard<T>::value, void>::type adbc_destruct_resource(ErlNifEnv *env, void *args) {
+    auto res = (NifRes<T> *)args;
     printf("%p: Destructing resource\n", res);
     if (res) {
         if (res->val.release) {
             res->val.release(&res->val);
         }
     }
-}
+}    
 
-template <>
-void NifRes<struct ArrowArrayStream>::destruct_resource(ErlNifEnv *env, void *args) {
-    auto res = (NifRes<struct ArrowArrayStream> *)args;
-    printf("%p: Destructing resource\n", res);
-    if (res) {
-        if (res->val.release) {
-            res->val.release(&res->val);
-        }
-    }
+template <typename T>
+static typename std::enable_if<!release_guard<T>::value, void>::type adbc_destruct_resource(ErlNifEnv *env, void *args) {
+    printf("%p: Destructing resource\n", args);
 }
 
 // Used to construct a unique_ptr wrapping memory that is managed remotely.

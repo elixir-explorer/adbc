@@ -23,7 +23,7 @@ defmodule ADBC.MixProject do
 
   def application do
     [
-      extra_applications: [:logger, :public_key, :inets]
+      extra_applications: [:logger, inets: :optional, ssl: :optional],
     ]
   end
 

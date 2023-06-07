@@ -20,7 +20,7 @@ template <typename T, typename = void>
 struct release_guard : std::false_type {};
 
 template <typename T>
-struct release_guard<T, void_t<decltype(T::release)>> : std::true_type {};
+struct release_guard<T, typename std::enable_if<std::is_same<decltype(T::release), void(*)(T*)>::value>::type> : std::true_type {};
 
 /// A NifRes<T> wraps a `T` to allow it to be shared between C++ and Erlang while managing its lifetime properly.
 ///

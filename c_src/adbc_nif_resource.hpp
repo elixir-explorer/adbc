@@ -92,26 +92,26 @@ struct NifRes {
       printf("%p: Decrementing resource count\n", this);
       enif_release_resource(this);
     }
-};
 
-// Callback which is called by the Erlang GC when the _last_ reference to the NifRes goes out of scope.
-// If there is special cleanup that should happen for a particular child-class,
-// create a template specialization for it.
-template <typename T>
-static typename std::enable_if<release_guard<T>::value, void>::type adbc_destruct_resource(ErlNifEnv *env, void *args) {
-    auto res = (NifRes<T> *)args;
-    printf("%p: Destructing resource\n", res);
-    if (res) {
-        if (res->val.release) {
-            res->val.release(&res->val);
+    // Callback which is called by the Erlang GC when the _last_ reference to the NifRes goes out of scope.
+    // If there is special cleanup that should happen for a particular child-class,
+    // create a template specialization for it.
+    template <typename R = T>
+    static auto destruct_resource(ErlNifEnv *env, void *args) -> typename std::enable_if<release_guard<R>::value, void>::type {
+        auto res = (NifRes<T> *)args;
+        printf("%p: Destructing resource (release %s)\n", res, typeid(R).name());
+        if (res) {
+            if (res->val.release) {
+                res->val.release(&res->val);
+            }
         }
-    }
-}    
+    }    
 
-template <typename T>
-static typename std::enable_if<!release_guard<T>::value, void>::type adbc_destruct_resource(ErlNifEnv *env, void *args) {
-    printf("%p: Destructing resource\n", args);
-}
+    template <typename R = T>
+    static auto destruct_resource(ErlNifEnv *env, void *args) -> typename std::enable_if<!release_guard<R>::value, void>::type {
+        printf("%p: Destructing resource\n", args);
+    }
+};
 
 // Used to construct a unique_ptr wrapping memory that is managed remotely.
 // The value in this memory *does* need to be destructed

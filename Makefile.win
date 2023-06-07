@@ -4,7 +4,8 @@ MIX_APP_PATH=$(MAKEDIR)
 
 PRIV_DIR = $(MIX_APP_PATH)/priv
 NIF_SO = $(PRIV_DIR)/adbc_nif.dll
-ADBC_SRC = $(MAKEDIR)\3rd_party\apache-arrow-adbc
+THIRD_PARTY_DIR = $(MAKEDIR)\3rd_party
+ADBC_SRC = $(THIRD_PARTY_DIR)\apache-arrow-adbc
 ADBC_C_SRC = $(ADBC_SRC)\c
 C_SRC = $(MAKEDIR)\c_src
 !IFDEF CMAKE_TOOLCHAIN_FILE
@@ -52,7 +53,7 @@ adbc: priv_dir
 			-DADBC_BUILD_SHARED="ON" \
 			-DADBC_DRIVER_MANAGER="ON" \
 			-DADBC_DRIVER_POSTGRESQL="OFF" \
-			-DADBC_DRIVER_SQLITE="ON" \
+			-DADBC_DRIVER_SQLITE="OFF" \
 			-DADBC_DRIVER_FLIGHTSQL="OFF" \
 			-DADBC_DRIVER_SNOWFLAKE="OFF" \
 			-DADBC_BUILD_STATIC="OFF" \
@@ -63,12 +64,12 @@ adbc: priv_dir
 			-DCMAKE_INSTALL_PREFIX="$(PRIV_DIR)" \
 			-DADBC_DEPENDENCY_SOURCE=BUNDLED \
 			$(CMAKE_CONFIGURE_FLAGS) $(CMAKE_ADBC_OPTIONS) "$(ADBC_C_SRC)" && \
-    	cmake --build . --target install -j ; \
+    	cmake --build . --target install -j \
     )
 
 $(NIF_SO): adbc priv_dir c_src\adbc_nif_resource.hpp c_src\adbc_nif.cpp c_src\nif_utils.cpp c_src\nif_utils.hpp
 	@ if not exist "$(CMAKE_ADBC_NIF_BUILD_DIR)" mkdir "$(CMAKE_ADBC_NIF_BUILD_DIR)" && \
-    cd "$(CMAKE_HNSWLIB_BUILD_DIR)" && \
+    cd "$(CMAKE_ADBC_NIF_BUILD_DIR)" && \
     cmake -G "$(CMAKE_GENERATOR_TYPE)" \
         --no-warn-unused-cli \
         -D C_SRC="$(C_SRC)" \

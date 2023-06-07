@@ -52,7 +52,7 @@ jobs:
         shell: bash
         run: |
           mix deps.get
-          mix test || true
+          mix test
 
   macos:
     runs-on: macos-11

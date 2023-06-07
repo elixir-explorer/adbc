@@ -5,8 +5,9 @@ endif
 PRIV_DIR = $(MIX_APP_PATH)/priv
 NIF_SO = $(PRIV_DIR)/adbc_nif.so
 NIF_SO_REL = $(NIF_SO:$(shell pwd)/%=%)
-ADBC_SRC = $(shell pwd)/3rd_party/apache-arrow-adbc
-ADBC_C_SRC = $(shell pwd)/3rd_party/apache-arrow-adbc/c
+THIRD_PARTY_DIR = $(shell pwd)/3rd_party
+ADBC_SRC = $(THIRD_PARTY_DIR)/apache-arrow-adbc
+ADBC_C_SRC = $(ADBC_SRC)/c
 UNAME_S := $(shell uname -s)
 ifeq ($(UNAME_S),Linux)
 	ADBC_DRIVER_COMMON_LIB = $(PRIV_DIR)/lib/libadbc_driver_manager.so
@@ -47,7 +48,7 @@ adbc: priv_dir
 			-DADBC_BUILD_SHARED="ON" \
 			-DADBC_DRIVER_MANAGER="ON" \
 			-DADBC_DRIVER_POSTGRESQL="OFF" \
-			-DADBC_DRIVER_SQLITE="ON" \
+			-DADBC_DRIVER_SQLITE="OFF" \
 			-DADBC_DRIVER_FLIGHTSQL="OFF" \
 			-DADBC_DRIVER_SNOWFLAKE="OFF" \
 			-DADBC_BUILD_STATIC="OFF" \

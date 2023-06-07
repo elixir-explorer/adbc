@@ -38,18 +38,22 @@ defmodule Adbc.Database do
   support setting options after initialization as well.
   """
   @doc group: :adbc_database
-  @spec set_option(Adbc.Database.t(), String.t(), String.t()) :: :ok | Adbc.Error.adbc_error()
+  @spec set_option(Adbc.Database.t(), String.t(), String.t()) ::
+          :ok | Adbc.Error.adbc_error() | {:error, String.t()}
   def set_option(self = %T{}, "driver", value) when is_binary(value) do
-    value =
-      case value do
-        "adbc_driver_" <> driver ->
-          Helper.shared_driver_path(driver)
+    case value do
+      "adbc_driver_" <> driver ->
+        case Helper.shared_driver_path(driver) do
+          {:ok, path} ->
+            Adbc.Nif.adbc_database_set_option(self.reference, "driver", path)
 
-        other ->
-          other
-      end
+          {:error, reason} ->
+            {:error, reason}
+        end
 
-    Adbc.Nif.adbc_database_set_option(self.reference, "driver", value)
+      other ->
+        Adbc.Nif.adbc_database_set_option(self.reference, "driver", other)
+    end
   end
 
   def set_option(self = %T{}, key, value)

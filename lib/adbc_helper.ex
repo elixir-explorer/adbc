@@ -290,7 +290,3 @@ defmodule Adbc.Helper do
     end
   end
 end
-
-for driver <- Application.compile_env(:adbc, :drivers, [:sqlite, :postgresql]) do
-  Adbc.Driver.download_driver(driver)
-end

@@ -29,6 +29,8 @@ jobs:
 
       - name: Compile and Test
         run: |
+          mkdir config
+          echo "import Config\nconfig :adbc, drivers: [:sqlite]" > config/config.exs
           mix deps.get
           mix test
 
@@ -51,6 +53,8 @@ jobs:
       - name: Compile and Test
         shell: bash
         run: |
+          mkdir config
+          echo "import Config\nconfig :adbc, drivers: [:sqlite]" > config/config.exs
           mix deps.get
           mix test
 
@@ -70,5 +74,7 @@ jobs:
 
       - name: Compile and Test
         run: |
+          mkdir config
+          echo "import Config\nconfig :adbc, drivers: [:sqlite]" > config/config.exs
           mix deps.get
           mix test

@@ -18,6 +18,6 @@ defmodule Adbc do
   end
 end
 
-for driver <- Application.compile_env(:adbc, :drivers, [:sqlite, :postgresql]) do
+for driver <- Application.compile_env(:adbc, :drivers, []) do
   Adbc.Driver.download_driver(driver)
 end

@@ -68,12 +68,13 @@ defmodule Adbc.Driver do
               "adbc_driver_#{driver_name}/",
               "#{triplet}-"
             )
-          filepath = Path.join(Helper.driver_directory(), filename),
+
+          filepath = Path.join(Helper.driver_directory(), filename)
           File.write(filepath, file_data)
         end
       end
 
-      :zip_close(zip_handle)
+      :zip.zip_close(zip_handle)
     end
   end
 

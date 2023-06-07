@@ -81,7 +81,26 @@ defmodule Adbc.Driver do
   def driver_filepath(driver_name) do
     case Helper.get_current_triplet() do
       {:ok, triplet} ->
-        {:ok, Path.join(Helper.driver_directory(), "#{triplet}-libadbc_driver_#{driver_name}.so")}
+        expected_filepath =
+          Path.join(Helper.driver_directory(), "#{triplet}-libadbc_driver_#{driver_name}.so")
+
+        if File.exists?(expected_filepath) do
+          {:ok, expected_filepath}
+        else
+          official_drivers = ["sqlite", "postgresql", "flightsql", "snowflake"]
+
+          if Enum.member?(official_drivers, driver_name) do
+            case download_driver(String.to_existing_atom(driver_name)) do
+              :ok ->
+                {:ok, expected_filepath}
+
+              {:error, reason} ->
+                {:error, reason}
+            end
+          else
+            {:error, "driver name must be one of #{inspect(official_drivers)}"}
+          end
+        end
 
       {:error, reason} ->
         {:error, reason}

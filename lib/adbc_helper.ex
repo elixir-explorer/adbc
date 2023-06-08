@@ -222,8 +222,11 @@ defmodule Adbc.Helper do
     options = [body_format: :binary]
 
     case :httpc.request(:get, {url_charlist, []}, https_options, options) do
-      {:ok, {{_, 200, _}, _, body}} -> {:ok, body}
-      other -> {:error, "couldn't fetch and cache file from #{url}: #{inspect(other)}"}
+      {:ok, {{_, 200, _}, _, body}} ->
+        {:ok, body}
+
+      other ->
+        {:error, "couldn't fetch file from #{url}: #{inspect(other)}"}
     end
   end
 

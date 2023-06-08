@@ -44,7 +44,8 @@ defmodule Adbc.Driver do
           end
 
         if status == :ok do
-          do_download(info, triplet, ignore_proxy, official_driver)
+          IO.puts("download :ok: #{inspect(info)}")
+          do_download(info, triplet, version, ignore_proxy, official_driver)
         else
           {:error, info}
         end
@@ -54,10 +55,14 @@ defmodule Adbc.Driver do
     end
   end
 
-  defp do_download(url, triplet, ignore_proxy, driver_name) do
+  defp do_download(url, triplet, version, ignore_proxy, driver_name) do
     with {:ok, zip_data} <- Helper.download(url, ignore_proxy),
-         {:ok, zip_handle} <- :zip.zip_open(zip_data, [:cooked, :memory]) do
-      for {:ok, zip_files} <- [:zip.table(zip_data, [:cooked])],
+         {:ok, adbc_cache_dir} = adbc_cache_dir(),
+         cache_path = Path.join(adbc_cache_dir, "#{triplet}-#{version}.zip"),
+         :ok <- File.write(cache_path, zip_data),
+         cache_path = String.to_charlist(cache_path),
+         {:ok, zip_handle} <- :zip.zip_open(cache_path, [:memory]) do
+      for {:ok, zip_files} <- [:zip.table(cache_path)],
           {:zip_file, filename, _, _, _, _} <- zip_files,
           Path.extname(filename) == ".so" do
         with {:ok, {filename, file_data}} <- :zip.zip_get(filename, zip_handle) do
@@ -65,7 +70,7 @@ defmodule Adbc.Driver do
             String.replace_leading(
               to_string(filename),
               "adbc_driver_#{driver_name}/",
-              "#{triplet}-"
+              "#{triplet}-#{version}-"
             )
 
           filepath = Path.join(Helper.driver_directory(), filename)
@@ -74,14 +79,22 @@ defmodule Adbc.Driver do
       end
 
       :zip.zip_close(zip_handle)
+    else
+      oo ->
+        IO.puts(inspect(oo))
     end
   end
 
-  def driver_filepath(driver_name) do
+  def driver_filepath(driver_name, opts \\ []) do
+    version = opts[:version] || @version
+
     case Helper.get_current_triplet() do
       {:ok, triplet} ->
         expected_filepath =
-          Path.join(Helper.driver_directory(), "#{triplet}-libadbc_driver_#{driver_name}.so")
+          Path.join(
+            Helper.driver_directory(),
+            "#{triplet}-#{version}-libadbc_driver_#{driver_name}.so"
+          )
 
         if File.exists?(expected_filepath) do
           {:ok, expected_filepath}
@@ -89,7 +102,7 @@ defmodule Adbc.Driver do
           official_drivers = ["sqlite", "postgresql", "flightsql", "snowflake"]
 
           if Enum.member?(official_drivers, driver_name) do
-            case download_driver(String.to_existing_atom(driver_name)) do
+            case download_driver(String.to_existing_atom(driver_name), version: version) do
               :ok ->
                 {:ok, expected_filepath}
 
@@ -103,6 +116,27 @@ defmodule Adbc.Driver do
 
       {:error, reason} ->
         {:error, reason}
+    end
+  end
+
+  defp adbc_cache_dir() do
+    dir =
+      if dir = System.get_env("ADBC_CACHE_DIR") do
+        Path.expand(dir)
+      else
+        :filename.basedir(:user_cache, "adbc")
+      end
+
+    if File.dir?(dir) do
+      {:ok, dir}
+    else
+      r = File.mkdir_p(dir)
+
+      if r == :ok do
+        {:ok, dir}
+      else
+        r
+      end
     end
   end
 end

@@ -176,52 +176,54 @@ defmodule Adbc.Helper do
   end
 
   def download(url, ignore_proxy, filename) do
-    with {:ok, adbc_cache_dir} <- adbc_cache_dir(),
-         cache_path = Path.join(adbc_cache_dir, filename) do
-      if File.exists?(cache_path) do
+    cache_path = Path.join(adbc_cache_dir(), filename)
+
+    if File.exists?(cache_path) do
+      {:ok, cache_path}
+    else
+      with {:ok, body} <- uncached_download(url, ignore_proxy),
+           :ok <- File.write(cache_path, body) do
         {:ok, cache_path}
-      else
-        url_charlist = String.to_charlist(url)
-
-        {:ok, _} = Application.ensure_all_started(:inets)
-        {:ok, _} = Application.ensure_all_started(:ssl)
-        {:ok, _} = Application.ensure_all_started(:public_key)
-
-        if !ignore_proxy do
-          if proxy = System.get_env("HTTP_PROXY") || System.get_env("http_proxy") do
-            %{host: host, port: port} = URI.parse(proxy)
-            :httpc.set_options([{:proxy, {{String.to_charlist(host), port}, []}}])
-          end
-
-          if proxy = System.get_env("HTTPS_PROXY") || System.get_env("https_proxy") do
-            %{host: host, port: port} = URI.parse(proxy)
-            :httpc.set_options([{:https_proxy, {{String.to_charlist(host), port}, []}}])
-          end
-        end
-
-        # https://erlef.github.io/security-wg/secure_coding_and_deployment_hardening/inets
-        # TODO: This may no longer be necessary from Erlang/OTP 25.0 or later.
-        https_options = [
-          ssl:
-            [
-              verify: :verify_peer,
-              customize_hostname_check: [
-                match_fun: :public_key.pkix_verify_hostname_match_fun(:https)
-              ]
-            ] ++ cacerts_options()
-        ]
-
-        options = [body_format: :binary]
-
-        with {:ok, {{_, 200, _}, _, body}} <-
-               :httpc.request(:get, {url_charlist, []}, https_options, options),
-             :ok <- File.write(cache_path, body) do
-          {:ok, cache_path}
-        else
-          other ->
-            {:error, "couldn't fetch and cache file from #{url}: #{inspect(other)}"}
-        end
       end
+    end
+  end
+  
+  defp uncached_download(url, ignore_proxy) do
+    url_charlist = String.to_charlist(url)
+
+    {:ok, _} = Application.ensure_all_started(:inets)
+    {:ok, _} = Application.ensure_all_started(:ssl)
+    {:ok, _} = Application.ensure_all_started(:public_key)
+
+    if !ignore_proxy do
+      if proxy = System.get_env("HTTP_PROXY") || System.get_env("http_proxy") do
+        %{host: host, port: port} = URI.parse(proxy)
+        :httpc.set_options([{:proxy, {{String.to_charlist(host), port}, []}}])
+      end
+
+      if proxy = System.get_env("HTTPS_PROXY") || System.get_env("https_proxy") do
+        %{host: host, port: port} = URI.parse(proxy)
+        :httpc.set_options([{:https_proxy, {{String.to_charlist(host), port}, []}}])
+      end
+    end
+
+    # https://erlef.github.io/security-wg/secure_coding_and_deployment_hardening/inets
+    # TODO: This may no longer be necessary from Erlang/OTP 25.0 or later.
+    https_options = [
+      ssl:
+        [
+          verify: :verify_peer,
+          customize_hostname_check: [
+            match_fun: :public_key.pkix_verify_hostname_match_fun(:https)
+          ]
+        ] ++ cacerts_options()
+    ]
+
+    options = [body_format: :binary]
+
+    case :httpc.request(:get, {url_charlist, []}, https_options, options) do
+      {:ok, {{_, 200, _}, _, body}} -> {:ok, body}
+      other -> {:error, "couldn't fetch and cache file from #{url}: #{inspect(other)}"}
     end
   end
 
@@ -299,23 +301,10 @@ defmodule Adbc.Helper do
   end
 
   defp adbc_cache_dir() do
-    dir =
-      if dir = System.get_env("ADBC_CACHE_DIR") do
-        Path.expand(dir)
-      else
-        :filename.basedir(:user_cache, "adbc")
-      end
-
-    if File.dir?(dir) do
-      {:ok, dir}
+    if dir = System.get_env("ADBC_CACHE_DIR") do
+      Path.expand(dir)
     else
-      r = File.mkdir_p(dir)
-
-      if r == :ok do
-        {:ok, dir}
-      else
-        r
-      end
+      :filename.basedir(:user_cache, "adbc")
     end
   end
 end

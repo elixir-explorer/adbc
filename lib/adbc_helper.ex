@@ -187,7 +187,7 @@ defmodule Adbc.Helper do
       end
     end
   end
-  
+
   defp uncached_download(url, ignore_proxy) do
     url_charlist = String.to_charlist(url)
 
@@ -304,10 +304,19 @@ defmodule Adbc.Helper do
   end
 
   defp adbc_cache_dir() do
-    if dir = System.get_env("ADBC_CACHE_DIR") do
-      Path.expand(dir)
-    else
-      :filename.basedir(:user_cache, "adbc")
+    dir =
+      if dir = System.get_env("ADBC_CACHE_DIR") do
+        Path.expand(dir)
+      else
+        :filename.basedir(:user_cache, "adbc")
+      end
+
+    case File.mkdir_p(dir) do
+      :ok ->
+        {:ok, dir}
+
+      other ->
+        other
     end
   end
 end

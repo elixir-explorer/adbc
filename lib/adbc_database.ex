@@ -36,6 +36,38 @@ defmodule Adbc.Database do
 
   Options may be set before `Adbc.Database.init/1`.  Some drivers may
   support setting options after initialization as well.
+
+  ##### Keyword Arguments
+
+  - `version`, `String.t()`
+
+  Specify which driver version to use.
+  Valid only for official drivers at the moment.
+  """
+  @doc group: :adbc_database
+  @spec set_option(Adbc.Database.t(), String.t(), String.t(), [{:version, String.t()}]) ::
+          :ok | Adbc.Error.adbc_error() | {:error, String.t()}
+  def set_option(self = %T{}, "driver", value, opts) when is_binary(value) do
+    case value do
+      "adbc_driver_" <> driver ->
+        case Helper.shared_driver_path(driver, opts) do
+          {:ok, path} ->
+            Adbc.Nif.adbc_database_set_option(self.reference, "driver", path)
+
+          {:error, reason} ->
+            {:error, reason}
+        end
+
+      other ->
+        Adbc.Nif.adbc_database_set_option(self.reference, "driver", other)
+    end
+  end
+
+  @doc """
+  Set an option.
+
+  Options may be set before `Adbc.Database.init/1`.  Some drivers may
+  support setting options after initialization as well.
   """
   @doc group: :adbc_database
   @spec set_option(Adbc.Database.t(), String.t(), String.t()) ::

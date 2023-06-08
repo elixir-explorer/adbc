@@ -104,8 +104,8 @@ defmodule Adbc.Helper do
     end
   end
 
-  def shared_driver_path(driver) do
-    Adbc.Driver.driver_filepath(driver)
+  def shared_driver_path(driver, opts \\ []) do
+    Adbc.Driver.driver_filepath(driver, opts)
   end
 
   def get_current_triplet do
@@ -175,7 +175,22 @@ defmodule Adbc.Helper do
     end
   end
 
-  def download(url, ignore_proxy) do
+  def download(url, ignore_proxy, filename) do
+    cache_dir = adbc_cache_dir()
+    cache_path = Path.join(cache_dir, filename)
+
+    if File.exists?(cache_path) do
+      {:ok, cache_path}
+    else
+      with {:ok, body} <- uncached_download(url, ignore_proxy),
+           :ok <- File.mkdir_p(cache_dir),
+           :ok <- File.write(cache_path, body) do
+        {:ok, cache_path}
+      end
+    end
+  end
+
+  defp uncached_download(url, ignore_proxy) do
     url_charlist = String.to_charlist(url)
 
     {:ok, _} = Application.ensure_all_started(:inets)
@@ -287,6 +302,14 @@ defmodule Adbc.Helper do
 
       _ ->
         "#{:code.priv_dir(:adbc)}/lib"
+    end
+  end
+
+  defp adbc_cache_dir() do
+    if dir = System.get_env("ADBC_CACHE_DIR") do
+      Path.expand(dir)
+    else
+      :filename.basedir(:user_cache, "adbc")
     end
   end
 end

@@ -44,7 +44,6 @@ defmodule Adbc.Driver do
           end
 
         if status == :ok do
-          IO.puts("download :ok: #{inspect(info)}")
           do_download(info, triplet, version, ignore_proxy, official_driver)
         else
           {:error, info}
@@ -56,10 +55,9 @@ defmodule Adbc.Driver do
   end
 
   defp do_download(url, triplet, version, ignore_proxy, driver_name) do
-    with {:ok, zip_data} <- Helper.download(url, ignore_proxy),
-         {:ok, adbc_cache_dir} = adbc_cache_dir(),
+    with {:ok, adbc_cache_dir} = adbc_cache_dir(),
          cache_path = Path.join(adbc_cache_dir, "#{triplet}-#{version}.zip"),
-         :ok <- File.write(cache_path, zip_data),
+         :ok <- Helper.download(url, ignore_proxy, cache_path),
          cache_path = String.to_charlist(cache_path),
          {:ok, zip_handle} <- :zip.zip_open(cache_path, [:memory]) do
       for {:ok, zip_files} <- [:zip.table(cache_path)],
@@ -79,9 +77,6 @@ defmodule Adbc.Driver do
       end
 
       :zip.zip_close(zip_handle)
-    else
-      oo ->
-        IO.puts(inspect(oo))
     end
   end
 

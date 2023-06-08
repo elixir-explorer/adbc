@@ -175,45 +175,49 @@ defmodule Adbc.Helper do
     end
   end
 
-  def download(url, ignore_proxy) do
-    url_charlist = String.to_charlist(url)
+  def download(url, ignore_proxy, save_to) do
+    if File.exists?(save_to) do
+      :ok
+    else
+      url_charlist = String.to_charlist(url)
 
-    {:ok, _} = Application.ensure_all_started(:inets)
-    {:ok, _} = Application.ensure_all_started(:ssl)
-    {:ok, _} = Application.ensure_all_started(:public_key)
+      {:ok, _} = Application.ensure_all_started(:inets)
+      {:ok, _} = Application.ensure_all_started(:ssl)
+      {:ok, _} = Application.ensure_all_started(:public_key)
 
-    if !ignore_proxy do
-      if proxy = System.get_env("HTTP_PROXY") || System.get_env("http_proxy") do
-        %{host: host, port: port} = URI.parse(proxy)
-        :httpc.set_options([{:proxy, {{String.to_charlist(host), port}, []}}])
+      if !ignore_proxy do
+        if proxy = System.get_env("HTTP_PROXY") || System.get_env("http_proxy") do
+          %{host: host, port: port} = URI.parse(proxy)
+          :httpc.set_options([{:proxy, {{String.to_charlist(host), port}, []}}])
+        end
+
+        if proxy = System.get_env("HTTPS_PROXY") || System.get_env("https_proxy") do
+          %{host: host, port: port} = URI.parse(proxy)
+          :httpc.set_options([{:https_proxy, {{String.to_charlist(host), port}, []}}])
+        end
       end
 
-      if proxy = System.get_env("HTTPS_PROXY") || System.get_env("https_proxy") do
-        %{host: host, port: port} = URI.parse(proxy)
-        :httpc.set_options([{:https_proxy, {{String.to_charlist(host), port}, []}}])
+      # https://erlef.github.io/security-wg/secure_coding_and_deployment_hardening/inets
+      # TODO: This may no longer be necessary from Erlang/OTP 25.0 or later.
+      https_options = [
+        ssl:
+          [
+            verify: :verify_peer,
+            customize_hostname_check: [
+              match_fun: :public_key.pkix_verify_hostname_match_fun(:https)
+            ]
+          ] ++ cacerts_options()
+      ]
+
+      options = [body_format: :binary]
+
+      case :httpc.request(:get, {url_charlist, []}, https_options, options) do
+        {:ok, {{_, 200, _}, _headers, body}} ->
+          File.write(save_to, body)
+
+        other ->
+          {:error, "couldn't fetch file from #{url}: #{inspect(other)}"}
       end
-    end
-
-    # https://erlef.github.io/security-wg/secure_coding_and_deployment_hardening/inets
-    # TODO: This may no longer be necessary from Erlang/OTP 25.0 or later.
-    https_options = [
-      ssl:
-        [
-          verify: :verify_peer,
-          customize_hostname_check: [
-            match_fun: :public_key.pkix_verify_hostname_match_fun(:https)
-          ]
-        ] ++ cacerts_options()
-    ]
-
-    options = [body_format: :binary]
-
-    case :httpc.request(:get, {url_charlist, []}, https_options, options) do
-      {:ok, {{_, 200, _}, _headers, body}} ->
-        {:ok, body}
-
-      other ->
-        {:error, "couldn't fetch file from #{url}: #{inspect(other)}"}
     end
   end
 

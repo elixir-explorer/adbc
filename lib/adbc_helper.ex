@@ -176,12 +176,14 @@ defmodule Adbc.Helper do
   end
 
   def download(url, ignore_proxy, filename) do
-    cache_path = Path.join(adbc_cache_dir(), filename)
+    cache_dir = adbc_cache_dir()
+    cache_path = Path.join(cache_dir, filename)
 
     if File.exists?(cache_path) do
       {:ok, cache_path}
     else
       with {:ok, body} <- uncached_download(url, ignore_proxy),
+           :ok <- File.mkdir_p(cache_dir),
            :ok <- File.write(cache_path, body) do
         {:ok, cache_path}
       end
@@ -304,19 +306,10 @@ defmodule Adbc.Helper do
   end
 
   defp adbc_cache_dir() do
-    dir =
-      if dir = System.get_env("ADBC_CACHE_DIR") do
-        Path.expand(dir)
-      else
-        :filename.basedir(:user_cache, "adbc")
-      end
-
-    case File.mkdir_p(dir) do
-      :ok ->
-        {:ok, dir}
-
-      other ->
-        other
+    if dir = System.get_env("ADBC_CACHE_DIR") do
+      Path.expand(dir)
+    else
+      :filename.basedir(:user_cache, "adbc")
     end
   end
 end

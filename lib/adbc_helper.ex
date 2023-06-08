@@ -222,7 +222,7 @@ defmodule Adbc.Helper do
     options = [body_format: :binary]
 
     case :httpc.request(:get, {url_charlist, []}, https_options, options) do
-      {:ok, {{_, 200, _}, _, body}} ->
+      {:ok, {{_, 200, _}, _headers, body}} ->
         {:ok, body}
 
       other ->

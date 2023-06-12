@@ -179,10 +179,10 @@ defmodule Adbc.Statement do
 
   """
   @doc group: :adbc_statement
-  @spec bind(Adbc.Statement.t(), Adbc.ArrowArray.t(), Adbc.ArrowSchema.t()) ::
+  @spec bind(Adbc.Statement.t(), [integer() | float() | String.t() | nil | boolean()]) ::
           :ok | Adbc.Error.adbc_error()
-  def bind(self = %T{}, values = %ArrowArray{}, schema = %ArrowSchema{}) do
-    Adbc.Nif.adbc_statement_bind(self.reference, values.reference, schema.reference)
+  def bind(self = %T{}, values) do
+    Adbc.Nif.adbc_statement_bind(self.reference, values)
   end
 
   @doc """

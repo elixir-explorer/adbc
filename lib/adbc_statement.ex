@@ -10,7 +10,6 @@ defmodule Adbc.Statement do
         }
   defstruct [:reference]
   alias __MODULE__, as: T
-  alias Adbc.ArrowArray
   alias Adbc.ArrowArrayStream
   alias Adbc.ArrowSchema
 
@@ -181,7 +180,7 @@ defmodule Adbc.Statement do
   @doc group: :adbc_statement
   @spec bind(Adbc.Statement.t(), [integer() | float() | String.t() | nil | boolean()]) ::
           :ok | Adbc.Error.adbc_error()
-  def bind(self = %T{}, values) do
+  def bind(self = %T{}, values) when is_list(values) do
     Adbc.Nif.adbc_statement_bind(self.reference, values)
   end
 

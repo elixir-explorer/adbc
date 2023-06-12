@@ -51,10 +51,14 @@ set(SOURCE_FILES
 include_directories("${ERTS_INCLUDE_DIR}")
 include_directories("${ADBC_SRC}")
 
+add_subdirectory("${ADBC_SRC}/c/vendor/nanoarrow")
+include_directories("${ADBC_SRC}/c/vendor")
+
 add_library(adbc_nif SHARED
     ${SOURCE_FILES}
 )
 target_link_libraries(adbc_nif PUBLIC AdbcDriverManager::adbc_driver_manager_shared)
+target_link_libraries(adbc_nif PUBLIC nanoarrow)
 install(
     TARGETS adbc_nif
     RUNTIME DESTINATION "${PRIV_DIR}"

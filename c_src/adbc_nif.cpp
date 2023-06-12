@@ -4,6 +4,7 @@
 #include <climits>
 #include "nif_utils.hpp"
 #include <adbc.h>
+#include <nanoarrow/nanoarrow.h>
 #include "adbc_nif_resource.hpp"
 
 #ifdef __GNUC__
@@ -865,8 +866,6 @@ static ERL_NIF_TERM adbc_statement_set_substrait_plan(ErlNifEnv *env, int argc, 
 
 static ERL_NIF_TERM adbc_statement_bind(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
     using res_type = NifRes<struct AdbcStatement>;
-    using array_type = NifRes<struct ArrowArray>;
-    using schema_type = NifRes<struct ArrowSchema>;
 
     ERL_NIF_TERM ret{};
     ERL_NIF_TERM error{};
@@ -875,19 +874,14 @@ static ERL_NIF_TERM adbc_statement_bind(ErlNifEnv *env, int argc, const ERL_NIF_
     if ((statement = res_type::get_resource(env, argv[0], error)) == nullptr) {
         return error;
     }
-    
-    array_type * values = nullptr;
-    if ((values = array_type::get_resource(env, argv[1], error)) == nullptr) {
-        return error;
-    }
 
-    schema_type * schema = nullptr;
-    if ((schema = schema_type::get_resource(env, argv[2], error)) == nullptr) {
-        return error;
-    }
+    struct ArrowArray * values = nullptr;
+    struct ArrowSchema * schema = nullptr;
+    // TODO: 
+    // elixir_to_arrow_type_struct(argv[1], &values, &schema);
 
     struct AdbcError adbc_error{};
-    AdbcStatusCode code = AdbcStatementBind(&statement->val, &values->val, &schema->val, &adbc_error);
+    AdbcStatusCode code = AdbcStatementBind(&statement->val, values, schema, &adbc_error);
     if (code != ADBC_STATUS_OK) {
         return nif_error_from_adbc_error(env, &adbc_error);
     }
@@ -1073,7 +1067,7 @@ static ErlNifFunc nif_functions[] = {
     {"adbc_statement_prepare", 1, adbc_statement_prepare, 0},
     {"adbc_statement_set_sql_query", 2, adbc_statement_set_sql_query, 0},
     {"adbc_statement_set_substrait_plan", 3, adbc_statement_set_substrait_plan, 0},
-    {"adbc_statement_bind", 3, adbc_statement_bind, 0},
+    {"adbc_statement_bind", 2, adbc_statement_bind, 0},
     {"adbc_statement_bind_stream", 2, adbc_statement_bind_stream, 0},
     {"adbc_statement_get_parameter_schema", 1, adbc_statement_get_parameter_schema, 0},
 

@@ -13,11 +13,6 @@ defmodule Adbc.Statement do
   alias Adbc.ArrowArrayStream
   alias Adbc.ArrowSchema
 
-  @spec get_pointer(Adbc.Statement.t()) :: non_neg_integer()
-  def get_pointer(self = %T{}) do
-    Adbc.Nif.adbc_statement_get_pointer(self.reference)
-  end
-
   @doc """
   Create a new statement for a given connection.
   """

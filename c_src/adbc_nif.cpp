@@ -560,30 +560,6 @@ static ERL_NIF_TERM adbc_connection_rollback(ErlNifEnv *env, int argc, const ERL
     return erlang::nif::ok(env);
 }
 
-static ERL_NIF_TERM adbc_statement_get_pointer(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
-    using res_type = NifRes<struct AdbcStatement>;
-    ERL_NIF_TERM error{};
-
-    res_type * res = nullptr;
-    if ((res = res_type::get_resource(env, argv[0], error)) == nullptr) {
-        return error;
-    }
-
-    return enif_make_uint64(env, reinterpret_cast<uint64_t>(&res->val));
-}
-
-static ERL_NIF_TERM adbc_arrow_schema_get_pointer(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
-    using res_type = NifRes<struct ArrowSchema>;
-    ERL_NIF_TERM error{};
-
-    res_type * res = nullptr;
-    if ((res = res_type::get_resource(env, argv[0], error)) == nullptr) {
-        return error;
-    }
-
-    return enif_make_uint64(env, reinterpret_cast<uint64_t>(&res->val));
-}
-
 static ERL_NIF_TERM adbc_arrow_array_stream_get_pointer(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
     using res_type = NifRes<struct ArrowArrayStream>;
     ERL_NIF_TERM error{};
@@ -1048,42 +1024,6 @@ static ERL_NIF_TERM adbc_statement_get_parameter_schema(ErlNifEnv *env, int argc
     return erlang::nif::ok(env, ret);
 }
 
-static ERL_NIF_TERM adbc_get_all_function_pointers(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
-    ERL_NIF_TERM ret{};
-    std::map<std::string, uint64_t> fptr = {
-        {"AdbcDatabaseNew", reinterpret_cast<uint64_t>(&AdbcDatabaseNew)},
-        {"AdbcDatabaseSetOption", reinterpret_cast<uint64_t>(&AdbcDatabaseSetOption)},
-        {"AdbcDatabaseInit", reinterpret_cast<uint64_t>(&AdbcDatabaseInit)},
-        {"AdbcDatabaseRelease", reinterpret_cast<uint64_t>(&AdbcDatabaseRelease)},
-        
-        {"AdbcConnectionNew", reinterpret_cast<uint64_t>(&AdbcConnectionNew)},
-        {"AdbcConnectionSetOption", reinterpret_cast<uint64_t>(&AdbcConnectionSetOption)},
-        {"AdbcConnectionInit", reinterpret_cast<uint64_t>(&AdbcConnectionInit)},
-        {"AdbcConnectionRelease", reinterpret_cast<uint64_t>(&AdbcConnectionRelease)},
-        {"AdbcConnectionGetInfo", reinterpret_cast<uint64_t>(&AdbcConnectionGetInfo)},
-        {"AdbcConnectionGetObjects", reinterpret_cast<uint64_t>(&AdbcConnectionGetObjects)},
-        {"AdbcConnectionGetTableSchema", reinterpret_cast<uint64_t>(&AdbcConnectionGetTableSchema)},
-        {"AdbcConnectionGetTableTypes", reinterpret_cast<uint64_t>(&AdbcConnectionGetTableTypes)},
-        {"AdbcConnectionReadPartition", reinterpret_cast<uint64_t>(&AdbcConnectionReadPartition)},
-        {"AdbcConnectionCommit", reinterpret_cast<uint64_t>(&AdbcConnectionCommit)},
-        {"AdbcConnectionRollback", reinterpret_cast<uint64_t>(&AdbcConnectionRollback)},
-
-        {"AdbcStatementNew", reinterpret_cast<uint64_t>(&AdbcStatementNew)},
-        {"AdbcStatementRelease", reinterpret_cast<uint64_t>(&AdbcStatementRelease)},
-        {"AdbcStatementExecuteQuery", reinterpret_cast<uint64_t>(&AdbcStatementExecuteQuery)},
-        {"AdbcStatementPrepare", reinterpret_cast<uint64_t>(&AdbcStatementPrepare)},
-        {"AdbcStatementSetSqlQuery", reinterpret_cast<uint64_t>(&AdbcStatementSetSqlQuery)},
-        {"AdbcStatementSetSubstraitPlan", reinterpret_cast<uint64_t>(&AdbcStatementSetSubstraitPlan)},
-        {"AdbcStatementBind", reinterpret_cast<uint64_t>(&AdbcStatementBind)},
-        {"AdbcStatementBindStream", reinterpret_cast<uint64_t>(&AdbcStatementBindStream)},
-        {"AdbcStatementGetParameterSchema", reinterpret_cast<uint64_t>(&AdbcStatementGetParameterSchema)},
-        {"AdbcStatementSetOption", reinterpret_cast<uint64_t>(&AdbcStatementSetOption)},
-        {"AdbcStatementExecutePartitions", reinterpret_cast<uint64_t>(&AdbcStatementExecutePartitions)}
-    };
-    erlang::nif::make(env, fptr, ret, false);
-    return ret;
-}
-
 static int on_load(ErlNifEnv *env, void **, ERL_NIF_TERM) {
     ErlNifResourceType *rt;
 
@@ -1158,7 +1098,6 @@ static ErlNifFunc nif_functions[] = {
     {"adbc_connection_commit", 1, adbc_connection_commit, 0},
     {"adbc_connection_rollback", 1, adbc_connection_rollback, 0},
 
-    {"adbc_statement_get_pointer", 1, adbc_statement_get_pointer, 0},
     {"adbc_statement_new", 1, adbc_statement_new, 0},
     {"adbc_statement_release", 1, adbc_statement_release, 0},
     {"adbc_statement_execute_query", 1, adbc_statement_execute_query, 0},
@@ -1168,15 +1107,11 @@ static ErlNifFunc nif_functions[] = {
     {"adbc_statement_bind", 2, adbc_statement_bind, 0},
     {"adbc_statement_bind_stream", 2, adbc_statement_bind_stream, 0},
     {"adbc_statement_get_parameter_schema", 1, adbc_statement_get_parameter_schema, 0},
-
-    {"adbc_arrow_schema_get_pointer", 1, adbc_arrow_schema_get_pointer, 0},
     {"adbc_arrow_array_stream_get_pointer", 1, adbc_arrow_array_stream_get_pointer, 0},
 
     {"adbc_error_new", 0, adbc_error_new, 0},
     {"adbc_error_reset", 1, adbc_error_reset, 0},
-    {"adbc_error_to_term", 1, adbc_error_to_term, 0},
-
-    {"adbc_get_all_function_pointers", 0, adbc_get_all_function_pointers, 0}
+    {"adbc_error_to_term", 1, adbc_error_to_term, 0}
 };
 
 ERL_NIF_INIT(Elixir.Adbc.Nif, nif_functions, on_load, on_reload, on_upgrade, NULL);

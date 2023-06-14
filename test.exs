@@ -17,5 +17,6 @@ Database.init(database)
 
 Statement.set_sql_query(statement, "INSERT INTO foo(col,str) VALUES (?,?)")
 Statement.prepare(statement)
-:ok = Statement.bind(statement, [:random.uniform(1000), ":random.uniform(1000)"])
+r = :random.uniform(1000)
+:ok = Statement.bind(statement, [r, "value = #{r + 1}"])
 {:ok, _stream, _row_affected} = Statement.execute_query(statement)

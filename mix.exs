@@ -2,7 +2,7 @@ defmodule ADBC.MixProject do
   use Mix.Project
 
   @app :adbc
-  @version "0.1.0"
+  @version "0.1.0-dev"
   @github_url "https://github.com/cocoa-xu/adbc"
 
   def project do

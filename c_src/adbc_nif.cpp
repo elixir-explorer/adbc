@@ -926,6 +926,36 @@ int elixir_to_arrow_type_struct(ErlNifEnv *env, ERL_NIF_TERM values, struct Arro
             view.size_bytes = static_cast<int64_t>(bytes.size);
             NANOARROW_RETURN_NOT_OK(ArrowArrayStartAppending(child_i));
             NANOARROW_RETURN_NOT_OK(ArrowArrayAppendBytes(child_i, view));
+        } else if (enif_is_atom(env, head)) {
+            std::string atom_val;
+            int64_t val{};
+            if (erlang::nif::get_atom(env, head, atom_val)) {
+                auto type = NANOARROW_TYPE_BOOL;
+                if (atom_val == "true" || atom_val == "TRUE") {
+                    val = 1;
+                } else if (atom_val == "false" || atom_val == "FALSE") {
+                    val = 0;
+                } else if (atom_val == "nil") {
+                    type = NANOARROW_TYPE_NA;
+                } else {
+                    snprintf(error_out->message, sizeof(error_out->message), "atom `:%s` is not supported yet.", atom_val.c_str());
+                    return 1;
+                }
+
+                NANOARROW_RETURN_NOT_OK(ArrowSchemaSetType(schema_i, type));
+                NANOARROW_RETURN_NOT_OK(ArrowSchemaSetName(schema_i, ""));
+                NANOARROW_RETURN_NOT_OK(ArrowArrayInitFromSchema(child_i, schema_i, error_out));
+                if (type == NANOARROW_TYPE_BOOL) {
+                    NANOARROW_RETURN_NOT_OK(ArrowArrayStartAppending(child_i));
+                    NANOARROW_RETURN_NOT_OK(ArrowArrayAppendInt(child_i, val));
+                } else {
+                    NANOARROW_RETURN_NOT_OK(ArrowArrayStartAppending(child_i));
+                    NANOARROW_RETURN_NOT_OK(ArrowArrayAppendNull(child_i, 1));
+                }
+            } else {
+                snprintf(error_out->message, sizeof(error_out->message), "failed to get atom");
+                return 1;
+            }
         } else {
             snprintf(error_out->message, sizeof(error_out->message), "type not supported yet.");
             return 1;

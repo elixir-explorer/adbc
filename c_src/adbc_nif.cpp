@@ -37,7 +37,7 @@ static ERL_NIF_TERM nif_error_from_adbc_error(ErlNifEnv *env, struct AdbcError *
     return nif_error;
 }
 
-static int elixir_to_arrow_type_struct(ErlNifEnv *env, ERL_NIF_TERM argv, struct ArrowArray* array_out, struct ArrowSchema* schema_out);
+// static int elixir_to_arrow_type_struct(ErlNifEnv *env, ERL_NIF_TERM argv, struct ArrowArray* array_out, struct ArrowSchema* schema_out);
 
 static ERL_NIF_TERM adbc_database_new(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
     using res_type = NifRes<struct AdbcDatabase>;
@@ -867,18 +867,20 @@ static ERL_NIF_TERM adbc_statement_set_substrait_plan(ErlNifEnv *env, int argc, 
 }
 
 // non-zero return value indicating errors
-int elixir_to_arrow_type_struct(ErlNifEnv *env, ERL_NIF_TERM values, struct ArrowArray* array_out, struct ArrowSchema* schema_out) {
-    struct ArrowError error{};
+int elixir_to_arrow_type_struct(ErlNifEnv *env, ERL_NIF_TERM values, struct ArrowArray* array_out, struct ArrowSchema* schema_out, struct ArrowError* error_out) {
     array_out->release = NULL;
     schema_out->release = NULL;
 
     unsigned n_items = 0;
     if (!enif_get_list_length(env, values, &n_items)) {
-        return true;
+        return 1;
     }
 
     NANOARROW_RETURN_NOT_OK(ArrowArrayInitFromType(array_out, NANOARROW_TYPE_STRUCT));
     NANOARROW_RETURN_NOT_OK(ArrowArrayAllocateChildren(array_out, static_cast<int64_t>(n_items)));
+
+    array_out->length = 1;
+    array_out->null_count = -1;
 
     NANOARROW_RETURN_NOT_OK(ArrowSchemaInitFromType(schema_out, NANOARROW_TYPE_STRUCT));
     NANOARROW_RETURN_NOT_OK(ArrowSchemaAllocateChildren(schema_out, static_cast<int64_t>(n_items)));
@@ -887,6 +889,7 @@ int elixir_to_arrow_type_struct(ErlNifEnv *env, ERL_NIF_TERM values, struct Arro
     tail = values;
     int64_t processed = 0;
     while (enif_get_list_cell(env, tail, &head, &tail)) {
+        printf("child[%lld]\r\n", processed);
         auto child_i = array_out->children[processed];
         auto schema_i = schema_out->children[processed];
         ErlNifSInt64 i64;
@@ -911,20 +914,21 @@ int elixir_to_arrow_type_struct(ErlNifEnv *env, ERL_NIF_TERM values, struct Arro
                 NANOARROW_RETURN_NOT_OK(ArrowSchemaInitFromType(schema_i, type));
                 NANOARROW_RETURN_NOT_OK(ArrowArrayInitFromType(child_i, type));
 
-                struct ArrowBufferView view{
-                    {bytes.data},
-                    static_cast<int64_t>(bytes.size)
-                };
+                struct ArrowBufferView view{};
+                view.data.data = bytes.data;
+                view.size_bytes = static_cast<int64_t>(bytes.size);
                 NANOARROW_RETURN_NOT_OK(ArrowArrayStartAppending(child_i));
                 NANOARROW_RETURN_NOT_OK(ArrowArrayAppendBytes(child_i, view));
             }
         }
-        NANOARROW_RETURN_NOT_OK(ArrowArrayFinishBuildingDefault(child_i, nullptr));
+        NANOARROW_RETURN_NOT_OK(ArrowArrayFinishBuildingDefault(child_i, error_out));
         processed++;
     }
-    NANOARROW_RETURN_NOT_OK(ArrowArrayFinishBuildingDefault(array_out, &error));
+    printf("%d\r\n", __LINE__);
+    NANOARROW_RETURN_NOT_OK(ArrowArrayFinishBuildingDefault(array_out, error_out));
+    printf("%d\r\n", __LINE__);
 
-    return false;
+    return !(processed == n_items);
 }
 
 static ERL_NIF_TERM adbc_statement_bind(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
@@ -944,16 +948,23 @@ static ERL_NIF_TERM adbc_statement_bind(ErlNifEnv *env, int argc, const ERL_NIF_
 
     struct ArrowArray values{};
     struct ArrowSchema schema{};
-    if (elixir_to_arrow_type_struct(env, argv[1], &values, &schema)) {
-        return enif_make_badarg(env);
+    struct ArrowError arrow_error{};
+    if (elixir_to_arrow_type_struct(env, argv[1], &values, &schema, &arrow_error)) {
+        if (values.release) values.release(&values);
+        if (schema.release) schema.release(&schema);
+        return erlang::nif::error(env, arrow_error.message);
     }
 
     struct AdbcError adbc_error{};
     AdbcStatusCode code = AdbcStatementBind(&statement->val, &values, &schema, &adbc_error);
     if (code != ADBC_STATUS_OK) {
+        if (values.release) values.release(&values);
+        if (schema.release) schema.release(&schema);
         return nif_error_from_adbc_error(env, &adbc_error);
     }
 
+    if (values.release) values.release(&values);
+    if (schema.release) schema.release(&schema);
     return erlang::nif::ok(env);
 }
 

@@ -37,6 +37,8 @@ static ERL_NIF_TERM nif_error_from_adbc_error(ErlNifEnv *env, struct AdbcError *
     return nif_error;
 }
 
+static int elixir_to_arrow_type_struct(ErlNifEnv *env, ERL_NIF_TERM argv, struct ArrowArray* array_out, struct ArrowSchema* schema_out);
+
 static ERL_NIF_TERM adbc_database_new(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
     using res_type = NifRes<struct AdbcDatabase>;
 
@@ -864,6 +866,70 @@ static ERL_NIF_TERM adbc_statement_set_substrait_plan(ErlNifEnv *env, int argc, 
     return erlang::nif::ok(env);
 }
 
+// non-zero return value indicating errors
+int elixir_to_arrow_type_struct(ErlNifEnv *env, ERL_NIF_TERM values, struct ArrowArray* array_out, struct ArrowSchema* schema_out) {
+    struct ArrowError error{};
+    array_out->release = NULL;
+    schema_out->release = NULL;
+
+    unsigned n_items = 0;
+    if (!enif_get_list_length(env, values, &n_items)) {
+        return true;
+    }
+
+    NANOARROW_RETURN_NOT_OK(ArrowArrayInitFromType(array_out, NANOARROW_TYPE_STRUCT));
+    NANOARROW_RETURN_NOT_OK(ArrowArrayAllocateChildren(array_out, static_cast<int64_t>(n_items)));
+
+    NANOARROW_RETURN_NOT_OK(ArrowSchemaInitFromType(schema_out, NANOARROW_TYPE_STRUCT));
+    NANOARROW_RETURN_NOT_OK(ArrowSchemaAllocateChildren(schema_out, static_cast<int64_t>(n_items)));
+
+    ERL_NIF_TERM head, tail;
+    tail = values;
+    int64_t processed = 0;
+    while (enif_get_list_cell(env, tail, &head, &tail)) {
+        auto child_i = array_out->children[processed];
+        auto schema_i = schema_out->children[processed];
+        ErlNifSInt64 i64;
+        double f64;
+        if (enif_get_int64(env, head, &i64)) {
+            NANOARROW_RETURN_NOT_OK(ArrowSchemaInitFromType(schema_i, NANOARROW_TYPE_INT64));
+            NANOARROW_RETURN_NOT_OK(ArrowArrayInitFromType(child_i, NANOARROW_TYPE_INT64));
+            NANOARROW_RETURN_NOT_OK(ArrowArrayAppendInt(child_i, i64));
+        } else if (enif_get_double(env, head, &f64)) {
+            NANOARROW_RETURN_NOT_OK(ArrowSchemaInitFromType(schema_i, NANOARROW_TYPE_DOUBLE));
+            NANOARROW_RETURN_NOT_OK(ArrowArrayInitFromType(child_i, NANOARROW_TYPE_DOUBLE));
+            NANOARROW_RETURN_NOT_OK(ArrowArrayAppendDouble(child_i, f64));
+        } else if (enif_is_binary(env, head)) {
+            printf("%d\r\n", __LINE__);
+            ErlNifBinary bytes;
+            if (enif_inspect_binary(env, head, &bytes)) {
+                printf("%d\r\n", __LINE__);
+                auto type = NANOARROW_TYPE_BINARY;
+                if (bytes.size > INT32_MAX) {
+                    type = NANOARROW_TYPE_LARGE_BINARY;
+                }
+                printf("%d\r\n", __LINE__);
+                NANOARROW_RETURN_NOT_OK(ArrowSchemaInitFromType(schema_i, type));
+                printf("%d\r\n", __LINE__);
+                NANOARROW_RETURN_NOT_OK(ArrowArrayInitFromType(child_i, type));
+                printf("%d\r\n", __LINE__);
+
+                struct ArrowBufferView view{};
+                view.data.data = bytes.data;
+                view.size_bytes = static_cast<int64_t>(bytes.size);
+                printf("%d\r\n", __LINE__);
+                auto ok = ArrowArrayAppendBytes(child_i, view);
+                printf("%d\r\n", __LINE__);
+                NANOARROW_RETURN_NOT_OK(ok);
+            }
+        }
+        processed++;
+    }
+    NANOARROW_RETURN_NOT_OK(ArrowArrayFinishBuildingDefault(array_out, &error));
+
+    return false;
+}
+
 static ERL_NIF_TERM adbc_statement_bind(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
     using res_type = NifRes<struct AdbcStatement>;
 
@@ -875,13 +941,18 @@ static ERL_NIF_TERM adbc_statement_bind(ErlNifEnv *env, int argc, const ERL_NIF_
         return error;
     }
 
-    struct ArrowArray * values = nullptr;
-    struct ArrowSchema * schema = nullptr;
-    // TODO: 
-    // elixir_to_arrow_type_struct(argv[1], &values, &schema);
+    if (!enif_is_list(env, argv[1])) {
+        return enif_make_badarg(env);
+    }
+
+    struct ArrowArray values{};
+    struct ArrowSchema schema{};
+    if (elixir_to_arrow_type_struct(env, argv[1], &values, &schema)) {
+        return enif_make_badarg(env);
+    }
 
     struct AdbcError adbc_error{};
-    AdbcStatusCode code = AdbcStatementBind(&statement->val, values, schema, &adbc_error);
+    AdbcStatusCode code = AdbcStatementBind(&statement->val, &values, &schema, &adbc_error);
     if (code != ADBC_STATUS_OK) {
         return nif_error_from_adbc_error(env, &adbc_error);
     }

@@ -876,57 +876,63 @@ int elixir_to_arrow_type_struct(ErlNifEnv *env, ERL_NIF_TERM values, struct Arro
         return 1;
     }
 
+    ArrowSchemaInit(schema_out);
+    NANOARROW_RETURN_NOT_OK(ArrowSchemaSetTypeStruct(schema_out, n_items));
+    NANOARROW_RETURN_NOT_OK(ArrowSchemaSetName(schema_out, ""));
+
     NANOARROW_RETURN_NOT_OK(ArrowArrayInitFromType(array_out, NANOARROW_TYPE_STRUCT));
     NANOARROW_RETURN_NOT_OK(ArrowArrayAllocateChildren(array_out, static_cast<int64_t>(n_items)));
 
+    // TODO: only 1 row for now
     array_out->length = 1;
     array_out->null_count = -1;
-
-    NANOARROW_RETURN_NOT_OK(ArrowSchemaInitFromType(schema_out, NANOARROW_TYPE_STRUCT));
-    NANOARROW_RETURN_NOT_OK(ArrowSchemaAllocateChildren(schema_out, static_cast<int64_t>(n_items)));
 
     ERL_NIF_TERM head, tail;
     tail = values;
     int64_t processed = 0;
     while (enif_get_list_cell(env, tail, &head, &tail)) {
-        printf("child[%lld]\r\n", processed);
-        auto child_i = array_out->children[processed];
         auto schema_i = schema_out->children[processed];
+        ArrowSchemaInit(schema_i);
+        
+        auto child_i = array_out->children[processed];
         ErlNifSInt64 i64;
         double f64;
+        ErlNifBinary bytes;
+
         if (enif_get_int64(env, head, &i64)) {
-            NANOARROW_RETURN_NOT_OK(ArrowSchemaInitFromType(schema_i, NANOARROW_TYPE_INT64));
-            NANOARROW_RETURN_NOT_OK(ArrowArrayInitFromType(child_i, NANOARROW_TYPE_INT64));
+            NANOARROW_RETURN_NOT_OK(ArrowSchemaSetType(schema_i, NANOARROW_TYPE_INT64));
+            NANOARROW_RETURN_NOT_OK(ArrowSchemaSetName(schema_i, ""));
+            NANOARROW_RETURN_NOT_OK(ArrowArrayInitFromSchema(child_i, schema_i, error_out));
             NANOARROW_RETURN_NOT_OK(ArrowArrayStartAppending(child_i));
             NANOARROW_RETURN_NOT_OK(ArrowArrayAppendInt(child_i, i64));
         } else if (enif_get_double(env, head, &f64)) {
-            NANOARROW_RETURN_NOT_OK(ArrowSchemaInitFromType(schema_i, NANOARROW_TYPE_DOUBLE));
-            NANOARROW_RETURN_NOT_OK(ArrowArrayInitFromType(child_i, NANOARROW_TYPE_DOUBLE));
+            NANOARROW_RETURN_NOT_OK(ArrowSchemaSetType(schema_i, NANOARROW_TYPE_DOUBLE));
+            NANOARROW_RETURN_NOT_OK(ArrowSchemaSetName(schema_i, ""));
+            NANOARROW_RETURN_NOT_OK(ArrowArrayInitFromSchema(child_i, schema_i, error_out));
             NANOARROW_RETURN_NOT_OK(ArrowArrayStartAppending(child_i));
             NANOARROW_RETURN_NOT_OK(ArrowArrayAppendDouble(child_i, f64));
-        } else if (enif_is_binary(env, head)) {
-            ErlNifBinary bytes;
-            if (enif_inspect_binary(env, head, &bytes)) {
-                auto type = NANOARROW_TYPE_BINARY;
-                if (bytes.size > INT32_MAX) {
-                    type = NANOARROW_TYPE_LARGE_BINARY;
-                }
-                NANOARROW_RETURN_NOT_OK(ArrowSchemaInitFromType(schema_i, type));
-                NANOARROW_RETURN_NOT_OK(ArrowArrayInitFromType(child_i, type));
-
-                struct ArrowBufferView view{};
-                view.data.data = bytes.data;
-                view.size_bytes = static_cast<int64_t>(bytes.size);
-                NANOARROW_RETURN_NOT_OK(ArrowArrayStartAppending(child_i));
-                NANOARROW_RETURN_NOT_OK(ArrowArrayAppendBytes(child_i, view));
+        } else if (enif_is_binary(env, head) && enif_inspect_binary(env, head, &bytes)) {
+            auto type = NANOARROW_TYPE_BINARY;
+            if (bytes.size > INT32_MAX) {
+                type = NANOARROW_TYPE_LARGE_BINARY;
             }
+
+            NANOARROW_RETURN_NOT_OK(ArrowSchemaSetType(schema_i, type));
+            NANOARROW_RETURN_NOT_OK(ArrowSchemaSetName(schema_i, ""));
+            NANOARROW_RETURN_NOT_OK(ArrowArrayInitFromSchema(child_i, schema_i, error_out));
+
+            struct ArrowBufferView view{};
+            view.data.data = bytes.data;
+            view.size_bytes = static_cast<int64_t>(bytes.size);
+            NANOARROW_RETURN_NOT_OK(ArrowArrayStartAppending(child_i));
+            NANOARROW_RETURN_NOT_OK(ArrowArrayAppendBytes(child_i, view));
+        } else {
+            snprintf(error_out->message, sizeof(error_out->message), "type not supported yet.");
+            return 1;
         }
         NANOARROW_RETURN_NOT_OK(ArrowArrayFinishBuildingDefault(child_i, error_out));
         processed++;
     }
-    printf("%d\r\n", __LINE__);
-    NANOARROW_RETURN_NOT_OK(ArrowArrayFinishBuildingDefault(array_out, error_out));
-    printf("%d\r\n", __LINE__);
 
     return !(processed == n_items);
 }

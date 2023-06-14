@@ -23,7 +23,8 @@ template<> ErlNifResourceType * NifRes<struct ArrowSchema>::type = nullptr;
 
 static ERL_NIF_TERM nif_error_from_adbc_error(ErlNifEnv *env, struct AdbcError * adbc_error) {
     char const* message = (adbc_error->message == nullptr) ? "unknown error" : adbc_error->message;
-    ERL_NIF_TERM nif_error = erlang::nif::error(env, enif_make_tuple3(env,
+    ERL_NIF_TERM nif_error = erlang::nif::error(env, enif_make_tuple4(env,
+        erlang::nif::atom(env, "adbc_error"),
         erlang::nif::make_binary(env, message),
         enif_make_int(env, adbc_error->vendor_code),
         erlang::nif::make_binary(env, adbc_error->sqlstate, 5)

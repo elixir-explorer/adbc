@@ -1,4 +1,4 @@
-defmodule ADBC.MixProject do
+defmodule Adbc.MixProject do
   use Mix.Project
 
   @app :adbc

@@ -15,7 +15,7 @@ iex> {:ok, database} = Database.new()
 {:ok, %Adbc.Database{reference: #Reference<0.1918355494.3778674689.52121>}}
 iex> Database.set_option(database, "driver", "adbc_driver_sqlite")
 :ok
-iex> Database.set_option(database, "uri", "file:my_db.db")
+iex> Database.set_option(database, "uri", "file:my_db1.db")
 :ok
 iex> Database.init(database)
 :ok
@@ -32,7 +32,7 @@ iex> {:ok, statement} = Statement.new(connection)
 
 # execute query
 # this creates a table if not exists
-iex> Statement.set_sql_query(statement, "CREATE TABLE IF NOT EXISTS foo (col)")
+iex> Statement.set_sql_query(statement, "CREATE TABLE IF NOT EXISTS foo (col REAL, str TEXT)")
 :ok
 iex> Statement.prepare(statement)
 :ok
@@ -43,10 +43,12 @@ iex> {:ok, _stream, _row_affected} = Statement.execute_query(statement)
 
 # execute another query
 # this inserts a row with value 42 into the foo table
-iex> Statement.set_sql_query(statement, "INSERT INTO foo VALUES (42)")
+iex> Statement.set_sql_query(statement, "INSERT INTO foo (col,str) VALUES (?,?)")
 :ok
 iex> Statement.prepare(statement)
 :ok
+iex> r = :random.uniform(1000)
+iex> :ok = Statement.bind(statement, [r, "value = #{r + 1}"])
 iex> {:ok, _stream, _row_affected} = Statement.execute_query(statement)
 {:ok,
  %Adbc.ArrowArrayStream{reference: #Reference<0.1918355494.3778674689.52300>},

@@ -16,6 +16,7 @@ concurrency:
 
 jobs:
   linux:
+    if: "!contains(github.event.pull_request.labels.*.name, 'skip ci')"
     runs-on: ubuntu-20.04
     env:
       MIX_ENV: test
@@ -33,6 +34,7 @@ jobs:
           mix test
 
   windows:
+    if: "!contains(github.event.pull_request.labels.*.name, 'skip ci')"
     runs-on: windows-latest
     env:
       MIX_ENV: test
@@ -55,6 +57,7 @@ jobs:
           mix test
 
   macos:
+    if: "!contains(github.event.pull_request.labels.*.name, 'skip ci')"
     runs-on: macos-11
     env:
       MIX_ENV: test

@@ -77,7 +77,7 @@ defmodule Adbc.Nif do
   def adbc_statement_set_substrait_plan(_statement, _plan, _length),
     do: :erlang.nif_error(:not_loaded)
 
-  def adbc_statement_bind(_statement, _values, _schema), do: :erlang.nif_error(:not_loaded)
+  def adbc_statement_bind(_statement, _values), do: :erlang.nif_error(:not_loaded)
 
   def adbc_statement_bind_stream(_statement, _stream), do: :erlang.nif_error(:not_loaded)
 

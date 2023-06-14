@@ -945,12 +945,13 @@ int elixir_to_arrow_type_struct(ErlNifEnv *env, ERL_NIF_TERM values, struct Arro
                 NANOARROW_RETURN_NOT_OK(ArrowSchemaSetType(schema_i, type));
                 NANOARROW_RETURN_NOT_OK(ArrowSchemaSetName(schema_i, ""));
                 NANOARROW_RETURN_NOT_OK(ArrowArrayInitFromSchema(child_i, schema_i, error_out));
+                NANOARROW_RETURN_NOT_OK(ArrowArrayStartAppending(child_i));
                 if (type == NANOARROW_TYPE_BOOL) {
-                    NANOARROW_RETURN_NOT_OK(ArrowArrayStartAppending(child_i));
                     NANOARROW_RETURN_NOT_OK(ArrowArrayAppendInt(child_i, val));
                 } else {
-                    NANOARROW_RETURN_NOT_OK(ArrowArrayStartAppending(child_i));
-                    NANOARROW_RETURN_NOT_OK(ArrowArrayAppendNull(child_i, 1));
+                    // 1x Null
+                    val = 1;
+                    NANOARROW_RETURN_NOT_OK(ArrowArrayAppendNull(child_i, val));
                 }
             } else {
                 snprintf(error_out->message, sizeof(error_out->message), "failed to get atom");
@@ -985,23 +986,25 @@ static ERL_NIF_TERM adbc_statement_bind(ErlNifEnv *env, int argc, const ERL_NIF_
     struct ArrowArray values{};
     struct ArrowSchema schema{};
     struct ArrowError arrow_error{};
-    if (elixir_to_arrow_type_struct(env, argv[1], &values, &schema, &arrow_error)) {
-        if (values.release) values.release(&values);
-        if (schema.release) schema.release(&schema);
-        return erlang::nif::error(env, arrow_error.message);
-    }
-
     struct AdbcError adbc_error{};
-    AdbcStatusCode code = AdbcStatementBind(&statement->val, &values, &schema, &adbc_error);
-    if (code != ADBC_STATUS_OK) {
-        if (values.release) values.release(&values);
-        if (schema.release) schema.release(&schema);
-        return nif_error_from_adbc_error(env, &adbc_error);
+    AdbcStatusCode code{};
+
+    if (elixir_to_arrow_type_struct(env, argv[1], &values, &schema, &arrow_error)) {
+        ret = erlang::nif::error(env, arrow_error.message);
+        goto cleanup;
     }
 
+    code = AdbcStatementBind(&statement->val, &values, &schema, &adbc_error);
+    if (code != ADBC_STATUS_OK) {
+        ret = nif_error_from_adbc_error(env, &adbc_error);
+        goto cleanup;
+    }
+    ret = erlang::nif::ok(env);
+
+cleanup:
     if (values.release) values.release(&values);
     if (schema.release) schema.release(&schema);
-    return erlang::nif::ok(env);
+    return ret;
 }
 
 static ERL_NIF_TERM adbc_statement_bind_stream(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {

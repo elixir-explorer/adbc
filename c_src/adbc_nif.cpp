@@ -2,6 +2,7 @@
 #include <cstdbool>
 #include <cstdio>
 #include <climits>
+#include <map>
 #include "nif_utils.hpp"
 #include <adbc.h>
 #include <nanoarrow/nanoarrow.h>
@@ -37,7 +38,42 @@ static ERL_NIF_TERM nif_error_from_adbc_error(ErlNifEnv *env, struct AdbcError *
     return nif_error;
 }
 
-// static int elixir_to_arrow_type_struct(ErlNifEnv *env, ERL_NIF_TERM argv, struct ArrowArray* array_out, struct ArrowSchema* schema_out);
+static ERL_NIF_TERM arrow_schema_metadata_to_nif_term(ErlNifEnv *env, const char* metadata) {
+    if (metadata == nullptr) return erlang::nif::atom(env, "nil");
+    
+    std::map<std::string, std::string> metadata_map;
+
+    int64_t bytes = 0;
+    uint8_t * ptr = (uint8_t *)metadata;
+    int32_t n_pairs = *(int32_t *)ptr; ptr += sizeof(int32_t);
+    int32_t key_bytes = 0, val_bytes = 0;
+
+    for (int32_t pair_i = 0; pair_i < n_pairs; pair_i++) {
+        key_bytes = *(int32_t *)ptr; ptr += sizeof(int32_t);
+        std::string key{(char *)ptr, (size_t)key_bytes}; ptr += key_bytes;
+
+        val_bytes = *(int32_t *)ptr; ptr += sizeof(int32_t);
+        std::string val{(char *)ptr, (size_t)val_bytes}; ptr += val_bytes;
+        
+        metadata_map[key] = val;
+    }
+
+    ERL_NIF_TERM out{};
+    erlang::nif::make(env, metadata_map, out, true);
+    return out;
+}
+
+static ERL_NIF_TERM arrow_schema_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema) {
+    const char* format = schema->format ? schema->format : "";
+    const char* name = schema->name ? schema->name : "";
+    return enif_make_tuple5(env,
+        erlang::nif::make_binary(env, format),
+        erlang::nif::make_binary(env, name),
+        arrow_schema_metadata_to_nif_term(env, schema->metadata),
+        enif_make_int64(env, schema->flags),
+        enif_make_int64(env, schema->n_children)
+    );
+}
 
 static ERL_NIF_TERM adbc_database_new(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
     using res_type = NifRes<struct AdbcDatabase>;
@@ -374,6 +410,8 @@ static ERL_NIF_TERM adbc_connection_get_table_schema(ErlNifEnv *env, int argc, c
     using res_type = NifRes<struct AdbcConnection>;
     using schema_type = NifRes<struct ArrowSchema>;
 
+    ERL_NIF_TERM ret{};
+    ERL_NIF_TERM nif_schema{};
     ERL_NIF_TERM error{};
     res_type * connection = res_type::get_resource(env, argv[0], error);
     if (connection == nullptr) {
@@ -422,7 +460,12 @@ static ERL_NIF_TERM adbc_connection_get_table_schema(ErlNifEnv *env, int argc, c
     }
 
     ERL_NIF_TERM ret = schema->make_resource(env);
-    return erlang::nif::ok(env, ret);
+    nif_schema = arrow_schema_to_nif_term(env, &schema->val);
+    return enif_make_tuple3(env, 
+        erlang::nif::ok(env),
+        ret,
+        nif_schema
+    );
 }
 
 static ERL_NIF_TERM adbc_connection_get_table_types(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
@@ -554,21 +597,41 @@ static ERL_NIF_TERM adbc_arrow_array_stream_get_pointer(ErlNifEnv *env, int argc
     return enif_make_uint64(env, reinterpret_cast<uint64_t>(&res->val));
 }
 
-static ERL_NIF_TERM adbc_arrow_array_stream_new(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
+static ERL_NIF_TERM adbc_arrow_array_stream_get_schema(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
     using res_type = NifRes<struct ArrowArrayStream>;
+    using schema_type = NifRes<struct ArrowSchema>;
+
+    ERL_NIF_TERM ret{};
+    ERL_NIF_TERM nif_schema{};
     ERL_NIF_TERM error{};
 
-    auto res = res_type::allocate_resource(env, error);
-    if (res == nullptr) {
+    res_type * res = nullptr;
+    if ((res = res_type::get_resource(env, argv[0], error)) == nullptr) {
         return error;
     }
 
-    ERL_NIF_TERM ret = res->make_resource(env);
+    schema_type * schema = nullptr;
+    if ((schema = schema_type::allocate_resource(env, error)) == nullptr) {
+        return error;
+    }
 
+    if (res->val.get_schema == nullptr) {
+        return erlang::nif::error(env, "invalid ArrowArrayStream");
+    }
+
+    int code = res->val.get_schema(&res->val, &schema->val);
+    if (code != 0) {
+        return erlang::nif::error(env, strerror(code));
+    }
+
+    ret = enif_make_resource(env, schema);
+    nif_schema = arrow_schema_to_nif_term(env, &schema->val);
+    enif_release_resource(schema);
+    
     return enif_make_tuple3(env, 
-        erlang::nif::ok(env), 
-        ret, 
-        enif_make_uint64(env, reinterpret_cast<uint64_t>(&res->val))
+        erlang::nif::ok(env),
+        ret,
+        nif_schema
     );
 }
 
@@ -1075,7 +1138,9 @@ static ErlNifFunc nif_functions[] = {
     {"adbc_statement_bind", 2, adbc_statement_bind, 0},
     {"adbc_statement_bind_stream", 2, adbc_statement_bind_stream, 0},
     {"adbc_statement_get_parameter_schema", 1, adbc_statement_get_parameter_schema, 0},
+
     {"adbc_arrow_array_stream_get_pointer", 1, adbc_arrow_array_stream_get_pointer, 0},
+    {"adbc_arrow_array_stream_get_schema", 1, adbc_arrow_array_stream_get_schema, 0},
 
     {"adbc_error_new", 0, adbc_error_new, 0},
     {"adbc_error_reset", 1, adbc_error_reset, 0},

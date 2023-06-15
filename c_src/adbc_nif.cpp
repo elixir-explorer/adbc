@@ -640,7 +640,8 @@ static ERL_NIF_TERM adbc_arrow_array_stream_get_schema(ErlNifEnv *env, int argc,
 
     int code = res->val.get_schema(&res->val, &schema->val);
     if (code != 0) {
-        return erlang::nif::error(env, strerror(code));
+        const char * reason = res->val.get_last_error(&res->val);
+        return erlang::nif::error(env, reason ? reason : "unknown error");
     }
 
     ret = schema->make_resource(env);

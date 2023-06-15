@@ -654,23 +654,6 @@ static ERL_NIF_TERM adbc_arrow_array_stream_get_schema(ErlNifEnv *env, int argc,
     );
 }
 
-static ERL_NIF_TERM adbc_arrow_array_stream_reset(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
-    using res_type = NifRes<struct ArrowArrayStream>;
-    ERL_NIF_TERM ret{};
-    ERL_NIF_TERM error{};
-
-    res_type * res = nullptr;
-    if ((res = res_type::get_resource(env, argv[0], error)) == nullptr) {
-        return error;
-    }
-
-    if (res->val.release) {
-        res->val.release(&res->val);
-    }
-
-    return erlang::nif::ok(env);
-}
-
 static ERL_NIF_TERM adbc_error_new(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
     using res_type = NifRes<struct AdbcError>;
     ERL_NIF_TERM error{};

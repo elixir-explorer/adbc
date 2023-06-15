@@ -43,6 +43,11 @@ defmodule Adbc.ArrowArrayStream do
     end
   end
 
+  @spec next(Adbc.ArrowArrayStream.t()) :: term() | {:error, String.t()}
+  def next(self = %T{}) do
+    Adbc.Nif.adbc_arrow_array_stream_release(self.reference)
+  end
+
   @spec release(Adbc.ArrowArrayStream.t()) :: :ok | {:error, String.t()}
   def release(self = %T{}) do
     Adbc.Nif.adbc_arrow_array_stream_release(self.reference)

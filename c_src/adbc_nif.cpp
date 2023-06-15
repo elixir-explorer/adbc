@@ -654,6 +654,30 @@ static ERL_NIF_TERM adbc_arrow_array_stream_get_schema(ErlNifEnv *env, int argc,
     );
 }
 
+static ERL_NIF_TERM adbc_arrow_array_stream_next(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
+    using res_type = NifRes<struct ArrowArrayStream>;
+    ERL_NIF_TERM error{};
+
+    res_type * res = nullptr;
+    if ((res = res_type::get_resource(env, argv[0], error)) == nullptr) {
+        return error;
+    }
+    if (res->val.get_next == nullptr) {
+        
+    }
+
+    struct ArrowArray out{};
+    int code = res->val.get_next(&res->val, &out);
+    if (code != 0) {
+        const char * reason = res->val.get_last_error(&res->val);
+        return erlang::nif::error(env, reason ? reason : "unknown error");
+    }
+
+    // TODO: convert out ArrowArray to elixir values    
+
+    return erlang::nif::ok(env);
+}
+
 static ERL_NIF_TERM adbc_arrow_array_stream_release(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
     using res_type = NifRes<struct ArrowArrayStream>;
     ERL_NIF_TERM error{};
@@ -1160,6 +1184,7 @@ static ErlNifFunc nif_functions[] = {
 
     {"adbc_arrow_array_stream_get_pointer", 1, adbc_arrow_array_stream_get_pointer, 0},
     {"adbc_arrow_array_stream_get_schema", 1, adbc_arrow_array_stream_get_schema, 0},
+    {"adbc_arrow_array_stream_next", 1, adbc_arrow_array_stream_next, 0},
     {"adbc_arrow_array_stream_release", 1, adbc_arrow_array_stream_release, 0},
 
     {"adbc_error_new", 0, adbc_error_new, 0},

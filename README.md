@@ -17,7 +17,7 @@ iex> Database.set_option(database, "driver", "adbc_driver_sqlite")
 :ok
 iex> Database.set_option(database, "uri", "file:my_db1.db")
 :ok
-iex> Database.init(database)
+iex> Database.it(database)
 :ok
 
 # init the connection
@@ -79,4 +79,3 @@ end
 Documentation can be generated with [ExDoc](https://github.com/elixir-lang/ex_doc)
 and published on [HexDocs](https://hexdocs.pm). Once published, the docs can
 be found at <https://hexdocs.pm/adbc>.
-

@@ -104,10 +104,6 @@ defmodule Adbc.Helper do
     end
   end
 
-  def shared_driver_path(driver, opts \\ []) do
-    Adbc.Driver.driver_filepath(driver, opts)
-  end
-
   def get_current_triplet do
     current_target(:os.type())
   end

@@ -1,6 +1,7 @@
 defmodule Adbc.Driver do
   alias Adbc.Helper
 
+  @official_drivers ~w(sqlite postgresql flightsql snowflake)a
   @official_driver_base_url "https://github.com/apache/arrow-adbc/releases/download/apache-arrow-adbc-"
   @version "0.4.0"
 
@@ -55,7 +56,8 @@ defmodule Adbc.Driver do
   end
 
   defp do_download(url, triplet, version, ignore_proxy, driver_name) do
-    with {:ok, cache_path} <- Helper.download(url, ignore_proxy, "#{triplet}-#{version}.zip"),
+    with {:ok, cache_path} <-
+           Helper.download(url, ignore_proxy, "#{driver_name}-#{triplet}-#{version}.zip"),
          cache_path = String.to_charlist(cache_path),
          {:ok, zip_handle} <- :zip.zip_open(cache_path, [:memory]) do
       for {:ok, zip_files} <- [:zip.table(cache_path)],
@@ -78,7 +80,9 @@ defmodule Adbc.Driver do
     end
   end
 
-  def driver_filepath(driver_name, opts \\ []) do
+  def driver_filepath(driver_name, opts \\ [])
+
+  def driver_filepath(driver_name, opts) when driver_name in @official_drivers do
     version = opts[:version] || @version
 
     case Helper.get_current_triplet() do
@@ -110,5 +114,9 @@ defmodule Adbc.Driver do
       {:error, reason} ->
         {:error, reason}
     end
+  end
+
+  def driver_filepath(driver_name, _opts) do
+    {:error, "unknown driver #{inspect(driver_name)}"}
   end
 end

@@ -1,24 +1,30 @@
-defmodule Adbc.Database.Test do
+defmodule Adbc.DatabaseTest do
   use ExUnit.Case
   doctest Adbc.Database
   alias Adbc.Database
 
-  test "allocate a database, init it and then release it" do
-    {:ok, %Database{} = database} = Database.new()
-    assert is_reference(database.reference)
-    :ok = Database.set_option(database, "driver", "adbc_driver_sqlite")
+  describe "start_link" do
+    test "starts a process" do
+      assert {:ok, _} = Database.start_link(driver: :sqlite)
+    end
 
-    assert :ok == Database.init(database)
-    assert :ok == Database.release(database)
-  end
+    test "accepts process options" do
+      assert {:ok, pid} =
+               Database.start_link(driver: :sqlite, process_options: [name: :who_knows])
 
-  test "release a database twice should return invalid state" do
-    {:ok, %Database{} = database} = Database.new()
-    assert is_reference(database.reference)
-    :ok = Database.set_option(database, "driver", "adbc_driver_sqlite")
+      assert Process.whereis(:who_knows) == pid
+    end
 
-    assert :ok == Database.init(database)
-    assert :ok == Database.release(database)
-    assert {:error, "invalid state"} == Database.release(database)
+    test "errors with invalid driver" do
+      assert {:error, %ArgumentError{} = error} = Database.start_link(driver: :who_knows)
+      assert Exception.message(error) == "unknown driver :who_knows"
+    end
+
+    test "errors with invalid option" do
+      assert {:error, %Adbc.Error{} = error} =
+               Database.start_link(driver: :sqlite, who_knows: 123)
+
+      assert Exception.message(error) == "[SQLite] Unknown database option who_knows=123"
+    end
   end
 end

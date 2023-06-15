@@ -2,7 +2,6 @@ defmodule Adbc.Statement.Test do
   use ExUnit.Case
   doctest Adbc.Statement
 
-  alias Adbc.Connection
   alias Adbc.Database
   alias Adbc.Statement
 

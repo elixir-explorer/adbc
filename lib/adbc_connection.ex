@@ -14,7 +14,6 @@ defmodule Adbc.Connection do
         }
   defstruct [:reference]
   alias __MODULE__, as: T
-  alias Adbc.Database
   alias Adbc.ArrowArrayStream
   alias Adbc.ArrowSchema
   alias Adbc.Helper

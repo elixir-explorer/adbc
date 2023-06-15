@@ -478,7 +478,7 @@ static ERL_NIF_TERM adbc_connection_get_table_schema(ErlNifEnv *env, int argc, c
         return nif_error_from_adbc_error(env, &adbc_error);
     }
 
-    ERL_NIF_TERM ret = schema->make_resource(env);
+    ret = schema->make_resource(env);
     nif_schema = arrow_schema_to_nif_term(env, &schema->val);
     return enif_make_tuple3(env, 
         erlang::nif::ok(env),
@@ -629,8 +629,8 @@ static ERL_NIF_TERM adbc_arrow_array_stream_get_schema(ErlNifEnv *env, int argc,
         return error;
     }
 
-    schema_type * schema = nullptr;
-    if ((schema = schema_type::allocate_resource(env, error)) == nullptr) {
+    auto schema = schema_type::allocate_resource(env, error);
+    if (schema == nullptr) {
         return error;
     }
 
@@ -643,9 +643,8 @@ static ERL_NIF_TERM adbc_arrow_array_stream_get_schema(ErlNifEnv *env, int argc,
         return erlang::nif::error(env, strerror(code));
     }
 
-    ret = enif_make_resource(env, schema);
+    ret = schema->make_resource(env);
     nif_schema = arrow_schema_to_nif_term(env, &schema->val);
-    enif_release_resource(schema);
 
     return enif_make_tuple3(env, 
         erlang::nif::ok(env),

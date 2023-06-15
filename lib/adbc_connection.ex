@@ -282,15 +282,17 @@ defmodule Adbc.Connection do
       when (is_binary(catalog) or catalog == nil) and (is_binary(db_schema) or catalog == nil) and
              is_binary(table_name) do
     case Adbc.Nif.adbc_connection_get_table_schema(self.reference, catalog, db_schema, table_name) do
-      {:ok, schema_ref, {format, name, metadata, flags, n_children}} ->
-        {:ok, %ArrowSchema{
-          format: format,
-          name: name,
-          metadata: metadata,
-          flags: flags,
-          n_children: n_children,
-          reference: schema_ref
-        }}
+      {:ok, schema_ref, {format, name, metadata, flags, n_children, children}} ->
+        {:ok,
+         %ArrowSchema{
+           format: format,
+           name: name,
+           metadata: metadata,
+           flags: flags,
+           n_children: n_children,
+           children: Enum.map(children, &ArrowSchema.from_metainfo/1),
+           reference: schema_ref
+         }}
 
       {:error, {reason, code, sql_state}} ->
         {:error, {reason, code, sql_state}}

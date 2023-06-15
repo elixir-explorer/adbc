@@ -64,14 +64,33 @@ static ERL_NIF_TERM arrow_schema_metadata_to_nif_term(ErlNifEnv *env, const char
 }
 
 static ERL_NIF_TERM arrow_schema_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema) {
+    if (schema == nullptr) {
+        return erlang::nif::error(env, "invalid schema, schema == nullptr");
+    }
+
     const char* format = schema->format ? schema->format : "";
     const char* name = schema->name ? schema->name : "";
-    return enif_make_tuple5(env,
+
+    ERL_NIF_TERM children_term{};
+    std::vector<ERL_NIF_TERM> children(schema->n_children < 0 ? 0 : schema->n_children);
+    if (schema->n_children > 0 && schema->children == nullptr) {
+        return erlang::nif::error(env, "invalid schema, schema->children == nullptr, however, schema->n_children > 0");
+    }
+    if (schema->n_children > 0) {
+        for (int64_t child_i = 0; child_i < schema->n_children; child_i++) {
+            struct ArrowSchema * child = schema->children[child_i];
+            children[child_i] = arrow_schema_to_nif_term(env, child);
+        }
+    }
+    children_term = enif_make_list_from_array(env, children.data(), (unsigned)schema->n_children);
+
+    return enif_make_tuple6(env,
         erlang::nif::make_binary(env, format),
         erlang::nif::make_binary(env, name),
         arrow_schema_metadata_to_nif_term(env, schema->metadata),
         enif_make_int64(env, schema->flags),
-        enif_make_int64(env, schema->n_children)
+        enif_make_int64(env, schema->n_children),
+        children_term
     );
 }
 
@@ -627,7 +646,7 @@ static ERL_NIF_TERM adbc_arrow_array_stream_get_schema(ErlNifEnv *env, int argc,
     ret = enif_make_resource(env, schema);
     nif_schema = arrow_schema_to_nif_term(env, &schema->val);
     enif_release_resource(schema);
-    
+
     return enif_make_tuple3(env, 
         erlang::nif::ok(env),
         ret,

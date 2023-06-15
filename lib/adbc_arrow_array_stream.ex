@@ -26,7 +26,7 @@ defmodule Adbc.ArrowArrayStream do
           {:ok, Adbc.ArrowSchema.t()} | {:error, String.t()} | Adbc.Error.adbc_error()
   def get_schema(self = %T{}) do
     case Adbc.Nif.adbc_arrow_array_stream_get_schema(self.reference) do
-      {:ok, schema_ref, {format, name, metadata, flags, n_children}} ->
+      {:ok, schema_ref, {format, name, metadata, flags, n_children, children}} ->
         {:ok,
          %ArrowSchema{
            format: format,
@@ -34,6 +34,7 @@ defmodule Adbc.ArrowArrayStream do
            metadata: metadata,
            flags: flags,
            n_children: n_children,
+           children: Enum.map(children, &ArrowSchema.from_metainfo/1),
            reference: schema_ref
          }}
 

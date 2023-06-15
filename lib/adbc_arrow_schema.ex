@@ -96,7 +96,20 @@ defmodule Adbc.ArrowSchema do
           metadata: String.t(),
           flags: integer(),
           n_children: integer(),
+          children: [Adbc.ArrowSchema.t() | {:error, String.t()}],
           reference: reference()
         }
-  defstruct [:format, :name, :metadata, :flags, :n_children, :reference]
+  defstruct [:format, :name, :metadata, :flags, :n_children, :children, :reference]
+  alias __MODULE__, as: T
+
+  def from_metainfo({format, name, metadata, flags, n_children, children}) do
+    %T{
+      format: format,
+      name: name,
+      metadata: metadata,
+      flags: flags,
+      n_children: n_children,
+      children: Enum.map(children, &from_metainfo/1)
+    }
+  end
 end

@@ -47,12 +47,10 @@ struct NifRes {
     static auto allocate_resource(ErlNifEnv * env, ERL_NIF_TERM &error) -> std::unique_ptr<NifRes<T>, NoOpDeleter<res_type>> {
         std::unique_ptr<NifRes<T>, NoOpDeleter<res_type>> res{static_cast<res_type *>(enif_alloc_resource(res_type::type, sizeof(res_type)))};
         if (res == nullptr) {
-            error = erlang::nif::error(env, "cannot allocate Nif resource\n");
+            error = erlang::nif::error(env, "cannot allocate Nif resource");
             return res;
         }
         memset(&res->val, 0, sizeof(val_type));
-
-        printf("%p: Allocating resource (and setting refcount to 1)\n", &*res);
 
         return res;
     }
@@ -81,7 +79,6 @@ struct NifRes {
     /// Creates another reference to the same underlying NifRes to be used in C++.
     /// (Increments the reference count on the C++ side).
     auto clone_ref() const -> std::unique_ptr<NifRes<T>, NoOpDeleter<res_type>> {
-        printf("%p: Incrementing resource refcount\n", &*this);
         enif_keep_resource(this);
         return std::unique_ptr<NifRes<T>>{this};
     }
@@ -89,7 +86,6 @@ struct NifRes {
     // Called whenever a _single_ reference to the resource goes out of scope.
     // Decrements the reference count on the C++ side.
     ~NifRes() {
-      printf("%p: Decrementing resource count\n", this);
       enif_release_resource(this);
     }
 
@@ -99,7 +95,6 @@ struct NifRes {
     template <typename R = T>
     static auto destruct_resource(ErlNifEnv *env, void *args) -> typename std::enable_if<release_guard<R>::value, void>::type {
         auto res = (NifRes<T> *)args;
-        printf("%p: Destructing resource (release %s)\n", res, typeid(R).name());
         if (res) {
             if (res->val.release) {
                 res->val.release(&res->val);
@@ -109,7 +104,6 @@ struct NifRes {
 
     template <typename R = T>
     static auto destruct_resource(ErlNifEnv *env, void *args) -> typename std::enable_if<!release_guard<R>::value, void>::type {
-        printf("%p: Destructing resource\n", args);
     }
 };
 

@@ -94,6 +94,169 @@ static ERL_NIF_TERM arrow_schema_to_nif_term(ErlNifEnv *env, struct ArrowSchema 
     );
 }
 
+template <typename T, typename M> static ERL_NIF_TERM values_from_buffer(ErlNifEnv *env, int64_t length, const uint8_t * validity_bitmap, const T * value_buffer, const M& value_to_nif) {
+    std::vector<ERL_NIF_TERM> values(length);
+    if (validity_bitmap == nullptr) {
+        for (int64_t i = 0; i < length; i++) {
+            values[i] = value_to_nif(env, value_buffer[i]);
+        }
+    } else {
+        for (int64_t i = 0; i < length; i++) {
+            uint8_t vbyte = validity_bitmap[i/8];
+            if (vbyte & (1 << (i & 0b11111111))) {
+                values[i] = value_to_nif(env, value_buffer[i]);
+            } else {
+                values[i] = erlang::nif::atom(env, "nil");
+            }
+        }
+    }
+
+    if (length == 1) {
+        return values[0];
+    } else {
+        return enif_make_list_from_array(env, values.data(), (unsigned)values.size());
+    }
+}
+
+template <typename M> static ERL_NIF_TERM strings_from_buffer(ErlNifEnv *env, int64_t length, const uint8_t * validity_bitmap, const int32_t * offsets_buffer, const uint8_t* value_buffer, const M& value_to_nif) {
+    int64_t start_index = validity_bitmap == nullptr ? 1 : 2;
+
+    int32_t offset = offsets_buffer[0];
+    std::vector<ERL_NIF_TERM> values(length);
+    if (validity_bitmap == nullptr) {
+        for (int64_t i = 0; i < length; i++) {
+            int32_t end_index = offsets_buffer[i + 1];
+            size_t nbytes = end_index - offset;
+            if (nbytes == 0) {
+                values[i] = erlang::nif::atom(env, "nil");
+            } else {
+                values[i] = value_to_nif(env, value_buffer, offset, nbytes);
+            }
+            offset = end_index;
+        }
+    } else {
+        for (int64_t i = 0; i < length; i++) {
+            uint8_t vbyte = validity_bitmap[i / 8];
+            int32_t end_index = offsets_buffer[i + 1];
+            size_t nbytes = end_index - offset;
+            if (nbytes > 0 && vbyte & (1 << (i & 0b11111111))) {
+                values[i] = value_to_nif(env, value_buffer, offset, nbytes);
+            } else {
+                values[i] = erlang::nif::atom(env, "nil");
+            }
+            offset = end_index;
+        }
+    }
+
+    if (length == 1) {
+        return values[0];
+    } else {
+        return enif_make_list_from_array(env, values.data(), (unsigned)values.size());
+    }
+}
+
+static ERL_NIF_TERM arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct ArrowArray * values, uint64_t level, bool as_map = true) {
+    if (schema == nullptr) {
+        return erlang::nif::error(env, "invalid ArrowSchema (nullptr) when invoking next");
+    }
+    if (values == nullptr) {
+        return erlang::nif::error(env, "invalid ArrowArray (nullptr) when invoking next");
+    }
+
+    const char* format = schema->format ? schema->format : "";
+    const char* name = schema->name ? schema->name : "";
+    
+    ERL_NIF_TERM children_term{};
+    if (schema->n_children > 0 && schema->children == nullptr) {
+        return erlang::nif::error(env, "invalid ArrowSchema, schema->children == nullptr, however, schema->n_children > 0");
+    }
+    if (values->n_children > 0 && values->children == nullptr) {
+        return erlang::nif::error(env, "invalid ArrowArray, values->children == nullptr, however, values->n_children > 0");
+    }
+    if (values->n_children != schema->n_children) {
+        return erlang::nif::error(env, "invalid ArrowArray or ArrowSchema, values->n_children != schema->n_children");
+    }
+
+    std::vector<ERL_NIF_TERM> children(schema->n_children < 0 ? 0 : schema->n_children);
+    if (schema->n_children > 0) {
+        for (int64_t child_i = 0; child_i < schema->n_children; child_i++) {
+            struct ArrowSchema * child_schema = schema->children[child_i];
+            struct ArrowArray * child_values = values->children[child_i];
+            children[child_i] = arrow_array_to_nif_term(env, child_schema, child_values, level + 1, as_map);
+        }
+    }
+    children_term = enif_make_list_from_array(env, children.data(), (unsigned)schema->n_children);
+
+    ERL_NIF_TERM current_term = erlang::nif::error(env, "not implemented");
+
+    bool has_validity_bitmap = values->null_count != 0 && values->null_count != -1;
+    const uint8_t * bitmap_buffer = nullptr;
+    if (has_validity_bitmap && values->n_buffers >= 2) {
+        bitmap_buffer = (const uint8_t *)values->buffers[0];
+    }
+
+    bool is_struct = false;
+    if (strncmp("l", format, 1) == 0) {
+        using value_type = int64_t;
+        current_term = values_from_buffer(
+            env,
+            values->length, 
+            bitmap_buffer,
+            (const value_type *)values->buffers[1],
+            enif_make_int64
+        );
+    } else if (strncmp("g", format, 1) == 0) {
+        using value_type = double;
+        current_term = values_from_buffer(
+            env,
+            values->length,
+            bitmap_buffer,
+            (const value_type *)values->buffers[1],
+            enif_make_double
+        );
+    } else if (strncmp("u", format, 1) == 0) {
+        int64_t length = values->length;
+        current_term = strings_from_buffer(
+            env,
+            values->length,
+            bitmap_buffer,
+            (const int32_t *)values->buffers[1],
+            (const uint8_t *)values->buffers[2],
+            [](ErlNifEnv *env, const uint8_t * string_buffers, int32_t offset, size_t nbytes) -> ERL_NIF_TERM {
+                return erlang::nif::make_binary(env, (const char *)(string_buffers + offset), nbytes);
+            }
+        );
+    } else if (strncmp("+s", format, 1) == 0) {
+        // only handle and return children if this is a struct
+        is_struct = true;
+    } else {
+        printf("not implemented for format: `%s`\r\n", schema->format);
+        printf("has_validity_bitmap: %d\r\n", has_validity_bitmap);
+        printf("length: %lld\r\n", values->length);
+        printf("null_count: %lld\r\n", values->null_count);
+        printf("offset: %lld\r\n", values->offset);
+        printf("n_buffers: %lld\r\n", values->n_buffers);
+        printf("n_children: %lld\r\n", values->n_children);
+        printf("buffers: %p\r\n", values->buffers);
+    }
+
+    if (is_struct) {
+        return children_term;
+    } else {
+        if (schema->children) {
+            return enif_make_tuple2(env,
+                erlang::nif::make_binary(env, name),
+                children_term
+            );
+        } else {
+            return enif_make_tuple2(env,
+                erlang::nif::make_binary(env, name),
+                current_term
+            );
+        }
+    }
+}
+
 static ERL_NIF_TERM adbc_database_new(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
     using res_type = NifRes<struct AdbcDatabase>;
 
@@ -109,7 +272,6 @@ static ERL_NIF_TERM adbc_database_new(ErlNifEnv *env, int argc, const ERL_NIF_TE
         return nif_error_from_adbc_error(env, &adbc_error);
     }
 
-    //ERL_NIF_TERM ret = enif_make_resource(env, &*database);
     ERL_NIF_TERM ret = database->make_resource(env);
     return erlang::nif::ok(env, ret);
 }
@@ -655,6 +817,7 @@ static ERL_NIF_TERM adbc_arrow_array_stream_get_schema(ErlNifEnv *env, int argc,
 
 static ERL_NIF_TERM adbc_arrow_array_stream_next(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
     using res_type = NifRes<struct ArrowArrayStream>;
+    ERL_NIF_TERM ret{};
     ERL_NIF_TERM error{};
 
     res_type * res = nullptr;
@@ -662,6 +825,7 @@ static ERL_NIF_TERM adbc_arrow_array_stream_next(ErlNifEnv *env, int argc, const
         return error;
     }
     if (res->val.get_next == nullptr) {
+        return enif_make_badarg(env);
     }
 
     struct ArrowArray out{};
@@ -671,9 +835,26 @@ static ERL_NIF_TERM adbc_arrow_array_stream_next(ErlNifEnv *env, int argc, const
         return erlang::nif::error(env, reason ? reason : "unknown error");
     }
 
-    // TODO: convert out ArrowArray to elixir values    
+    if (res->private_data == nullptr) {
+        res->private_data = enif_alloc(sizeof(struct ArrowSchema));
+        memset(res->private_data, 0, sizeof(struct ArrowSchema));
+        int code = res->val.get_schema(&res->val, (struct ArrowSchema *)res->private_data);
+        if (code != 0) {
+            const char * reason = res->val.get_last_error(&res->val);
+            enif_free(res->private_data);
+            res->private_data = nullptr;
+            return erlang::nif::error(env, reason ? reason : "unknown error");
+        }
+    }
 
-    return erlang::nif::ok(env);
+    auto schema = (struct ArrowSchema*)res->private_data;
+    ret = arrow_array_to_nif_term(env, schema, &out, 0);
+
+    if (out.release) {
+        out.release(&out);
+    }
+
+    return erlang::nif::ok(env, ret);
 }
 
 static ERL_NIF_TERM adbc_arrow_array_stream_release(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {

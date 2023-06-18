@@ -47,6 +47,9 @@ template <typename T> struct NifRes {
 
   val_type val;
 
+  // only used when T = struct 
+  void * private_data = nullptr;
+
   static ErlNifResourceType *type;
 
   /// Creates a new NifRes<T> using `enif_alloc_resource`, returning it as an
@@ -62,6 +65,7 @@ template <typename T> struct NifRes {
       return res;
     }
     memset(&res->val, 0, sizeof(val_type));
+    res->private_data = nullptr;
     return res;
   }
 
@@ -110,6 +114,14 @@ template <typename T> struct NifRes {
     if (res) {
       if (res->val.release) {
         res->val.release(&res->val);
+      }
+
+      if (res->private_data) {
+        auto schema = (struct ArrowSchema*)res->private_data;
+        if (schema->release) {
+          schema->release(schema);
+        }
+        enif_free(schema);
       }
     }
   }

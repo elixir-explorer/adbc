@@ -232,13 +232,12 @@ static ERL_NIF_TERM arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema *
         is_struct = true;
     } else {
         printf("not implemented for format: `%s`\r\n", schema->format);
-        printf("has_validity_bitmap: %d\r\n", has_validity_bitmap);
-        printf("length: %lld\r\n", values->length);
-        printf("null_count: %lld\r\n", values->null_count);
-        printf("offset: %lld\r\n", values->offset);
-        printf("n_buffers: %lld\r\n", values->n_buffers);
-        printf("n_children: %lld\r\n", values->n_children);
-        printf("buffers: %p\r\n", values->buffers);
+        // printf("length: %lld\r\n", values->length);
+        // printf("null_count: %lld\r\n", values->null_count);
+        // printf("offset: %lld\r\n", values->offset);
+        // printf("n_buffers: %lld\r\n", values->n_buffers);
+        // printf("n_children: %lld\r\n", values->n_children);
+        // printf("buffers: %p\r\n", values->buffers);
     }
 
     if (is_struct) {

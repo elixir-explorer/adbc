@@ -111,14 +111,16 @@ template <typename T, typename M> static ERL_NIF_TERM values_from_buffer(ErlNifE
         }
     }
 
-    if (length == 1) {
-        return values[0];
-    } else {
-        return enif_make_list_from_array(env, values.data(), (unsigned)values.size());
-    }
+    return enif_make_list_from_array(env, values.data(), (unsigned)values.size());
 }
 
-template <typename M> static ERL_NIF_TERM strings_from_buffer(ErlNifEnv *env, int64_t length, const uint8_t * validity_bitmap, const int32_t * offsets_buffer, const uint8_t* value_buffer, const M& value_to_nif) {
+template <typename M> static ERL_NIF_TERM strings_from_buffer(
+    ErlNifEnv *env,
+    int64_t length, 
+    const uint8_t * validity_bitmap, 
+    const int32_t * offsets_buffer,
+    const uint8_t* value_buffer,
+    const M& value_to_nif) {
     int64_t start_index = validity_bitmap == nullptr ? 1 : 2;
 
     int32_t offset = offsets_buffer[0];
@@ -148,14 +150,10 @@ template <typename M> static ERL_NIF_TERM strings_from_buffer(ErlNifEnv *env, in
         }
     }
 
-    if (length == 1) {
-        return values[0];
-    } else {
-        return enif_make_list_from_array(env, values.data(), (unsigned)values.size());
-    }
+    return enif_make_list_from_array(env, values.data(), (unsigned)values.size());
 }
 
-static ERL_NIF_TERM arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct ArrowArray * values, uint64_t level, bool as_map = true) {
+static ERL_NIF_TERM arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct ArrowArray * values, uint64_t level) {
     if (schema == nullptr) {
         return erlang::nif::error(env, "invalid ArrowSchema (nullptr) when invoking next");
     }
@@ -165,7 +163,7 @@ static ERL_NIF_TERM arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema *
 
     const char* format = schema->format ? schema->format : "";
     const char* name = schema->name ? schema->name : "";
-    
+
     ERL_NIF_TERM children_term{};
     if (schema->n_children > 0 && schema->children == nullptr) {
         return erlang::nif::error(env, "invalid ArrowSchema, schema->children == nullptr, however, schema->n_children > 0");
@@ -174,6 +172,9 @@ static ERL_NIF_TERM arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema *
         return erlang::nif::error(env, "invalid ArrowArray, values->children == nullptr, however, values->n_children > 0");
     }
     if (values->n_children != schema->n_children) {
+        printf("values->n_children: %lld\r\n", values->n_children);
+        printf("schema->n_children: %lld\r\n", schema->n_children);
+        printf("not implemented for format: `%s`\r\n", schema->format);
         return erlang::nif::error(env, "invalid ArrowArray or ArrowSchema, values->n_children != schema->n_children");
     }
 
@@ -182,7 +183,7 @@ static ERL_NIF_TERM arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema *
         for (int64_t child_i = 0; child_i < schema->n_children; child_i++) {
             struct ArrowSchema * child_schema = schema->children[child_i];
             struct ArrowArray * child_values = values->children[child_i];
-            children[child_i] = arrow_array_to_nif_term(env, child_schema, child_values, level + 1, as_map);
+            children[child_i] = arrow_array_to_nif_term(env, child_schema, child_values, level + 1);
         }
     }
     children_term = enif_make_list_from_array(env, children.data(), (unsigned)schema->n_children);

@@ -106,5 +106,7 @@ defmodule Adbc.Statement.Test do
       {"f64", [42.0]},
       {"str", ["value = 42"]}
     ] == next
+
+    Statement.release(statement)
   end
 end

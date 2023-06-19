@@ -195,6 +195,10 @@ static ERL_NIF_TERM arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema *
     if (has_validity_bitmap && values->n_buffers >= 2) {
         bitmap_buffer = (const uint8_t *)values->buffers[0];
     }
+    const int32_t * offsets_buffer = nullptr;
+    if (values->n_buffers >= 3) {
+        offsets_buffer = (const int32_t *)values->buffers[1];
+    }
 
     bool is_struct = false;
     if (strncmp("l", format, 1) == 0) {
@@ -205,6 +209,78 @@ static ERL_NIF_TERM arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema *
             bitmap_buffer,
             (const value_type *)values->buffers[1],
             enif_make_int64
+        );
+    } else if (strncmp("c", format, 1) == 0) {
+        using value_type = int8_t;
+        current_term = values_from_buffer(
+            env,
+            values->length,
+            bitmap_buffer,
+            (const value_type *)values->buffers[1],
+            enif_make_int64
+        );
+    } else if (strncmp("s", format, 1) == 0) {
+        using value_type = int16_t;
+        current_term = values_from_buffer(
+            env,
+            values->length,
+            bitmap_buffer,
+            (const value_type *)values->buffers[1],
+            enif_make_int64
+        );
+    } else if (strncmp("i", format, 1) == 0) {
+        using value_type = int32_t;
+        current_term = values_from_buffer(
+            env,
+            values->length,
+            bitmap_buffer,
+            (const value_type *)values->buffers[1],
+            enif_make_int64
+        );
+    } else if (strncmp("L", format, 1) == 0) {
+        using value_type = uint64_t;
+        current_term = values_from_buffer(
+            env,
+            values->length, 
+            bitmap_buffer,
+            (const value_type *)values->buffers[1],
+            enif_make_uint64
+        );
+    } else if (strncmp("C", format, 1) == 0) {
+        using value_type = uint8_t;
+        current_term = values_from_buffer(
+            env,
+            values->length,
+            bitmap_buffer,
+            (const value_type *)values->buffers[1],
+            enif_make_uint64
+        );
+    } else if (strncmp("S", format, 1) == 0) {
+        using value_type = uint16_t;
+        current_term = values_from_buffer(
+            env,
+            values->length,
+            bitmap_buffer,
+            (const value_type *)values->buffers[1],
+            enif_make_uint64
+        );
+    } else if (strncmp("I", format, 1) == 0) {
+        using value_type = uint32_t;
+        current_term = values_from_buffer(
+            env,
+            values->length,
+            bitmap_buffer,
+            (const value_type *)values->buffers[1],
+            enif_make_uint64
+        );
+    } else if (strncmp("f", format, 1) == 0) {
+        using value_type = float;
+        current_term = values_from_buffer(
+            env,
+            values->length,
+            bitmap_buffer,
+            (const value_type *)values->buffers[1],
+            enif_make_double
         );
     } else if (strncmp("g", format, 1) == 0) {
         using value_type = double;
@@ -221,7 +297,7 @@ static ERL_NIF_TERM arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema *
             env,
             values->length,
             bitmap_buffer,
-            (const int32_t *)values->buffers[1],
+            offsets_buffer,
             (const uint8_t *)values->buffers[2],
             [](ErlNifEnv *env, const uint8_t * string_buffers, int32_t offset, size_t nbytes) -> ERL_NIF_TERM {
                 return erlang::nif::make_binary(env, (const char *)(string_buffers + offset), nbytes);

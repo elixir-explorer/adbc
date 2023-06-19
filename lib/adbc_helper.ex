@@ -1,6 +1,19 @@
 defmodule Adbc.Helper do
   @moduledoc false
 
+  @doc false
+  def error_to_exception(string) when is_binary(string) do
+    ArgumentError.exception(string)
+  end
+
+  def error_to_exception(list) when is_list(list) do
+    ArgumentError.exception(List.to_string(list))
+  end
+
+  def error_to_exception({:adbc_error, message, vendor_code, state}) do
+    Adbc.Error.exception(message: message, vendor_code: vendor_code, state: state)
+  end
+
   def get_keyword!(opts, key, type, options \\ []) when is_atom(key) do
     val = opts[key] || options[:default] || nil
     allow_nil? = options[:allow_nil] || false

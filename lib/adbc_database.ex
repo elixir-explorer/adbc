@@ -3,7 +3,10 @@ defmodule Adbc.Database do
   Documentation for `Adbc.Database`.
   """
 
+  # TODO: Allow options to be set on the database after it has been initialized
+
   use GenServer
+  import Adbc.Helper, only: [error_to_exception: 1]
 
   @doc """
   TODO.
@@ -27,19 +30,6 @@ defmodule Adbc.Database do
     end
   end
 
-  @doc """
-  TODO.
-  """
-  def connection(database, timeout \\ 5000) do
-    case GenServer.call(database, :connection, timeout) do
-      {:ok, connection} ->
-        {:ok, %Adbc.Connection{reference: connection}}
-
-      {:error, reason} ->
-        {:error, error_to_exception(reason)}
-    end
-  end
-
   ## Callbacks
 
   @impl true
@@ -49,20 +39,25 @@ defmodule Adbc.Database do
   end
 
   @impl true
-  def handle_call(:connection, _from, db) do
-    # TODO: Accept options
-    # TODO: Put connection behind a process
-    result =
-      with {:ok, ref} <- Adbc.Nif.adbc_connection_new(),
-           :ok <- Adbc.Nif.adbc_connection_init(ref, db),
-           do: {:ok, ref}
+  def handle_call({:initialize_connection, conn_ref}, {pid, _}, db) do
+    case Adbc.Nif.adbc_connection_init(conn_ref, db) do
+      :ok ->
+        Process.link(pid)
+        {:reply, :ok, db}
 
-    {:reply, result, db}
+      {:error, reason} ->
+        {:reply, {:error, reason}, db}
+    end
+  end
+
+  @impl true
+  def handle_info(_msg, state) do
+    {:noreply, state}
   end
 
   @impl true
   def terminate(_, db) do
-    Adbc.Nif.adbc_connection_release(db)
+    Adbc.Nif.adbc_database_release(db)
   end
 
   defp init_driver(ref, driver) do
@@ -79,17 +74,5 @@ defmodule Adbc.Database do
         {:error, _} = error -> {:halt, error}
       end
     end)
-  end
-
-  defp error_to_exception(string) when is_binary(string) do
-    ArgumentError.exception(string)
-  end
-
-  defp error_to_exception(list) when is_list(list) do
-    ArgumentError.exception(List.to_string(list))
-  end
-
-  defp error_to_exception({:adbc_error, message, vendor_code, state}) do
-    Adbc.Error.exception(message: message, vendor_code: vendor_code, state: state)
   end
 end

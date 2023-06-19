@@ -3,57 +3,47 @@ defmodule Adbc.Connection do
   Documentation for `Adbc.Connection`.
   """
 
-  @typedoc """
-  - **reference**: `reference`.
+  # TODO: Allow options to be set on init
+  # TODO: Allow options to be set on the conn after it has been initialized
+  # TODO: Remove pointer from ArrowArrayStream
 
-    The underlying erlang resource variable.
+  @type t :: GenServer.server()
 
-  """
-  @type t :: %__MODULE__{
-          reference: reference()
-        }
-  defstruct [:reference]
-  alias __MODULE__, as: T
-  alias Adbc.ArrowArrayStream
-  alias Adbc.ArrowSchema
-  alias Adbc.Helper
+
+  use GenServer
+  import Adbc.Helper, only: [error_to_exception: 1]
 
   @doc """
-  Set an option.
-
-  Options may be set before `Adbc.Connection.init/2`.  Some drivers may
-  support setting options after initialization as well.
+  TODO.
   """
-  @doc group: :adbc_connection
-  @spec set_option(Adbc.Connection.t(), String.t(), String.t()) :: :ok | Adbc.Error.adbc_error()
-  def set_option(self = %T{}, key, value)
-      when is_binary(key) and is_binary(value) do
-    Adbc.Nif.adbc_connection_set_option(self.reference, key, value)
-  end
+  def start_link(opts) do
+    {db, opts} = Keyword.pop(opts, :database, nil)
 
-  @doc """
-  Destroy this connection.
-  """
-  @doc group: :adbc_connection
-  @spec release(Adbc.Connection.t()) :: :ok | Adbc.Error.adbc_error()
-  def release(self = %T{}) do
-    Adbc.Nif.adbc_connection_release(self.reference)
+    unless db do
+      raise ArgumentError, ":database option must be specified"
+    end
+
+    {process_options, opts} = Keyword.pop(opts, :process_options, [])
+
+    with {:ok, conn} <- Adbc.Nif.adbc_connection_new() do
+      GenServer.start_link(__MODULE__, {db, conn}, process_options)
+    else
+      {:error, reason} -> {:error, error_to_exception(reason)}
+    end
   end
 
   @doc """
   Get metadata about the database/driver.
+
   The result is an Arrow dataset with the following schema:
 
-  ```markdown
   Field Name                  | Field Type
   ----------------------------|------------------------
   info_name                   | uint32 not null
   info_value                  | INFO_SCHEMA
-  ```
 
   `INFO_SCHEMA` is a dense union with members:
 
-  ```markdown
   Field Name (Type Code)      | Field Type
   ----------------------------|------------------------
   string_value (0)            | utf8
@@ -62,39 +52,18 @@ defmodule Adbc.Connection do
   int32_bitmask (3)           | int32
   string_list (4)             | list<utf8>
   int32_to_int32_list_map (5) | map<int32, list<int32>>
-  ```
 
-  Each metadatum is identified by an integer code.  The recognized
-  codes are defined as constants.  Codes [0, 10_000) are reserved
-  for ADBC usage.  Drivers/vendors will ignore requests for
+  Each metadatum is identified by an integer code. The recognized
+  codes are defined as constants. Codes [0, 10_000) are reserved
+  for ADBC usage. Drivers/vendors will ignore requests for
   unrecognized codes (the row will be omitted from the result).
-
-  ##### Positional Parameters
-
-  - `self`: `%T{}`
-
-    Current connection.
-
-  - `info_codes`: `list(neg_integer())`
-
-    A list of metadata codes to fetch, or `[]` to fetch all.
-
-    Defaults to `[]`.
   """
-  @doc group: :adbc_connection_metadata
-  @spec get_info(Adbc.Connection.t(), list(neg_integer())) ::
-          {:ok, Adbc.ArrowArrayStream.t()} | Adbc.Error.adbc_error()
-  def get_info(self = %T{}, info_codes \\ []) when is_list(info_codes) do
-    case Adbc.Nif.adbc_connection_get_info(self.reference, info_codes) do
-      {:ok, ref, ptr} ->
-        {:ok,
-         %ArrowArrayStream{
-           reference: ref,
-           pointer: ptr
-         }}
-
-      {:error, {reason, code, sql_state}} ->
-        {:error, {reason, code, sql_state}}
+  @spec get_info(t(), list(non_neg_integer())) ::
+          {:ok, Adbc.ArrowArrayStream.t()} | {:error, Exception.t()}
+  def get_info(conn, info_codes \\ []) when is_list(info_codes) do
+    case GenServer.call(conn, {:get_info, info_codes}, :infinity) do
+      {:ok, ref, ptr} -> {:ok, %Adbc.ArrowArrayStream{reference: ref, pointer: ptr}}
+      {:error, reason} -> {:error, error_to_exception(reason)}
     end
   end
 
@@ -103,36 +72,29 @@ defmodule Adbc.Connection do
 
   The result is an Arrow dataset with the following schema:
 
-  ```markdown
   | Field Name               | Field Type              |
   |--------------------------|-------------------------|
   | catalog_name             | utf8                    |
   | catalog_db_schemas       | list<DB_SCHEMA_SCHEMA>  |
-  ```
 
   `DB_SCHEMA_SCHEMA` is a Struct with fields:
 
-  ```markdown
   | Field Name               | Field Type              |
   |--------------------------|-------------------------|
   | db_schema_name           | utf8                    |
   | db_schema_tables         | list<TABLE_SCHEMA>      |
-  ```
 
   `TABLE_SCHEMA` is a Struct with fields:
 
-  ```markdown
   | Field Name               | Field Type              |
   |--------------------------|-------------------------|
   | table_name               | utf8 not null           |
   | table_type               | utf8 not null           |
   | table_columns            | list<COLUMN_SCHEMA>     |
   | table_constraints        | list<CONSTRAINT_SCHEMA> |
-  ```
 
   `COLUMN_SCHEMA` is a Struct with fields:
 
-  ```markdown
   | Field Name               | Field Type              | Comments |
   |--------------------------|-------------------------|----------|
   | column_name              | utf8 not null           |          |
@@ -154,120 +116,49 @@ defmodule Adbc.Connection do
   | xdbc_scope_table         | utf8                    | (3)      |
   | xdbc_is_autoincrement    | bool                    | (3)      |
   | xdbc_is_generatedcolumn  | bool                    | (3)      |
-  ```
 
   1. The column's ordinal position in the table (starting from 1).
   2. Database-specific description of the column.
-  3. Optional value.  Should be null if not supported by the driver.
+  3. Optional value. Should be null if not supported by the driver.
      xdbc_ values are meant to provide JDBC/ODBC-compatible metadata
      in an agnostic manner.
 
   `CONSTRAINT_SCHEMA` is a Struct with fields:
 
-  ```markdown
   | Field Name               | Field Type              | Comments |
   |--------------------------|-------------------------|----------|
   | constraint_name          | utf8                    |          |
   | constraint_type          | utf8 not null           | (1)      |
   | constraint_column_names  | list<utf8> not null     | (2)      |
   | constraint_column_usage  | list<USAGE_SCHEMA>      | (3)      |
-  ```
 
   1. One of 'CHECK', 'FOREIGN KEY', 'PRIMARY KEY', or 'UNIQUE'.
-  2. The columns on the current table that are constrained, in
-     order.
+  2. The columns on the current table that are constrained, in order.
   3. For FOREIGN KEY only, the referenced table and columns.
 
   `USAGE_SCHEMA` is a Struct with fields:
 
-  ```markdown
   | Field Name               | Field Type              |
   |--------------------------|-------------------------|
   | fk_catalog               | utf8                    |
   | fk_db_schema             | utf8                    |
   | fk_table                 | utf8 not null           |
   | fk_column_name           | utf8 not null           |
-  ```
   """
-  @doc group: :adbc_connection_metadata
-  @spec get_objects(Adbc.Connection.t(), non_neg_integer(), [
-          {:catalog, String.t() | nil},
-          {:db_schema, String.t() | nil},
-          {:table_name, String.t() | nil},
-          {:table_type, [String.t()] | nil},
-          {:column_name, String.t() | nil}
-        ]) :: {:ok, Adbc.ArrowArrayStream.t()} | Adbc.Error.adbc_error()
-  def get_objects(self = %T{}, depth, opts \\ [])
+  @spec get_objects(t(), non_neg_integer(),
+          catalog: String.t(),
+          db_schema: String.t(),
+          table_name: String.t(),
+          table_type: [String.t()],
+          column_name: String.t()
+        ) :: {:ok, Adbc.ArrowArrayStream.t()} | {:error, Exception.t()}
+  def get_objects(conn, depth, opts \\ [])
       when is_integer(depth) and depth >= 0 do
-    catalog = Helper.get_keyword!(opts, :catalog, :string, allow_nil: true)
-    db_schema = Helper.get_keyword!(opts, :db_schema, :string, allow_nil: true)
-    table_name = Helper.get_keyword!(opts, :table_name, :string, allow_nil: true)
-    table_type = Helper.get_keyword!(opts, :table_type, [:string], allow_nil: true)
-    column_name = Helper.get_keyword!(opts, :column_name, :string, allow_nil: true)
+    opts = Keyword.validate!(opts, [:catalog, :db_schema, :table_name, :table_type, :column_name])
 
-    case Adbc.Nif.adbc_connection_get_objects(
-           self.reference,
-           depth,
-           catalog,
-           db_schema,
-           table_name,
-           table_type,
-           column_name
-         ) do
-      {:ok, ref, ptr} ->
-        {:ok,
-         %ArrowArrayStream{
-           reference: ref,
-           pointer: ptr
-         }}
-
-      {:error, {reason, code, sql_state}} ->
-        {:error, {reason, code, sql_state}}
-    end
-  end
-
-  @doc """
-  Get the Arrow schema of a table.
-
-  ##### Positional Parameters
-
-  - `self`: `Adbc.Connection.t()`
-
-    A valid `Adbc.Connection` struct.
-
-  - `catalog`: `String.t()` | `nil`
-
-    The catalog (or `nil` if not applicable).
-
-  - `db_schema`: `String.t()` | `nil`
-
-    The database schema (or `nil` if not applicable).
-
-  - `table_name`: `String.t()`
-
-    The table name.
-  """
-  @doc group: :adbc_connection_metadata
-  @spec get_table_schema(Adbc.Connection.t(), String.t() | nil, String.t() | nil, String.t()) ::
-          {:ok, Adbc.ArrowSchema.t()} | Adbc.Error.adbc_error()
-  def get_table_schema(self = %T{}, catalog, db_schema, table_name)
-      when (is_binary(catalog) or catalog == nil) and (is_binary(db_schema) or catalog == nil) and
-             is_binary(table_name) do
-    case Adbc.Nif.adbc_connection_get_table_schema(self.reference, catalog, db_schema, table_name) do
-      {:ok, schema_ref, {format, name, metadata, flags, n_children, children}} ->
-        {:ok,
-         %ArrowSchema{
-           format: format,
-           name: name,
-           metadata: metadata,
-           flags: flags,
-           n_children: n_children,
-           children: Enum.map(children, &ArrowSchema.from_metainfo/1),
-           reference: schema_ref
-         }}
-
-      {:error, {reason, code, sql_state}} ->
-        {:error, {reason, code, sql_state}}
+    case GenServer.call(conn, {:get_objects, depth, opts}, :infinity) do
+      {:ok, ref, ptr} -> {:ok, %Adbc.ArrowArrayStream{reference: ref, pointer: ptr}}
+      {:error, reason} -> {:error, error_to_exception(reason)}
     end
   end
 
@@ -276,90 +167,111 @@ defmodule Adbc.Connection do
 
   The result is an Arrow dataset with the following schema:
 
-  ```markdown
   Field Name     | Field Type
   ---------------|--------------
   table_type     | utf8 not null
-  ```
-
-  ##### Positional Parameters
-
-  - `self`: `Adbc.Connection.t()`
-
-    A valid `Adbc.Connection` struct.
-
   """
-  @doc group: :adbc_connection_metadata
-  @spec get_table_types(Adbc.Connection.t()) ::
-          {:ok, Adbc.ArrowArrayStream.t()} | Adbc.Error.adbc_error()
-  def get_table_types(self = %T{}) do
-    case Adbc.Nif.adbc_connection_get_table_types(self.reference) do
-      {:ok, ref, ptr} ->
-        {:ok,
-         %ArrowArrayStream{
-           reference: ref,
-           pointer: ptr
-         }}
-
-      {:error, {reason, code, sql_state}} ->
-        {:error, {reason, code, sql_state}}
+  @spec get_table_types(t) ::
+          {:ok, Adbc.ArrowArrayStream.t()} | {:error, Exception.t()}
+  def get_table_types(conn) do
+    case GenServer.call(conn, :get_table_types, :infinity) do
+      {:ok, ref, ptr} -> {:ok, %Adbc.ArrowArrayStream{reference: ref, pointer: ptr}}
+      {:error, reason} -> {:error, error_to_exception(reason)}
     end
   end
 
   @doc """
-  Construct a statement for a partition of a query. The
-  results can then be read independently.
-
-  A partition can be retrieved from AdbcPartitions.
-
-  ##### Positional Parameters
-
-  - `self`: `Adbc.Connection.t()`
-
-    A valid `Adbc.Connection` struct.
-
-  - `serialized_partition`: `binary()`
-
-    The partition descriptor.
-
-  - `serialized_length`: `non_neg_integer()`
-
-    The partition descriptor length.
-
-    Defaults to `byte_size(serialized_partition)`.
-
+  Get the Arrow schema of a table.
   """
-  @doc group: :adbc_connection_partition
-  @spec read_partition(Adbc.Connection.t(), binary(), non_neg_integer() | :auto) ::
-          {:ok, Adbc.ArrowArrayStream.t()} | Adbc.Error.adbc_error()
-  def read_partition(self = %T{}, serialized_partition, serialized_length \\ :auto) do
-    serialized_length =
-      if serialized_length == :auto do
-        byte_size(serialized_partition)
-      else
-        if serialized_length > byte_size(serialized_partition) do
-          raise RuntimeError,
-                "parameter `serialized_length` > bytes of acutal size of `serialized_partition` (#{byte_size(serialized_partition)})"
-        else
-          serialized_length
-        end
-      end
-
-    case Adbc.Nif.adbc_connection_read_partition(
-           self.reference,
-           serialized_partition,
-           serialized_length
-         ) do
-      {:ok, ref, ptr} ->
+  @spec get_table_schema(t, String.t() | nil, String.t() | nil, String.t()) ::
+          {:ok, Adbc.ArrowSchema.t()} | {:error, Exception.t()}
+  def get_table_schema(conn, catalog, db_schema, table_name)
+      when (is_binary(catalog) or catalog == nil) and (is_binary(db_schema) or catalog == nil) and
+             is_binary(table_name) do
+    case GenServer.call(conn, {:get_table_schema, catalog, db_schema, table_name}, :infinity) do
+      {:ok, schema_ref, {format, name, metadata, flags, n_children, children}} ->
         {:ok,
-         %ArrowArrayStream{
-           reference: ref,
-           pointer: ptr
-         }}
-
-      {:error, {reason, code, sql_state}} ->
-        {:error, {reason, code, sql_state}}
+           %ArrowSchema{
+             format: format,
+             name: name,
+             metadata: metadata,
+             flags: flags,
+             n_children: n_children,
+             children: Enum.map(children, &ArrowSchema.from_metainfo/1),
+             reference: schema_ref
+        }}
+      {:error, reason} -> {:error, error_to_exception(reason)}
     end
+  end
+
+  ## Callbacks
+
+  @impl true
+  def init({db, conn}) do
+    case GenServer.call(db, {:initialize_connection, conn}, :infinity) do
+      :ok ->
+        Process.flag(:trap_exit, true)
+        {:ok, conn}
+
+      {:error, reason} ->
+        {:stop, error_to_exception(reason)}
+    end
+  end
+
+  @impl true
+  def handle_call({:get_info, info_codes}, _from, conn) do
+    {:reply, Adbc.Nif.adbc_connection_get_info(conn, info_codes), conn}
+  end
+
+  @impl true
+  def handle_call({:get_objects, depth, opts}, _from, conn) do
+    result =
+      Adbc.Nif.adbc_connection_get_objects(
+        conn,
+        depth,
+        opts[:catalog],
+        opts[:db_schema],
+        opts[:table_name],
+        opts[:table_type],
+        opts[:column_name]
+      )
+
+    {:reply, result, conn}
+  end
+
+  @impl true
+  def handle_call(:get_table_types, _from, conn) do
+    {:reply, Adbc.Nif.adbc_connection_get_table_types(conn), conn}
+  end
+
+  @impl true
+  def handle_call({:get_table_schema, catalog, db_schema, table_name}, _from, conn) do
+    result = Adbc.Nif.adbc_connection_get_table_schema(conn, catalog, db_schema, table_name)
+    {:reply, result, conn}
+  end
+
+  @impl true
+  def handle_info({:EXIT, _db, reason}, conn), do: {:stop, reason, conn}
+  def handle_info(_msg, conn), do: {:noreply, conn}
+
+  @impl true
+  def terminate(_reason, conn) do
+    Adbc.Nif.adbc_connection_release(conn)
+    :ok
+  end
+
+  ## TODO: Convert below to the new API
+
+  @doc """
+  Set an option.
+
+  Options may be set before `Adbc.Connection.init/2`.  Some drivers may
+  support setting options after initialization as well.
+  """
+  @spec set_option(Adbc.Connection.t(), String.t(), String.t()) :: :ok | Adbc.Error.adbc_error()
+  def set_option(self, key, value)
+      when is_binary(key) and is_binary(value) do
+    Adbc.Nif.adbc_connection_set_option(self.reference, key, value)
   end
 
   @doc """
@@ -367,9 +279,8 @@ defmodule Adbc.Connection do
 
   Behavior is undefined if this is mixed with SQL transaction statements.
   """
-  @doc group: :adbc_connection_transaction
   @spec commit(Adbc.Connection.t()) :: :ok | Adbc.Error.adbc_error()
-  def commit(self = %T{}) do
+  def commit(self) do
     Adbc.Nif.adbc_connection_commit(self.reference)
   end
 
@@ -378,9 +289,8 @@ defmodule Adbc.Connection do
 
   Behavior is undefined if this is mixed with SQL transaction statements.
   """
-  @doc group: :adbc_connection_transaction
   @spec rollback(Adbc.Connection.t()) :: :ok | Adbc.Error.adbc_error()
-  def rollback(self = %T{}) do
+  def rollback(self) do
     Adbc.Nif.adbc_connection_rollback(self.reference)
   end
 end

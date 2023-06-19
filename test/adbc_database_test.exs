@@ -10,9 +10,9 @@ defmodule Adbc.DatabaseTest do
 
     test "accepts process options" do
       assert {:ok, pid} =
-               Database.start_link(driver: :sqlite, process_options: [name: :who_knows])
+               Database.start_link(driver: :sqlite, process_options: [name: :who_knows_db])
 
-      assert Process.whereis(:who_knows) == pid
+      assert Process.whereis(:who_knows_db) == pid
     end
 
     test "errors with invalid driver" do

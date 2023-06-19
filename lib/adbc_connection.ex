@@ -198,8 +198,12 @@ defmodule Adbc.Connection do
   @impl true
   def init({db, conn}) do
     case GenServer.call(db, {:initialize_connection, conn}, :infinity) do
-      :ok -> {:ok, conn}
-      {:error, reason} -> {:stop, error_to_exception(reason)}
+      :ok ->
+        Process.flag(:trap_exit, true)
+        {:ok, conn}
+
+      {:error, reason} ->
+        {:stop, error_to_exception(reason)}
     end
   end
 
@@ -235,6 +239,16 @@ defmodule Adbc.Connection do
     {:reply, result, conn}
   end
 
+  @impl true
+  def handle_info({:EXIT, _db, reason}, conn), do: {:stop, reason, conn}
+  def handle_info(_msg, conn), do: {:noreply, conn}
+
+  @impl true
+  def terminate(_reason, conn) do
+    Adbc.Nif.adbc_connection_release(conn)
+    :ok
+  end
+
   ## TODO: Convert below to the new API
 
   @doc """
@@ -247,14 +261,6 @@ defmodule Adbc.Connection do
   def set_option(self, key, value)
       when is_binary(key) and is_binary(value) do
     Adbc.Nif.adbc_connection_set_option(self.reference, key, value)
-  end
-
-  @doc """
-  Destroy this connection.
-  """
-  @spec release(Adbc.Connection.t()) :: :ok | Adbc.Error.adbc_error()
-  def release(self) do
-    Adbc.Nif.adbc_connection_release(self.reference)
   end
 
   @doc """

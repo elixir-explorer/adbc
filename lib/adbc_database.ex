@@ -38,10 +38,10 @@ defmodule Adbc.Database do
     {:ok, db}
   end
 
+  @impl true
   def handle_call({:initialize_connection, conn_ref}, {pid, _}, db) do
     case Adbc.Nif.adbc_connection_init(conn_ref, db) do
       :ok ->
-        # TODO: test this
         Process.link(pid)
         {:reply, :ok, db}
 
@@ -57,7 +57,7 @@ defmodule Adbc.Database do
 
   @impl true
   def terminate(_, db) do
-    Adbc.Nif.adbc_connection_release(db)
+    Adbc.Nif.adbc_database_release(db)
   end
 
   defp init_driver(ref, driver) do

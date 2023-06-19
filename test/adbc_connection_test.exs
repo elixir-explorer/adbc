@@ -4,7 +4,6 @@ defmodule Adbc.Connection.Test do
 
   alias Adbc.{ArrowArrayStream, ArrowSchema}
   alias Adbc.Connection
-  alias Adbc.Database
 
   setup do
     db = start_supervised!({Adbc.Database, driver: :sqlite})
@@ -22,6 +21,15 @@ defmodule Adbc.Connection.Test do
                Connection.start_link(database: db, process_options: [name: :who_knows_conn])
 
       assert Process.whereis(:who_knows_conn) == pid
+    end
+
+    @tag :capture_log
+    test "terminates when database terminates", %{db: db} do
+      Process.flag(:trap_exit, true)
+      assert {:ok, pid} = Connection.start_link(database: db)
+      ref = Process.monitor(pid)
+      Process.exit(db, :kill)
+      assert_receive {:DOWN, ^ref, _, _, _}
     end
   end
 

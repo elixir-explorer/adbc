@@ -314,62 +314,6 @@ defmodule Adbc.Connection do
   end
 
   @doc """
-  Construct a statement for a partition of a query. The
-  results can then be read independently.
-
-  A partition can be retrieved from AdbcPartitions.
-
-  ##### Positional Parameters
-
-  - `self`: `Adbc.Connection.t()`
-
-    A valid `Adbc.Connection` struct.
-
-  - `serialized_partition`: `binary()`
-
-    The partition descriptor.
-
-  - `serialized_length`: `non_neg_integer()`
-
-    The partition descriptor length.
-
-    Defaults to `byte_size(serialized_partition)`.
-
-  """
-  @doc group: :adbc_connection_partition
-  @spec read_partition(Adbc.Connection.t(), binary(), non_neg_integer() | :auto) ::
-          {:ok, Adbc.ArrowArrayStream.t()} | Adbc.Error.adbc_error()
-  def read_partition(self = %T{}, serialized_partition, serialized_length \\ :auto) do
-    serialized_length =
-      if serialized_length == :auto do
-        byte_size(serialized_partition)
-      else
-        if serialized_length > byte_size(serialized_partition) do
-          raise RuntimeError,
-                "parameter `serialized_length` > bytes of acutal size of `serialized_partition` (#{byte_size(serialized_partition)})"
-        else
-          serialized_length
-        end
-      end
-
-    case Adbc.Nif.adbc_connection_read_partition(
-           self.reference,
-           serialized_partition,
-           serialized_length
-         ) do
-      {:ok, ref, ptr} ->
-        {:ok,
-         %ArrowArrayStream{
-           reference: ref,
-           pointer: ptr
-         }}
-
-      {:error, {reason, code, sql_state}} ->
-        {:error, {reason, code, sql_state}}
-    end
-  end
-
-  @doc """
   Commit any pending transactions. Only used if autocommit is disabled.
 
   Behavior is undefined if this is mixed with SQL transaction statements.

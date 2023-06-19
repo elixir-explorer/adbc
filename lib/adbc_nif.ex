@@ -55,9 +55,6 @@ defmodule Adbc.Nif do
 
   def adbc_connection_get_table_types(_self), do: :erlang.nif_error(:not_loaded)
 
-  def adbc_connection_read_partition(_self, _serialized_partition, _serialized_length),
-    do: :erlang.nif_error(:not_loaded)
-
   def adbc_connection_commit(_self), do: :erlang.nif_error(:not_loaded)
 
   def adbc_connection_rollback(_self), do: :erlang.nif_error(:not_loaded)
@@ -72,14 +69,9 @@ defmodule Adbc.Nif do
 
   def adbc_statement_set_sql_query(_statement, _query), do: :erlang.nif_error(:not_loaded)
 
-  def adbc_statement_set_substrait_plan(_statement, _plan, _length),
-    do: :erlang.nif_error(:not_loaded)
-
   def adbc_statement_bind(_statement, _values), do: :erlang.nif_error(:not_loaded)
 
   def adbc_statement_bind_stream(_statement, _stream), do: :erlang.nif_error(:not_loaded)
-
-  def adbc_statement_get_parameter_schema(_statement), do: :erlang.nif_error(:not_loaded)
 
   def adbc_arrow_array_stream_get_pointer(_arrow_array_stream), do: :erlang.nif_error(:not_loaded)
 end

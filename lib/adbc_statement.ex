@@ -111,49 +111,6 @@ defmodule Adbc.Statement do
   end
 
   @doc """
-  Set the Substrait plan to execute.
-
-  The query can then be executed with `Adbc.Statement.execute/1`.  For
-  queries expected to be executed repeatedly, `Adbc.Statement.prepare/1`
-  the statement first.
-
-  ##### Positional Parameter
-
-  - `self`: `Adbc.Statement.t()`
-
-    The statement.
-
-  - `plan`: `String.t()`
-
-    The serialized substrait.Plan to execute.
-
-  - `length`: `non_neg_integer()`
-
-    The length of the serialized plan.
-
-    Defaults to `byte_size(plan)`.
-  """
-  @doc group: :adbc_statement_substrait
-  @spec set_substrait_plan(Adbc.Statement.t(), binary(), non_neg_integer() | :auto) ::
-          :ok | Adbc.Error.adbc_error()
-  def set_substrait_plan(self = %T{}, plan, length \\ :auto)
-      when is_binary(plan) and ((is_integer(length) and length > 0) or length == :auto) do
-    length =
-      if length == :auto do
-        byte_size(plan)
-      else
-        if length > byte_size(plan) do
-          raise RuntimeError,
-                "parameter `length` > bytes of acutal size of `plan` (#{byte_size(plan)})"
-        else
-          length
-        end
-      end
-
-    Adbc.Nif.adbc_statement_set_substrait_plan(self.reference, plan, length)
-  end
-
-  @doc """
   Bind Arrow data. This can be used for bulk inserts or prepared statements.
 
   ##### Positional Parameter
@@ -200,33 +157,5 @@ defmodule Adbc.Statement do
           :ok | Adbc.Error.adbc_error()
   def bind_stream(self = %T{}, stream = %ArrowArrayStream{}) do
     Adbc.Nif.adbc_statement_bind_stream(self.reference, stream.reference)
-  end
-
-  @doc """
-  Get the schema for bound parameters.
-
-  This retrieves an Arrow schema describing the number, names, and
-  types of the parameters in a parameterized statement.  The fields
-  of the schema should be in order of the ordinal position of the
-  parameters; named parameters should appear only once.
-
-  If the parameter does not have a name, or the name cannot be
-  determined, the name of the corresponding field in the schema will
-  be an empty string.  If the type cannot be determined, the type of
-  the corresponding field will be NA (NullType).
-
-  This should be called after `Adbc.Statement.prepare/1`.
-  """
-  @doc group: :adbc_statement
-  @spec get_parameter_schema(Adbc.Statement.t()) ::
-          {:ok, %ArrowSchema{}} | Adbc.Error.adbc_error()
-  def get_parameter_schema(self = %T{}) do
-    case Adbc.Nif.adbc_statement_get_parameter_schema(self.reference) do
-      {:ok, schema_ref} ->
-        {:ok, %ArrowSchema{reference: schema_ref}}
-
-      {:error, {reason, code, sql_state}} ->
-        {:error, {reason, code, sql_state}}
-    end
   end
 end

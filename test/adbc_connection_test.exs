@@ -64,15 +64,4 @@ defmodule Adbc.Connection.Test do
       assert is_reference(array_stream.reference)
     end
   end
-
-  describe "adbc connection partition" do
-    # test "read partition" do
-    #   {:ok, %Connection{} = conn} = Database.connection(db)
-    #   assert is_reference(conn.reference)
-    #
-    #   partition_data = << >>
-    #   {:ok, %ArrowArrayStream{} = array_stream} = Connection.read_partition(conn, partition_data)
-    #   assert is_reference(array_stream.reference)
-    # end
-  end
 end

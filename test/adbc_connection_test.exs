@@ -2,7 +2,7 @@ defmodule Adbc.Connection.Test do
   use ExUnit.Case
   doctest Adbc.Connection
 
-  alias Adbc.ArrowArrayStream
+  alias Adbc.{ArrowArrayStream, ArrowSchema}
   alias Adbc.Connection
   alias Adbc.Database
 
@@ -39,29 +39,33 @@ defmodule Adbc.Connection.Test do
     end
   end
 
-  describe "adbc connection metadata" do
+  describe "get_objects" do
     test "get all objects from a connection", %{db: db} do
-      {:ok, %Connection{} = conn} = Database.connection(db)
-      assert is_reference(conn.reference)
-
+      conn = start_supervised!({Connection, database: db})
       {:ok, %ArrowArrayStream{} = array_stream} = Connection.get_objects(conn, 0)
       assert is_reference(array_stream.reference)
     end
+  end
 
-    # test "get table schema from a connection" do
-    #   {:ok, %Connection{} = conn} = Database.connection(db)
-    #   assert is_reference(conn.reference)
-    #
-    #   {:ok, %ArrowSchema{} = schema} = Connection.get_table_schema(conn, nil, nil, "table")
-    #   assert is_reference(schema.reference)
-    # end
-
+  describe "get_table_types" do
     test "get table types from a connection", %{db: db} do
-      {:ok, %Connection{} = conn} = Database.connection(db)
-      assert is_reference(conn.reference)
-
+      conn = start_supervised!({Connection, database: db})
       {:ok, %ArrowArrayStream{} = array_stream} = Connection.get_table_types(conn)
       assert is_reference(array_stream.reference)
+    end
+  end
+
+  describe "get_table_schema" do
+    @tag :skip
+    test "get table schema from a connection", %{db: db} do
+      conn = start_supervised!({Connection, database: db})
+      {:ok, %ArrowSchema{} = schema} = Connection.get_table_schema(conn, nil, nil, "table")
+      assert is_reference(schema.reference)
+    end
+
+    test "returns error when table does not exist", %{db: db} do
+      conn = start_supervised!({Connection, database: db})
+      {:error, %Adbc.Error{}} = Connection.get_table_schema(conn, nil, nil, "table")
     end
   end
 end

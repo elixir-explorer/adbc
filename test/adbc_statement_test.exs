@@ -2,13 +2,11 @@ defmodule Adbc.Statement.Test do
   use ExUnit.Case
   doctest Adbc.Statement
 
-  alias Adbc.Connection
-  alias Adbc.Database
   alias Adbc.Statement
 
   setup do
-    db = start_supervised!({Database, driver: :sqlite})
-    {:ok, conn} = Database.connection(db)
+    db = start_supervised!({Adbc.Database, driver: :sqlite})
+    conn = %{reference: :sys.get_state(start_supervised!({Adbc.Connection, database: db}))}
     %{db: db, conn: conn}
   end
 

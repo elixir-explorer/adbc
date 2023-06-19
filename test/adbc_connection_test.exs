@@ -11,15 +11,35 @@ defmodule Adbc.Connection.Test do
     %{db: db}
   end
 
-  describe "adbc connection metadata" do
-    test "get all info from a connection", %{db: db} do
-      {:ok, %Connection{} = conn} = Database.connection(db)
-      assert is_reference(conn.reference)
+  describe "start_link" do
+    test "starts a process", %{db: db} do
+      assert {:ok, pid} = Connection.start_link(database: db)
+      assert is_pid(pid)
+    end
 
+    test "accepts process options", %{db: db} do
+      assert {:ok, pid} =
+               Connection.start_link(database: db, process_options: [name: :who_knows_conn])
+
+      assert Process.whereis(:who_knows_conn) == pid
+    end
+  end
+
+  describe "get_info" do
+    test "get all info from a connection", %{db: db} do
+      conn = start_supervised!({Connection, database: db})
       {:ok, %ArrowArrayStream{} = array_stream} = Connection.get_info(conn)
       assert is_reference(array_stream.reference)
     end
 
+    test "get some info from a connection", %{db: db} do
+      conn = start_supervised!({Connection, database: db})
+      {:ok, %ArrowArrayStream{} = array_stream} = Connection.get_info(conn, [1])
+      assert is_reference(array_stream.reference)
+    end
+  end
+
+  describe "adbc connection metadata" do
     test "get all objects from a connection", %{db: db} do
       {:ok, %Connection{} = conn} = Database.connection(db)
       assert is_reference(conn.reference)

@@ -3,7 +3,10 @@ defmodule Adbc.Database do
   Documentation for `Adbc.Database`.
   """
 
+  # TODO: Allow options to be set on the database after it has been initialized
+
   use GenServer
+  import Adbc.Helper, only: [error_to_exception: 1]
 
   @doc """
   TODO.
@@ -60,6 +63,17 @@ defmodule Adbc.Database do
     {:reply, result, db}
   end
 
+  def handle_call({:initialize_connection, conn_ref}, {pid, _}, db) do
+    case Adbc.Nif.adbc_connection_init(conn_ref, db) do
+      :ok ->
+        Process.link(pid)
+        {:reply, :ok, db}
+
+      {:error, reason} ->
+        {:reply, {:error, reason}, db}
+    end
+  end
+
   @impl true
   def terminate(_, db) do
     Adbc.Nif.adbc_connection_release(db)
@@ -79,17 +93,5 @@ defmodule Adbc.Database do
         {:error, _} = error -> {:halt, error}
       end
     end)
-  end
-
-  defp error_to_exception(string) when is_binary(string) do
-    ArgumentError.exception(string)
-  end
-
-  defp error_to_exception(list) when is_list(list) do
-    ArgumentError.exception(List.to_string(list))
-  end
-
-  defp error_to_exception({:adbc_error, message, vendor_code, state}) do
-    Adbc.Error.exception(message: message, vendor_code: vendor_code, state: state)
   end
 end

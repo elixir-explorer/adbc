@@ -5,8 +5,10 @@ alias Adbc.ArrowArrayStream
 
 Adbc.Driver.download_driver(:sqlite)
 
-{:ok, db} = Adbc.Database.start_link(driver: :sqlite)
-{:ok, %Connection{} = conn} = Database.connection(db)
+{:ok, db} = Database.start_link(driver: :sqlite)
+{:ok, conn} = Connection.start_link(database: db)
+
+conn = %{reference: :sys.get_state(conn).conn}
 
 {:ok, statement} = Statement.new(conn)
 :ok = Statement.set_sql_query(statement, "CREATE TABLE IF NOT EXISTS foo (i64 INT, f64 REAL, str TEXT)")

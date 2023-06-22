@@ -31,6 +31,15 @@ defmodule Adbc.Connection.Test do
       Process.exit(db, :kill)
       assert_receive {:DOWN, ^ref, _, _, _}
     end
+
+    test "errors with invalid option", %{db: db} do
+      Process.flag(:trap_exit, true)
+
+      assert {:error, %Adbc.Error{} = error} =
+               Connection.start_link(database: db, who_knows: 123)
+
+      assert Exception.message(error) == "[SQLite] Unknown connection option who_knows=123"
+    end
   end
 
   describe "get_info" do
@@ -74,6 +83,16 @@ defmodule Adbc.Connection.Test do
     test "returns error when table does not exist", %{db: db} do
       conn = start_supervised!({Connection, database: db})
       {:error, %Adbc.Error{}} = Connection.get_table_schema(conn, nil, nil, "table")
+    end
+  end
+
+  describe "transactions" do
+    @tag :skip
+    test "rollback" do
+    end
+
+    @tag :skip
+    test "commit" do
     end
   end
 end

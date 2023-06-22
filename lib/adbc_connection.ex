@@ -3,8 +3,6 @@ defmodule Adbc.Connection do
   Documentation for `Adbc.Connection`.
   """
 
-  # TODO: Allow options to be set on init
-  # TODO: Allow options to be set on the conn after it has been initialized
   # TODO: Remove pointer from ArrowArrayStream
 
   @type t :: GenServer.server()
@@ -24,11 +22,21 @@ defmodule Adbc.Connection do
 
     {process_options, opts} = Keyword.pop(opts, :process_options, [])
 
-    with {:ok, conn} <- Adbc.Nif.adbc_connection_new() do
+    with {:ok, conn} <- Adbc.Nif.adbc_connection_new(),
+         :ok <- init_options(conn, opts) do
       GenServer.start_link(__MODULE__, {db, conn}, process_options)
     else
       {:error, reason} -> {:error, error_to_exception(reason)}
     end
+  end
+
+  defp init_options(ref, opts) do
+    Enum.reduce_while(opts, :ok, fn {key, value}, :ok ->
+      case Adbc.Nif.adbc_connection_set_option(ref, to_string(key), to_string(value)) do
+        :ok -> {:cont, :ok}
+        {:error, _} = error -> {:halt, error}
+      end
+    end)
   end
 
   @doc """
@@ -193,6 +201,32 @@ defmodule Adbc.Connection do
     end
   end
 
+  @doc """
+  Commit any pending transactions. Only used if autocommit is disabled.
+
+  Behavior is undefined if this is mixed with SQL transaction statements.
+  """
+  @spec commit(Adbc.Connection.t()) :: :ok | {:error, Exception.t()}
+  def commit(server) do
+    case GenServer.call(server, :commit, :infinity) do
+      :ok -> :ok
+      {:error, reason} -> {:error, error_to_exception(reason)}
+    end
+  end
+
+  @doc """
+  Roll back any pending transactions. Only used if autocommit is disabled.
+
+  Behavior is undefined if this is mixed with SQL transaction statements.
+  """
+  @spec rollback(Adbc.Connection.t()) :: :ok | {:error, Exception.t()}
+  def rollback(server) do
+    case GenServer.call(server, :rollback, :infinity) do
+      :ok -> :ok
+      {:error, reason} -> {:error, error_to_exception(reason)}
+    end
+  end
+
   ## Callbacks
 
   @impl true
@@ -240,6 +274,16 @@ defmodule Adbc.Connection do
   end
 
   @impl true
+  def handle_call(:commit, _from, conn) do
+    {:reply, Adbc.Nif.adbc_connection_commit(conn), conn}
+  end
+
+  @impl true
+  def handle_call(:rollback, _from, conn) do
+    {:reply, Adbc.Nif.adbc_connection_rollback(conn), conn}
+  end
+
+  @impl true
   def handle_info({:EXIT, _db, reason}, conn), do: {:stop, reason, conn}
   def handle_info(_msg, conn), do: {:noreply, conn}
 
@@ -247,39 +291,5 @@ defmodule Adbc.Connection do
   def terminate(_reason, conn) do
     Adbc.Nif.adbc_connection_release(conn)
     :ok
-  end
-
-  ## TODO: Convert below to the new API
-
-  @doc """
-  Set an option.
-
-  Options may be set before `Adbc.Connection.init/2`.  Some drivers may
-  support setting options after initialization as well.
-  """
-  @spec set_option(Adbc.Connection.t(), String.t(), String.t()) :: :ok | Adbc.Error.adbc_error()
-  def set_option(self, key, value)
-      when is_binary(key) and is_binary(value) do
-    Adbc.Nif.adbc_connection_set_option(self.reference, key, value)
-  end
-
-  @doc """
-  Commit any pending transactions. Only used if autocommit is disabled.
-
-  Behavior is undefined if this is mixed with SQL transaction statements.
-  """
-  @spec commit(Adbc.Connection.t()) :: :ok | Adbc.Error.adbc_error()
-  def commit(self) do
-    Adbc.Nif.adbc_connection_commit(self.reference)
-  end
-
-  @doc """
-  Roll back any pending transactions. Only used if autocommit is disabled.
-
-  Behavior is undefined if this is mixed with SQL transaction statements.
-  """
-  @spec rollback(Adbc.Connection.t()) :: :ok | Adbc.Error.adbc_error()
-  def rollback(self) do
-    Adbc.Nif.adbc_connection_rollback(self.reference)
   end
 end

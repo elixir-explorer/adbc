@@ -89,7 +89,7 @@ defmodule Adbc.Connection.Test do
   end
 
   describe "get_table_schema" do
-    @tag :skip
+    @tag skip: "needs to decode ArrowSchema"
     test "get table schema from a connection", %{db: db} do
       conn = start_supervised!({Connection, database: db})
       {:ok, %ArrowSchema{} = schema} = Connection.get_table_schema(conn, nil, nil, "table")
@@ -102,12 +102,68 @@ defmodule Adbc.Connection.Test do
     end
   end
 
+  describe "lock" do
+    test "serializes access", %{db: db} do
+      conn = start_supervised!({Connection, database: db})
+
+      for _ <- 1..10 do
+        Task.async(fn -> run_anything(conn) end)
+      end
+      |> Task.await_many()
+    end
+
+    test "crashes releases the lock", %{db: db} do
+      conn = start_supervised!({Connection, database: db})
+
+      assert_raise RuntimeError, fn ->
+        Connection.get_table_types(conn, fn %ArrowArrayStream{} ->
+          raise "oops"
+        end)
+      end
+
+      run_anything(conn)
+    end
+
+    test "broken link releases the lock", %{db: db} do
+      conn = start_supervised!({Connection, database: db})
+      parent = self()
+
+      child =
+        spawn(fn ->
+          Connection.get_table_types(conn, fn %ArrowArrayStream{} ->
+            send(parent, :ready)
+            Process.sleep(:infinity)
+          end)
+        end)
+
+      assert_receive :ready
+      Process.exit(child, :kill)
+      run_anything(conn)
+    end
+
+    @tag skip: "needs a command that fails"
+    test "commands that error do not lock", %{db: db} do
+      conn = start_supervised!({Connection, database: db})
+
+      {:error, %Adbc.Error{}} =
+        Connection.get_objects(conn, 0, [table_name: "unknown"], fn %ArrowArrayStream{} ->
+          raise "never invoked"
+        end)
+
+      run_anything(conn)
+    end
+
+    defp run_anything(conn) do
+      {:ok, :done} = Connection.get_table_types(conn, fn _ -> :done end)
+    end
+  end
+
   describe "transactions" do
-    @tag :skip
+    @tag skip: "needs to start a transaction"
     test "rollback" do
     end
 
-    @tag :skip
+    @tag skip: "needs to start a transaction"
     test "commit" do
     end
   end

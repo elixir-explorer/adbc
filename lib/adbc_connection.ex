@@ -244,6 +244,7 @@ defmodule Adbc.Connection do
         try do
           {:ok, fun.(%Adbc.ArrowArrayStream{reference: stream_ref})}
         after
+          # TODO: force release the arrow array stream on the server
           GenServer.cast(conn, {:unlock, unlock_ref})
         end
 
@@ -318,7 +319,6 @@ defmodule Adbc.Connection do
 
         case apply(Adbc.Nif, name, [state.conn | args]) do
           {:ok, something} ->
-            # TODO: Test that links unlocks and it handles dead processes
             unlock_ref = Process.monitor(pid)
             GenServer.reply(from, {:ok, self(), unlock_ref, something})
             %{state | lock: unlock_ref, queue: queue}

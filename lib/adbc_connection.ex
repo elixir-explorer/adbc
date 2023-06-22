@@ -191,13 +191,13 @@ defmodule Adbc.Connection do
     case GenServer.call(conn, {:get_table_schema, catalog, db_schema, table_name}, :infinity) do
       {:ok, schema_ref, {format, name, metadata, flags, n_children, children}} ->
         {:ok,
-           %ArrowSchema{
+           %Adbc.ArrowSchema{
              format: format,
              name: name,
              metadata: metadata,
              flags: flags,
              n_children: n_children,
-             children: Enum.map(children, &ArrowSchema.from_metainfo/1),
+             children: Enum.map(children, &Adbc.ArrowSchema.from_metainfo/1),
              reference: schema_ref
         }}
       {:error, reason} -> {:error, error_to_exception(reason)}

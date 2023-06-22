@@ -1272,7 +1272,6 @@ static ErlNifFunc nif_functions[] = {
     {"adbc_statement_set_sql_query", 2, adbc_statement_set_sql_query, 0},
     {"adbc_statement_bind", 2, adbc_statement_bind, 0},
     {"adbc_statement_bind_stream", 2, adbc_statement_bind_stream, 0},
-    {"adbc_statement_get_parameter_schema", 1, adbc_statement_get_parameter_schema, 0},
 
     {"adbc_arrow_array_stream_get_pointer", 1, adbc_arrow_array_stream_get_pointer, 0},
     {"adbc_arrow_array_stream_get_schema", 1, adbc_arrow_array_stream_get_schema, 0},

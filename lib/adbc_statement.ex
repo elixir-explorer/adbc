@@ -11,7 +11,6 @@ defmodule Adbc.Statement do
   defstruct [:reference]
   alias __MODULE__, as: T
   alias Adbc.ArrowArrayStream
-  alias Adbc.ArrowSchema
 
   @doc """
   Create a new statement for a given connection.

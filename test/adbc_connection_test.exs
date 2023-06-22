@@ -45,30 +45,46 @@ defmodule Adbc.Connection.Test do
   describe "get_info" do
     test "get all info from a connection", %{db: db} do
       conn = start_supervised!({Connection, database: db})
-      {:ok, %ArrowArrayStream{} = array_stream} = Connection.get_info(conn)
-      assert is_reference(array_stream.reference)
+
+      {:ok, :done} =
+        Connection.get_info(conn, fn %ArrowArrayStream{} = array_stream ->
+          assert is_reference(array_stream.reference)
+          :done
+        end)
     end
 
     test "get some info from a connection", %{db: db} do
       conn = start_supervised!({Connection, database: db})
-      {:ok, %ArrowArrayStream{} = array_stream} = Connection.get_info(conn, [1])
-      assert is_reference(array_stream.reference)
+
+      {:ok, :done} =
+        Connection.get_info(conn, [1], fn %ArrowArrayStream{} = array_stream ->
+          assert is_reference(array_stream.reference)
+          :done
+        end)
     end
   end
 
   describe "get_objects" do
     test "get all objects from a connection", %{db: db} do
       conn = start_supervised!({Connection, database: db})
-      {:ok, %ArrowArrayStream{} = array_stream} = Connection.get_objects(conn, 0)
-      assert is_reference(array_stream.reference)
+
+      {:ok, :done} =
+        Connection.get_objects(conn, 0, fn %ArrowArrayStream{} = array_stream ->
+          assert is_reference(array_stream.reference)
+          :done
+        end)
     end
   end
 
   describe "get_table_types" do
     test "get table types from a connection", %{db: db} do
       conn = start_supervised!({Connection, database: db})
-      {:ok, %ArrowArrayStream{} = array_stream} = Connection.get_table_types(conn)
-      assert is_reference(array_stream.reference)
+
+      {:ok, :done} =
+        Connection.get_table_types(conn, fn %ArrowArrayStream{} = array_stream ->
+          assert is_reference(array_stream.reference)
+          :done
+        end)
     end
   end
 

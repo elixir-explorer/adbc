@@ -232,7 +232,7 @@ defmodule Adbc.Connection do
     case GenServer.call(db, {:initialize_connection, conn}, :infinity) do
       :ok ->
         Process.flag(:trap_exit, true)
-        {:ok, conn}
+        {:ok, %{conn: conn}}
 
       {:error, reason} ->
         {:stop, error_to_exception(reason)}
@@ -240,15 +240,15 @@ defmodule Adbc.Connection do
   end
 
   @impl true
-  def handle_call({:get_info, info_codes}, _from, conn) do
-    {:reply, Adbc.Nif.adbc_connection_get_info(conn, info_codes), conn}
+  def handle_call({:get_info, info_codes}, _from, state) do
+    {:reply, Adbc.Nif.adbc_connection_get_info(state.conn, info_codes), state}
   end
 
   @impl true
-  def handle_call({:get_objects, depth, opts}, _from, conn) do
+  def handle_call({:get_objects, depth, opts}, _from, state) do
     result =
       Adbc.Nif.adbc_connection_get_objects(
-        conn,
+        state.conn,
         depth,
         opts[:catalog],
         opts[:db_schema],
@@ -257,37 +257,37 @@ defmodule Adbc.Connection do
         opts[:column_name]
       )
 
-    {:reply, result, conn}
+    {:reply, result, state}
   end
 
   @impl true
-  def handle_call(:get_table_types, _from, conn) do
-    {:reply, Adbc.Nif.adbc_connection_get_table_types(conn), conn}
+  def handle_call(:get_table_types, _from, state) do
+    {:reply, Adbc.Nif.adbc_connection_get_table_types(state.conn), state}
   end
 
   @impl true
-  def handle_call({:get_table_schema, catalog, db_schema, table_name}, _from, conn) do
-    result = Adbc.Nif.adbc_connection_get_table_schema(conn, catalog, db_schema, table_name)
-    {:reply, result, conn}
+  def handle_call({:get_table_schema, catalog, db_schema, table_name}, _from, state) do
+    result = Adbc.Nif.adbc_connection_get_table_schema(state.conn, catalog, db_schema, table_name)
+    {:reply, result, state}
   end
 
   @impl true
-  def handle_call(:commit, _from, conn) do
-    {:reply, Adbc.Nif.adbc_connection_commit(conn), conn}
+  def handle_call(:commit, _from, state) do
+    {:reply, Adbc.Nif.adbc_connection_commit(state.conn), state}
   end
 
   @impl true
-  def handle_call(:rollback, _from, conn) do
-    {:reply, Adbc.Nif.adbc_connection_rollback(conn), conn}
+  def handle_call(:rollback, _from, state) do
+    {:reply, Adbc.Nif.adbc_connection_rollback(state.conn), state}
   end
 
   @impl true
-  def handle_info({:EXIT, _db, reason}, conn), do: {:stop, reason, conn}
-  def handle_info(_msg, conn), do: {:noreply, conn}
+  def handle_info({:EXIT, _db, reason}, state), do: {:stop, reason, state}
+  def handle_info(_msg, state), do: {:noreply, state}
 
   @impl true
-  def terminate(_reason, conn) do
-    Adbc.Nif.adbc_connection_release(conn)
+  def terminate(_reason, state) do
+    Adbc.Nif.adbc_connection_release(state.conn)
     :ok
   end
 end

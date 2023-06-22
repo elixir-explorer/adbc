@@ -5,7 +5,6 @@ defmodule Adbc.Connection do
 
   @type t :: GenServer.server()
 
-
   use GenServer
   import Adbc.Helper, only: [error_to_exception: 1]
 
@@ -166,15 +165,14 @@ defmodule Adbc.Connection do
       when is_integer(depth) and depth >= 0 do
     opts = Keyword.validate!(opts, [:catalog, :db_schema, :table_name, :table_type, :column_name])
 
-    args =
-      [
-        depth,
-        opts[:catalog],
-        opts[:db_schema],
-        opts[:table_name],
-        opts[:table_type],
-        opts[:column_name]
-      ]
+    args = [
+      depth,
+      opts[:catalog],
+      opts[:db_schema],
+      opts[:table_name],
+      opts[:table_type],
+      opts[:column_name]
+    ]
 
     stream_lock(conn, {:adbc_connection_get_objects, args}, fun)
   end
@@ -204,16 +202,20 @@ defmodule Adbc.Connection do
       when (is_binary(catalog) or catalog == nil) and (is_binary(db_schema) or catalog == nil) and
              is_binary(table_name) do
     case queue(conn, {:adbc_connection_get_table_schema, [catalog, db_schema, table_name]}) do
-      {:ok, schema_ref, {format, name, metadata, flags, n_children, children}} -> {:ok, %Adbc.%Adbc.ArrowSchema{
-             format: format,
-             name: name,
-             metadata: metadata,
-             flags: flags,
-             n_children: n_children,
-             children: Enum.map(children, &Adbc.ArrowSchema.from_metainfo/1),
-             reference: schema_ref
-        }}
-      {:error, reason} -> {:error, error_to_exception(reason)}
+      {:ok, schema_ref, {format, name, metadata, flags, n_children, children}} ->
+        {:ok,
+         %Adbc.ArrowSchema{
+           format: format,
+           name: name,
+           metadata: metadata,
+           flags: flags,
+           n_children: n_children,
+           children: Enum.map(children, &Adbc.ArrowSchema.from_metainfo/1),
+           reference: schema_ref
+         }}
+
+      {:error, reason} ->
+        {:error, error_to_exception(reason)}
     end
   end
 

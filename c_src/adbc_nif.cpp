@@ -253,11 +253,7 @@ static ERL_NIF_TERM adbc_connection_get_info(ErlNifEnv *env, int argc, const ERL
     }
 
     ERL_NIF_TERM ret = array_stream->make_resource(env);
-    return enif_make_tuple3(env,
-        erlang::nif::ok(env),
-        ret,
-        enif_make_uint64(env, reinterpret_cast<uint64_t>(&array_stream->val))
-    );
+    return enif_make_tuple2(env, erlang::nif::ok(env), ret);
 }
 
 static ERL_NIF_TERM adbc_connection_get_objects(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
@@ -363,11 +359,7 @@ static ERL_NIF_TERM adbc_connection_get_objects(ErlNifEnv *env, int argc, const 
         if (at) enif_free((void *)at);
     }
 
-    return enif_make_tuple3(env,
-        erlang::nif::ok(env),
-        ret,
-        enif_make_uint64(env, reinterpret_cast<uint64_t>(&array_stream->val))
-    );
+    return enif_make_tuple2(env, erlang::nif::ok(env), ret);
 }
 
 static ERL_NIF_TERM adbc_connection_get_table_schema(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
@@ -448,11 +440,7 @@ static ERL_NIF_TERM adbc_connection_get_table_types(ErlNifEnv *env, int argc, co
 
     ERL_NIF_TERM ret = array_stream->make_resource(env);
 
-    return enif_make_tuple3(env,
-        erlang::nif::ok(env),
-        ret,
-        enif_make_uint64(env, reinterpret_cast<uint64_t>(&array_stream->val))
-    );
+    return enif_make_tuple2(env, erlang::nif::ok(env), ret);
 }
 
 static ERL_NIF_TERM adbc_connection_commit(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
@@ -516,11 +504,7 @@ static ERL_NIF_TERM adbc_arrow_array_stream_new(ErlNifEnv *env, int argc, const 
 
     ERL_NIF_TERM ret = res->make_resource(env);
 
-    return enif_make_tuple3(env,
-        erlang::nif::ok(env),
-        ret,
-        enif_make_uint64(env, reinterpret_cast<uint64_t>(&res->val))
-    );
+    return enif_make_tuple2(env, erlang::nif::ok(env), ret);
 }
 
 static ERL_NIF_TERM adbc_arrow_array_stream_reset(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {

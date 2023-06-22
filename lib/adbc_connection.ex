@@ -3,8 +3,6 @@ defmodule Adbc.Connection do
   Documentation for `Adbc.Connection`.
   """
 
-  # TODO: Remove pointer from ArrowArrayStream
-
   @type t :: GenServer.server()
 
   use GenServer
@@ -69,7 +67,7 @@ defmodule Adbc.Connection do
           {:ok, Adbc.ArrowArrayStream.t()} | {:error, Exception.t()}
   def get_info(conn, info_codes \\ []) when is_list(info_codes) do
     case GenServer.call(conn, {:get_info, info_codes}, :infinity) do
-      {:ok, ref, ptr} -> {:ok, %Adbc.ArrowArrayStream{reference: ref, pointer: ptr}}
+      {:ok, ref} -> {:ok, %Adbc.ArrowArrayStream{reference: ref}}
       {:error, reason} -> {:error, error_to_exception(reason)}
     end
   end
@@ -164,7 +162,7 @@ defmodule Adbc.Connection do
     opts = Keyword.validate!(opts, [:catalog, :db_schema, :table_name, :table_type, :column_name])
 
     case GenServer.call(conn, {:get_objects, depth, opts}, :infinity) do
-      {:ok, ref, ptr} -> {:ok, %Adbc.ArrowArrayStream{reference: ref, pointer: ptr}}
+      {:ok, ref} -> {:ok, %Adbc.ArrowArrayStream{reference: ref}}
       {:error, reason} -> {:error, error_to_exception(reason)}
     end
   end
@@ -182,7 +180,7 @@ defmodule Adbc.Connection do
           {:ok, Adbc.ArrowArrayStream.t()} | {:error, Exception.t()}
   def get_table_types(conn) do
     case GenServer.call(conn, :get_table_types, :infinity) do
-      {:ok, ref, ptr} -> {:ok, %Adbc.ArrowArrayStream{reference: ref, pointer: ptr}}
+      {:ok, ref} -> {:ok, %Adbc.ArrowArrayStream{reference: ref}}
       {:error, reason} -> {:error, error_to_exception(reason)}
     end
   end

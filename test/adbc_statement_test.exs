@@ -63,7 +63,13 @@ defmodule Adbc.Statement.Test do
   test "query values", %{conn: conn, test: test} do
     {:ok, %Statement{} = statement} = Statement.new(conn)
     assert is_reference(statement.reference)
-    assert :ok == Statement.set_sql_query(statement, "CREATE TABLE \"#{test}\" (i64 INT, f64 REAL, str TEXT)")
+
+    assert :ok ==
+             Statement.set_sql_query(
+               statement,
+               "CREATE TABLE \"#{test}\" (i64 INT, f64 REAL, str TEXT)"
+             )
+
     {:ok, _stream, row_affected} = Statement.execute_query(statement)
     assert row_affected == -1
 
@@ -89,22 +95,24 @@ defmodule Adbc.Statement.Test do
     {:ok, stream, row_affected} = Statement.execute_query(statement)
     assert row_affected == -1
     {:ok, next} = ArrowArrayStream.next(stream)
+
     assert [
-      {"i64", [43, 44]},
-      {"f64", [43.0, 44.0]},
-      {"str", ["value = 43", "value = 44"]}
-    ] == next
+             {"i64", [43, 44]},
+             {"f64", [43.0, 44.0]},
+             {"str", ["value = 43", "value = 44"]}
+           ] == next
 
     assert :ok == Statement.set_sql_query(statement, "SELECT * FROM \"#{test}\" WHERE i64 = ?")
     assert :ok == Statement.bind(statement, [42])
     {:ok, stream, row_affected} = Statement.execute_query(statement)
     assert row_affected == -1
     {:ok, next} = ArrowArrayStream.next(stream)
+
     assert [
-      {"i64", [42]},
-      {"f64", [42.0]},
-      {"str", ["value = 42"]}
-    ] == next
+             {"i64", [42]},
+             {"f64", [42.0]},
+             {"str", ["value = 42"]}
+           ] == next
 
     Statement.release(statement)
   end

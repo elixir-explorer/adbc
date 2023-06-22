@@ -172,9 +172,6 @@ static ERL_NIF_TERM arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema *
         return erlang::nif::error(env, "invalid ArrowArray, values->children == nullptr, however, values->n_children > 0");
     }
     if (values->n_children != schema->n_children) {
-        printf("values->n_children: %lld\r\n", values->n_children);
-        printf("schema->n_children: %lld\r\n", schema->n_children);
-        printf("not implemented for format: `%s`\r\n", schema->format);
         return erlang::nif::error(env, "invalid ArrowArray or ArrowSchema, values->n_children != schema->n_children");
     }
 
@@ -188,7 +185,7 @@ static ERL_NIF_TERM arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema *
     }
     children_term = enif_make_list_from_array(env, children.data(), (unsigned)schema->n_children);
 
-    ERL_NIF_TERM current_term = erlang::nif::error(env, "not implemented");
+    ERL_NIF_TERM current_term{};
 
     bool has_validity_bitmap = values->null_count != 0 && values->null_count != -1;
     const uint8_t * bitmap_buffer = nullptr;
@@ -307,7 +304,10 @@ static ERL_NIF_TERM arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema *
         // only handle and return children if this is a struct
         is_struct = true;
     } else {
-        printf("not implemented for format: `%s`\r\n", schema->format);
+        char buf[256] = { '\0' };
+        snprintf(buf, 256, "not implemented for format: `%s`", schema->format);
+        children_term = erlang::nif::error(env, buf);
+        // printf("not implemented for format: `%s`\r\n", schema->format);
         // printf("length: %lld\r\n", values->length);
         // printf("null_count: %lld\r\n", values->null_count);
         // printf("offset: %lld\r\n", values->offset);

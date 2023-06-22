@@ -3,10 +3,6 @@ defmodule Adbc.Connection do
   Documentation for `Adbc.Connection`.
   """
 
-  # TODO: Allow options to be set on init
-  # TODO: Allow options to be set on the conn after it has been initialized
-  # TODO: Remove pointer from ArrowArrayStream
-
   @type t :: GenServer.server()
 
 
@@ -25,11 +21,21 @@ defmodule Adbc.Connection do
 
     {process_options, opts} = Keyword.pop(opts, :process_options, [])
 
-    with {:ok, conn} <- Adbc.Nif.adbc_connection_new() do
+    with {:ok, conn} <- Adbc.Nif.adbc_connection_new(),
+         :ok <- init_options(conn, opts) do
       GenServer.start_link(__MODULE__, {db, conn}, process_options)
     else
       {:error, reason} -> {:error, error_to_exception(reason)}
     end
+  end
+
+  defp init_options(ref, opts) do
+    Enum.reduce_while(opts, :ok, fn {key, value}, :ok ->
+      case Adbc.Nif.adbc_connection_set_option(ref, to_string(key), to_string(value)) do
+        :ok -> {:cont, :ok}
+        {:error, _} = error -> {:halt, error}
+      end
+    end)
   end
 
   @doc """
@@ -58,13 +64,11 @@ defmodule Adbc.Connection do
   for ADBC usage. Drivers/vendors will ignore requests for
   unrecognized codes (the row will be omitted from the result).
   """
-  @spec get_info(t(), list(non_neg_integer())) ::
-          {:ok, Adbc.ArrowArrayStream.t()} | {:error, Exception.t()}
-  def get_info(conn, info_codes \\ []) when is_list(info_codes) do
-    case GenServer.call(conn, {:get_info, info_codes}, :infinity) do
-      {:ok, ref, ptr} -> {:ok, %Adbc.ArrowArrayStream{reference: ref, pointer: ptr}}
-      {:error, reason} -> {:error, error_to_exception(reason)}
-    end
+  @spec get_info(t(), list(non_neg_integer()), (Adbc.ArrowArrayStream.t() -> value)) ::
+          {:ok, value} | {:error, Exception.t()}
+        when value: var
+  def get_info(conn, info_codes \\ [], fun) when is_list(info_codes) do
+    stream_lock(conn, {:adbc_connection_get_info, [info_codes]}, fun)
   end
 
   @doc """
@@ -145,21 +149,34 @@ defmodule Adbc.Connection do
   | fk_table                 | utf8 not null           |
   | fk_column_name           | utf8 not null           |
   """
-  @spec get_objects(t(), non_neg_integer(),
-          catalog: String.t(),
-          db_schema: String.t(),
-          table_name: String.t(),
-          table_type: [String.t()],
-          column_name: String.t()
-        ) :: {:ok, Adbc.ArrowArrayStream.t()} | {:error, Exception.t()}
-  def get_objects(conn, depth, opts \\ [])
+  @spec get_objects(
+          t(),
+          non_neg_integer(),
+          [
+            catalog: String.t(),
+            db_schema: String.t(),
+            table_name: String.t(),
+            table_type: [String.t()],
+            column_name: String.t()
+          ],
+          (Adbc.ArrowArrayStream.t() -> value)
+        ) :: {:ok, value} | {:error, Exception.t()}
+        when value: var
+  def get_objects(conn, depth, opts \\ [], fun)
       when is_integer(depth) and depth >= 0 do
     opts = Keyword.validate!(opts, [:catalog, :db_schema, :table_name, :table_type, :column_name])
 
-    case GenServer.call(conn, {:get_objects, depth, opts}, :infinity) do
-      {:ok, ref, ptr} -> {:ok, %Adbc.ArrowArrayStream{reference: ref, pointer: ptr}}
-      {:error, reason} -> {:error, error_to_exception(reason)}
-    end
+    args =
+      [
+        depth,
+        opts[:catalog],
+        opts[:db_schema],
+        opts[:table_name],
+        opts[:table_type],
+        opts[:column_name]
+      ]
+
+    stream_lock(conn, {:adbc_connection_get_objects, args}, fun)
   end
 
   @doc """
@@ -171,13 +188,11 @@ defmodule Adbc.Connection do
   ---------------|--------------
   table_type     | utf8 not null
   """
-  @spec get_table_types(t) ::
-          {:ok, Adbc.ArrowArrayStream.t()} | {:error, Exception.t()}
-  def get_table_types(conn) do
-    case GenServer.call(conn, :get_table_types, :infinity) do
-      {:ok, ref, ptr} -> {:ok, %Adbc.ArrowArrayStream{reference: ref, pointer: ptr}}
-      {:error, reason} -> {:error, error_to_exception(reason)}
-    end
+  @spec get_table_types(t, (Adbc.ArrowArrayStream.t() -> value)) ::
+          {:ok, value} | {:error, Exception.t()}
+        when value: var
+  def get_table_types(conn, fun) do
+    stream_lock(conn, {:adbc_connection_get_table_types, []}, fun)
   end
 
   @doc """
@@ -188,10 +203,8 @@ defmodule Adbc.Connection do
   def get_table_schema(conn, catalog, db_schema, table_name)
       when (is_binary(catalog) or catalog == nil) and (is_binary(db_schema) or catalog == nil) and
              is_binary(table_name) do
-    case GenServer.call(conn, {:get_table_schema, catalog, db_schema, table_name}, :infinity) do
-      {:ok, schema_ref, {format, name, metadata, flags, n_children, children}} ->
-        {:ok,
-           %Adbc.ArrowSchema{
+    case queue(conn, {:adbc_connection_get_table_schema, [catalog, db_schema, table_name]}) do
+      {:ok, schema_ref, {format, name, metadata, flags, n_children, children}} -> {:ok, %Adbc.%Adbc.ArrowSchema{
              format: format,
              name: name,
              metadata: metadata,
@@ -204,84 +217,17 @@ defmodule Adbc.Connection do
     end
   end
 
-  ## Callbacks
-
-  @impl true
-  def init({db, conn}) do
-    case GenServer.call(db, {:initialize_connection, conn}, :infinity) do
-      :ok ->
-        Process.flag(:trap_exit, true)
-        {:ok, conn}
-
-      {:error, reason} ->
-        {:stop, error_to_exception(reason)}
-    end
-  end
-
-  @impl true
-  def handle_call({:get_info, info_codes}, _from, conn) do
-    {:reply, Adbc.Nif.adbc_connection_get_info(conn, info_codes), conn}
-  end
-
-  @impl true
-  def handle_call({:get_objects, depth, opts}, _from, conn) do
-    result =
-      Adbc.Nif.adbc_connection_get_objects(
-        conn,
-        depth,
-        opts[:catalog],
-        opts[:db_schema],
-        opts[:table_name],
-        opts[:table_type],
-        opts[:column_name]
-      )
-
-    {:reply, result, conn}
-  end
-
-  @impl true
-  def handle_call(:get_table_types, _from, conn) do
-    {:reply, Adbc.Nif.adbc_connection_get_table_types(conn), conn}
-  end
-
-  @impl true
-  def handle_call({:get_table_schema, catalog, db_schema, table_name}, _from, conn) do
-    result = Adbc.Nif.adbc_connection_get_table_schema(conn, catalog, db_schema, table_name)
-    {:reply, result, conn}
-  end
-
-  @impl true
-  def handle_info({:EXIT, _db, reason}, conn), do: {:stop, reason, conn}
-  def handle_info(_msg, conn), do: {:noreply, conn}
-
-  @impl true
-  def terminate(_reason, conn) do
-    Adbc.Nif.adbc_connection_release(conn)
-    :ok
-  end
-
-  ## TODO: Convert below to the new API
-
-  @doc """
-  Set an option.
-
-  Options may be set before `Adbc.Connection.init/2`.  Some drivers may
-  support setting options after initialization as well.
-  """
-  @spec set_option(Adbc.Connection.t(), String.t(), String.t()) :: :ok | Adbc.Error.adbc_error()
-  def set_option(self, key, value)
-      when is_binary(key) and is_binary(value) do
-    Adbc.Nif.adbc_connection_set_option(self.reference, key, value)
-  end
-
   @doc """
   Commit any pending transactions. Only used if autocommit is disabled.
 
   Behavior is undefined if this is mixed with SQL transaction statements.
   """
-  @spec commit(Adbc.Connection.t()) :: :ok | Adbc.Error.adbc_error()
-  def commit(self) do
-    Adbc.Nif.adbc_connection_commit(self.reference)
+  @spec commit(Adbc.Connection.t()) :: :ok | {:error, Exception.t()}
+  def commit(conn) do
+    case queue(conn, {:adbc_connection_commit, []}) do
+      :ok -> :ok
+      {:error, reason} -> {:error, error_to_exception(reason)}
+    end
   end
 
   @doc """
@@ -289,8 +235,110 @@ defmodule Adbc.Connection do
 
   Behavior is undefined if this is mixed with SQL transaction statements.
   """
-  @spec rollback(Adbc.Connection.t()) :: :ok | Adbc.Error.adbc_error()
-  def rollback(self) do
-    Adbc.Nif.adbc_connection_rollback(self.reference)
+  @spec rollback(Adbc.Connection.t()) :: :ok | {:error, Exception.t()}
+  def rollback(conn) do
+    case queue(conn, {:adbc_connection_rollback, []}) do
+      :ok -> :ok
+      {:error, reason} -> {:error, error_to_exception(reason)}
+    end
   end
+
+  defp queue(conn, command) do
+    GenServer.call(conn, {:queue, command}, :infinity)
+  end
+
+  defp stream_lock(conn, command, fun) do
+    case GenServer.call(conn, {:lock, command}, :infinity) do
+      {:ok, conn, unlock_ref, stream_ref} ->
+        try do
+          {:ok, fun.(%Adbc.ArrowArrayStream{reference: stream_ref})}
+        after
+          # TODO: force release the arrow array stream on the server
+          GenServer.cast(conn, {:unlock, unlock_ref})
+        end
+
+      {:error, reason} ->
+        {:error, error_to_exception(reason)}
+    end
+  end
+
+  ## Callbacks
+
+  @impl true
+  def init({db, conn}) do
+    case GenServer.call(db, {:initialize_connection, conn}, :infinity) do
+      :ok ->
+        Process.flag(:trap_exit, true)
+        {:ok, %{conn: conn, lock: :none, queue: :queue.new()}}
+
+      {:error, reason} ->
+        {:stop, error_to_exception(reason)}
+    end
+  end
+
+  @impl true
+  def handle_call({:queue, command}, from, state) do
+    state = update_in(state.queue, &:queue.in({:queue, command, from}, &1))
+    {:noreply, maybe_dequeue(state)}
+  end
+
+  @impl true
+  def handle_call({:lock, command}, from, state) do
+    state = update_in(state.queue, &:queue.in({:lock, command, from}, &1))
+    {:noreply, maybe_dequeue(state)}
+  end
+
+  @impl true
+  def handle_cast({:unlock, ref}, %{lock: ref} = state) do
+    Process.demonitor(ref, [:flush])
+    {:noreply, maybe_dequeue(%{state | lock: :none})}
+  end
+
+  @impl true
+  def handle_info({:DOWN, ref, _, _, _}, %{lock: ref} = state) do
+    {:noreply, maybe_dequeue(%{state | lock: :none})}
+  end
+
+  @impl true
+  def handle_info({:EXIT, _db, reason}, state), do: {:stop, reason, state}
+  def handle_info(_msg, state), do: {:noreply, state}
+
+  @impl true
+  def terminate(_reason, state) do
+    Adbc.Nif.adbc_connection_release(state.conn)
+    :ok
+  end
+
+  ## Queue helpers
+
+  defp maybe_dequeue(%{lock: :none, queue: queue} = state) do
+    case :queue.out(queue) do
+      {:empty, queue} ->
+        %{state | queue: queue}
+
+      {{:value, {:queue, command, from}}, queue} ->
+        {name, args} = command
+        result = apply(Adbc.Nif, name, [state.conn | args])
+        GenServer.reply(from, result)
+        maybe_dequeue(%{state | queue: queue})
+
+      {{:value, {:lock, command, from}}, queue} ->
+        {name, args} = command
+        {pid, _} = from
+
+        case apply(Adbc.Nif, name, [state.conn | args]) do
+          {:ok, something} ->
+            unlock_ref = Process.monitor(pid)
+            GenServer.reply(from, {:ok, self(), unlock_ref, something})
+            %{state | lock: unlock_ref, queue: queue}
+
+          {:error, error} ->
+            # TODO: Test that error dequeues next
+            GenServer.reply(from, {:error, error})
+            maybe_dequeue(%{state | queue: queue})
+        end
+    end
+  end
+
+  defp maybe_dequeue(state), do: state
 end

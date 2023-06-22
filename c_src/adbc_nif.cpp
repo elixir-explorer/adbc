@@ -546,11 +546,7 @@ static ERL_NIF_TERM adbc_connection_get_info(ErlNifEnv *env, int argc, const ERL
     }
 
     ERL_NIF_TERM ret = array_stream->make_resource(env);
-    return enif_make_tuple3(env,
-        erlang::nif::ok(env),
-        ret,
-        enif_make_uint64(env, reinterpret_cast<uint64_t>(&array_stream->val))
-    );
+    return enif_make_tuple2(env, erlang::nif::ok(env), ret);
 }
 
 static ERL_NIF_TERM adbc_connection_get_objects(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
@@ -656,11 +652,7 @@ static ERL_NIF_TERM adbc_connection_get_objects(ErlNifEnv *env, int argc, const 
         if (at) enif_free((void *)at);
     }
 
-    return enif_make_tuple3(env,
-        erlang::nif::ok(env),
-        ret,
-        enif_make_uint64(env, reinterpret_cast<uint64_t>(&array_stream->val))
-    );
+    return enif_make_tuple2(env, erlang::nif::ok(env), ret);
 }
 
 static ERL_NIF_TERM adbc_connection_get_table_schema(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
@@ -748,11 +740,7 @@ static ERL_NIF_TERM adbc_connection_get_table_types(ErlNifEnv *env, int argc, co
 
     ERL_NIF_TERM ret = array_stream->make_resource(env);
 
-    return enif_make_tuple3(env,
-        erlang::nif::ok(env),
-        ret,
-        enif_make_uint64(env, reinterpret_cast<uint64_t>(&array_stream->val))
-    );
+    return enif_make_tuple2(env, erlang::nif::ok(env), ret);
 }
 
 static ERL_NIF_TERM adbc_connection_commit(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
@@ -826,20 +814,7 @@ static ERL_NIF_TERM adbc_arrow_array_stream_get_schema(ErlNifEnv *env, int argc,
         return erlang::nif::error(env, "invalid ArrowArrayStream.");
     }
 
-    int code = res->val.get_schema(&res->val, &schema->val);
-    if (code != 0) {
-        const char * reason = res->val.get_last_error(&res->val);
-        return erlang::nif::error(env, reason ? reason : "unknown error");
-    }
-
-    ret = schema->make_resource(env);
-    nif_schema = arrow_schema_to_nif_term(env, &schema->val);
-
-    return enif_make_tuple3(env, 
-        erlang::nif::ok(env),
-        ret,
-        nif_schema
-    );
+    return erlang::nif::ok(env, ret);
 }
 
 static ERL_NIF_TERM adbc_arrow_array_stream_next(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {

@@ -7,7 +7,7 @@ defmodule Adbc.Statement.Test do
 
   setup do
     db = start_supervised!({Adbc.Database, driver: :sqlite})
-    conn = %{reference: :sys.get_state(start_supervised!({Adbc.Connection, database: db}))}
+    conn = %{reference: :sys.get_state(start_supervised!({Adbc.Connection, database: db})).conn}
     %{db: db, conn: conn}
   end
 

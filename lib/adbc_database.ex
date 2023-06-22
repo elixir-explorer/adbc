@@ -3,8 +3,6 @@ defmodule Adbc.Database do
   Documentation for `Adbc.Database`.
   """
 
-  # TODO: Allow options to be set on the database after it has been initialized
-
   use GenServer
   import Adbc.Helper, only: [error_to_exception: 1]
 

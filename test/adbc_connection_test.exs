@@ -35,8 +35,7 @@ defmodule Adbc.Connection.Test do
     test "errors with invalid option", %{db: db} do
       Process.flag(:trap_exit, true)
 
-      assert {:error, %Adbc.Error{} = error} =
-               Connection.start_link(database: db, who_knows: 123)
+      assert {:error, %Adbc.Error{} = error} = Connection.start_link(database: db, who_knows: 123)
 
       assert Exception.message(error) == "[SQLite] Unknown connection option who_knows=123"
     end

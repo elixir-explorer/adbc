@@ -74,4 +74,10 @@ defmodule Adbc.Nif do
   def adbc_statement_bind_stream(_statement, _stream), do: :erlang.nif_error(:not_loaded)
 
   def adbc_arrow_array_stream_get_pointer(_arrow_array_stream), do: :erlang.nif_error(:not_loaded)
+
+  def adbc_arrow_array_stream_get_schema(_arrow_array_stream), do: :erlang.nif_error(:not_loaded)
+
+  def adbc_arrow_array_stream_next(_arrow_array_stream), do: :erlang.nif_error(:not_loaded)
+
+  def adbc_arrow_array_stream_release(_arrow_array_stream), do: :erlang.nif_error(:not_loaded)
 end

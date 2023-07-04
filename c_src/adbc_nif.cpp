@@ -40,7 +40,7 @@ static ERL_NIF_TERM nif_error_from_adbc_error(ErlNifEnv *env, struct AdbcError *
 
 static ERL_NIF_TERM arrow_schema_metadata_to_nif_term(ErlNifEnv *env, const char* metadata) {
     if (metadata == nullptr) return erlang::nif::atom(env, "nil");
-    
+
     std::map<std::string, std::string> metadata_map;
 
     int64_t bytes = 0;
@@ -54,7 +54,7 @@ static ERL_NIF_TERM arrow_schema_metadata_to_nif_term(ErlNifEnv *env, const char
 
         val_bytes = *(int32_t *)ptr; ptr += sizeof(int32_t);
         std::string val{(char *)ptr, (size_t)val_bytes}; ptr += val_bytes;
-        
+
         metadata_map[key] = val;
     }
 
@@ -116,8 +116,8 @@ template <typename T, typename M> static ERL_NIF_TERM values_from_buffer(ErlNifE
 
 template <typename M> static ERL_NIF_TERM strings_from_buffer(
     ErlNifEnv *env,
-    int64_t length, 
-    const uint8_t * validity_bitmap, 
+    int64_t length,
+    const uint8_t * validity_bitmap,
     const int32_t * offsets_buffer,
     const uint8_t* value_buffer,
     const M& value_to_nif) {
@@ -202,7 +202,7 @@ static ERL_NIF_TERM arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema *
         using value_type = int64_t;
         current_term = values_from_buffer(
             env,
-            values->length, 
+            values->length,
             bitmap_buffer,
             (const value_type *)values->buffers[1],
             enif_make_int64
@@ -238,7 +238,7 @@ static ERL_NIF_TERM arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema *
         using value_type = uint64_t;
         current_term = values_from_buffer(
             env,
-            values->length, 
+            values->length,
             bitmap_buffer,
             (const value_type *)values->buffers[1],
             enif_make_uint64
@@ -710,7 +710,7 @@ static ERL_NIF_TERM adbc_connection_get_table_schema(ErlNifEnv *env, int argc, c
 
     ret = schema->make_resource(env);
     nif_schema = arrow_schema_to_nif_term(env, &schema->val);
-    return enif_make_tuple3(env, 
+    return enif_make_tuple3(env,
         erlang::nif::ok(env),
         ret,
         nif_schema
@@ -793,9 +793,24 @@ static ERL_NIF_TERM adbc_arrow_array_stream_get_pointer(ErlNifEnv *env, int argc
     return enif_make_uint64(env, reinterpret_cast<uint64_t>(&res->val));
 }
 
+ const char * populate_schema(NifRes<struct ArrowArrayStream> *res) {
+    if (res->private_data == nullptr) {
+        res->private_data = enif_alloc(sizeof(struct ArrowSchema));
+        memset(res->private_data, 0, sizeof(struct ArrowSchema));
+        int code = res->val.get_schema(&res->val, (struct ArrowSchema *)res->private_data);
+        if (code != 0) {
+            const char * reason = res->val.get_last_error(&res->val);
+            enif_free(res->private_data);
+            res->private_data = nullptr;
+            return reason ? reason : "unknown error";
+        }
+    }
+
+    return nullptr;
+}
+
 static ERL_NIF_TERM adbc_arrow_array_stream_get_schema(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
     using res_type = NifRes<struct ArrowArrayStream>;
-    using schema_type = NifRes<struct ArrowSchema>;
 
     ERL_NIF_TERM ret{};
     ERL_NIF_TERM nif_schema{};
@@ -805,15 +820,17 @@ static ERL_NIF_TERM adbc_arrow_array_stream_get_schema(ErlNifEnv *env, int argc,
     if ((res = res_type::get_resource(env, argv[0], error)) == nullptr) {
         return error;
     }
-
-    auto schema = schema_type::allocate_resource(env, error);
-    if (schema == nullptr) {
-        return error;
-    }
     if (res->val.get_schema == nullptr) {
-        return erlang::nif::error(env, "invalid ArrowArrayStream.");
+        return enif_make_badarg(env);
     }
 
+    const char * reason = populate_schema(res);
+    if(reason) {
+        return erlang::nif::error(env, reason);
+    }
+
+    auto schema = (struct ArrowSchema*)res->private_data;;
+    ret = arrow_schema_to_nif_term(env, schema);
     return erlang::nif::ok(env, ret);
 }
 
@@ -837,19 +854,12 @@ static ERL_NIF_TERM adbc_arrow_array_stream_next(ErlNifEnv *env, int argc, const
         return erlang::nif::error(env, reason ? reason : "unknown error");
     }
 
-    if (res->private_data == nullptr) {
-        res->private_data = enif_alloc(sizeof(struct ArrowSchema));
-        memset(res->private_data, 0, sizeof(struct ArrowSchema));
-        int code = res->val.get_schema(&res->val, (struct ArrowSchema *)res->private_data);
-        if (code != 0) {
-            const char * reason = res->val.get_last_error(&res->val);
-            enif_free(res->private_data);
-            res->private_data = nullptr;
-            return erlang::nif::error(env, reason ? reason : "unknown error");
-        }
+    const char * reason = populate_schema(res);
+    if(reason) {
+        return erlang::nif::error(env, reason);
     }
 
-    auto schema = (struct ArrowSchema*)res->private_data;
+    auto schema = (struct ArrowSchema*)res->private_data;;
     ret = arrow_array_to_nif_term(env, schema, &out, 0);
 
     if (out.release) {

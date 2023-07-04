@@ -101,6 +101,14 @@ defmodule Adbc.Connection.Test do
     end
   end
 
+  describe "query" do
+    test "select", %{db: db} do
+      conn = start_supervised!({Connection, database: db})
+
+      Connection.query(conn, "SELECT 123")
+    end
+  end
+
   describe "lock" do
     test "serializes access", %{db: db} do
       conn = start_supervised!({Connection, database: db})

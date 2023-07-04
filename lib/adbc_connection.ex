@@ -38,6 +38,28 @@ defmodule Adbc.Connection do
   end
 
   @doc """
+  TODO.
+  """
+  def query(conn, query, params \\ [])
+
+  def query(conn, query, params) when is_binary(query) and is_list(params) do
+    query(conn, query, params, fn stream ->
+      IO.inspect({Adbc.ArrowArrayStream.next(stream)})
+    end)
+  end
+
+  def query(conn, query, fun) when is_binary(query) and is_function(fun) do
+    query(conn, query, [], fun)
+  end
+
+  @doc """
+  TODO.
+  """
+  def query(conn, query, params, fun) when is_binary(query) and is_list(params) do
+    stream_lock(conn, {:query, query, params}, fun)
+  end
+
+  @doc """
   Get metadata about the database/driver.
 
   The result is an Arrow dataset with the following schema:
@@ -251,7 +273,7 @@ defmodule Adbc.Connection do
 
   defp stream_lock(conn, command, fun) do
     case GenServer.call(conn, {:lock, command}, :infinity) do
-      {:ok, conn, unlock_ref, stream_ref} ->
+      {:ok, conn, unlock_ref, stream_ref} when is_reference(stream_ref) ->
         try do
           {:ok, fun.(%Adbc.ArrowArrayStream{reference: stream_ref})}
         after
@@ -325,10 +347,9 @@ defmodule Adbc.Connection do
         maybe_dequeue(%{state | queue: queue})
 
       {{:value, {:lock, command, from}}, queue} ->
-        {name, args} = command
         {pid, _} = from
 
-        case apply(Adbc.Nif, name, [state.conn | args]) do
+        case handle_command(command, state.conn) do
           {:ok, something} ->
             unlock_ref = Process.monitor(pid)
             GenServer.reply(from, {:ok, self(), unlock_ref, something})
@@ -343,4 +364,20 @@ defmodule Adbc.Connection do
   end
 
   defp maybe_dequeue(state), do: state
+
+  defp handle_command({:query, query, params}, conn) do
+    with {:ok, stmt} <- Adbc.Nif.adbc_statement_new(conn),
+         :ok <- Adbc.Nif.adbc_statement_set_sql_query(stmt, query),
+         :ok <- maybe_bind(stmt, params),
+         {:ok, stream_ref, _rows_affected} <- Adbc.Nif.adbc_statement_execute_query(stmt) do
+      {:ok, stream_ref}
+    end
+  end
+
+  defp handle_command({name, args}, conn) do
+    apply(Adbc.Nif, name, [conn | args])
+  end
+
+  defp maybe_bind(_stmt, []), do: :ok
+  defp maybe_bind(stmt, params), do: Adbc.Nif.adbc_statement_bind(stmt, params)
 end

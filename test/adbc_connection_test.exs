@@ -2,7 +2,7 @@ defmodule Adbc.Connection.Test do
   use ExUnit.Case
   doctest Adbc.Connection
 
-  alias Adbc.{ArrowArrayStream, ArrowSchema}
+  alias Adbc.ArrowArrayStream
   alias Adbc.Connection
 
   setup do
@@ -87,25 +87,11 @@ defmodule Adbc.Connection.Test do
     end
   end
 
-  describe "get_table_schema" do
-    @tag skip: "needs to decode ArrowSchema"
-    test "get table schema from a connection", %{db: db} do
-      conn = start_supervised!({Connection, database: db})
-      {:ok, %ArrowSchema{} = schema} = Connection.get_table_schema(conn, nil, nil, "table")
-      assert is_reference(schema.reference)
-    end
-
-    test "returns error when table does not exist", %{db: db} do
-      conn = start_supervised!({Connection, database: db})
-      {:error, %Adbc.Error{}} = Connection.get_table_schema(conn, nil, nil, "table")
-    end
-  end
-
   describe "query" do
     test "select", %{db: db} do
       conn = start_supervised!({Connection, database: db})
 
-      Connection.query(conn, "SELECT 123")
+      assert {:ok, %{"num" => [123]}} = Connection.query(conn, "SELECT 123 as num")
     end
   end
 

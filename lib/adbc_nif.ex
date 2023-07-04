@@ -50,8 +50,6 @@ defmodule Adbc.Nif do
       ),
       do: :erlang.nif_error(:not_loaded)
 
-  def adbc_connection_get_table_schema(_self, _catalog, _db_schema, _table_name),
-    do: :erlang.nif_error(:not_loaded)
 
   def adbc_connection_get_table_types(_self), do: :erlang.nif_error(:not_loaded)
 

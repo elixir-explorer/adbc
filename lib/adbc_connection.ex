@@ -44,7 +44,10 @@ defmodule Adbc.Connection do
 
   def query(conn, query, params) when is_binary(query) and is_list(params) do
     query(conn, query, params, fn stream ->
-      IO.inspect({Adbc.ArrowArrayStream.next(stream)})
+      # TODO: We need to perform next until the end
+      with {:ok, result} <- Adbc.ArrowArrayStream.next(stream) do
+        Map.new(result)
+      end
     end)
   end
 
@@ -213,32 +216,6 @@ defmodule Adbc.Connection do
         when value: var
   def get_table_types(conn, fun) do
     stream_lock(conn, {:adbc_connection_get_table_types, []}, fun)
-  end
-
-  @doc """
-  Get the Arrow schema of a table.
-  """
-  @spec get_table_schema(t, String.t() | nil, String.t() | nil, String.t()) ::
-          {:ok, Adbc.ArrowSchema.t()} | {:error, Exception.t()}
-  def get_table_schema(conn, catalog, db_schema, table_name)
-      when (is_binary(catalog) or catalog == nil) and (is_binary(db_schema) or catalog == nil) and
-             is_binary(table_name) do
-    case queue(conn, {:adbc_connection_get_table_schema, [catalog, db_schema, table_name]}) do
-      {:ok, schema_ref, {format, name, metadata, flags, n_children, children}} ->
-        {:ok,
-         %Adbc.ArrowSchema{
-           format: format,
-           name: name,
-           metadata: metadata,
-           flags: flags,
-           n_children: n_children,
-           children: Enum.map(children, &Adbc.ArrowSchema.from_metainfo/1),
-           reference: schema_ref
-         }}
-
-      {:error, reason} ->
-        {:error, error_to_exception(reason)}
-    end
   end
 
   @doc """

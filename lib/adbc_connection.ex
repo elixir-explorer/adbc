@@ -207,36 +207,6 @@ defmodule Adbc.Connection do
     stream_lock(conn, {:adbc_connection_get_table_types, []}, &stream_results/1)
   end
 
-  @doc """
-  Commit any pending transactions. Only used if autocommit is disabled.
-
-  Behavior is undefined if this is mixed with SQL transaction statements.
-  """
-  @spec commit(Adbc.Connection.t()) :: :ok | {:error, Exception.t()}
-  def commit(conn) do
-    case queue(conn, {:adbc_connection_commit, []}) do
-      :ok -> :ok
-      {:error, reason} -> {:error, error_to_exception(reason)}
-    end
-  end
-
-  @doc """
-  Roll back any pending transactions. Only used if autocommit is disabled.
-
-  Behavior is undefined if this is mixed with SQL transaction statements.
-  """
-  @spec rollback(Adbc.Connection.t()) :: :ok | {:error, Exception.t()}
-  def rollback(conn) do
-    case queue(conn, {:adbc_connection_rollback, []}) do
-      :ok -> :ok
-      {:error, reason} -> {:error, error_to_exception(reason)}
-    end
-  end
-
-  defp queue(conn, command) do
-    GenServer.call(conn, {:queue, command}, :infinity)
-  end
-
   defp stream_lock(conn, command, fun) do
     case GenServer.call(conn, {:lock, command}, :infinity) do
       {:ok, conn, unlock_ref, stream_ref} when is_reference(stream_ref) ->

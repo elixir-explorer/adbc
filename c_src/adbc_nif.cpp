@@ -624,44 +624,6 @@ static ERL_NIF_TERM adbc_connection_get_table_types(ErlNifEnv *env, int argc, co
     return enif_make_tuple2(env, erlang::nif::ok(env), ret);
 }
 
-static ERL_NIF_TERM adbc_connection_commit(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
-    using res_type = NifRes<struct AdbcConnection>;
-
-    ERL_NIF_TERM ret{};
-    ERL_NIF_TERM error{};
-    res_type * connection = nullptr;
-    if ((connection = res_type::get_resource(env, argv[0], error)) == nullptr) {
-        return error;
-    }
-
-    struct AdbcError adbc_error{};
-    AdbcStatusCode code = AdbcConnectionCommit(&connection->val, &adbc_error);
-    if (code != ADBC_STATUS_OK) {
-        return nif_error_from_adbc_error(env, &adbc_error);
-    }
-
-    return erlang::nif::ok(env);
-}
-
-static ERL_NIF_TERM adbc_connection_rollback(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
-    using res_type = NifRes<struct AdbcConnection>;
-
-    ERL_NIF_TERM ret{};
-    ERL_NIF_TERM  error{};
-    res_type * connection = nullptr;
-    if ((connection = res_type::get_resource(env, argv[0], error)) == nullptr) {
-        return error;
-    }
-
-    struct AdbcError adbc_error{};
-    AdbcStatusCode code = AdbcConnectionRollback(&connection->val, &adbc_error);
-    if (code != ADBC_STATUS_OK) {
-        return nif_error_from_adbc_error(env, &adbc_error);
-    }
-
-    return erlang::nif::ok(env);
-}
-
 static ERL_NIF_TERM adbc_arrow_array_stream_get_pointer(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
     using res_type = NifRes<struct ArrowArrayStream>;
     ERL_NIF_TERM error{};
@@ -1087,8 +1049,6 @@ static ErlNifFunc nif_functions[] = {
     {"adbc_connection_get_info", 2, adbc_connection_get_info, 0},
     {"adbc_connection_get_objects", 7, adbc_connection_get_objects, 0},
     {"adbc_connection_get_table_types", 1, adbc_connection_get_table_types, 0},
-    {"adbc_connection_commit", 1, adbc_connection_commit, 0},
-    {"adbc_connection_rollback", 1, adbc_connection_rollback, 0},
 
     {"adbc_statement_new", 1, adbc_statement_new, 0},
     {"adbc_statement_release", 1, adbc_statement_release, 0},

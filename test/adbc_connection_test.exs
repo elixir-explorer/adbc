@@ -5,7 +5,7 @@ defmodule Adbc.Connection.Test do
   alias Adbc.Connection
 
   setup do
-    db = start_supervised!({Adbc.Database, driver: :sqlite})
+    db = start_supervised!({Adbc.Database, driver: :sqlite, uri: ":memory:"})
     %{db: db}
   end
 
@@ -133,16 +133,6 @@ defmodule Adbc.Connection.Test do
 
     defp run_anything(conn) do
       {:ok, %{}} = Connection.get_table_types(conn)
-    end
-  end
-
-  describe "transactions" do
-    @tag skip: "needs to start a transaction"
-    test "rollback" do
-    end
-
-    @tag skip: "needs to start a transaction"
-    test "commit" do
     end
   end
 end

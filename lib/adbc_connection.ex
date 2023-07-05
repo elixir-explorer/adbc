@@ -4,6 +4,7 @@ defmodule Adbc.Connection do
   """
 
   @type t :: GenServer.server()
+  @type result_set :: map
 
   use GenServer
   import Adbc.Helper, only: [error_to_exception: 1]
@@ -40,26 +41,18 @@ defmodule Adbc.Connection do
   @doc """
   TODO.
   """
-  def query(conn, query, params \\ [])
-
-  def query(conn, query, params) when is_binary(query) and is_list(params) do
-    query(conn, query, params, fn stream ->
-      # TODO: We need to perform next until the end
-      with {:ok, result} <- Adbc.ArrowArrayStream.next(stream) do
-        Map.new(result)
-      end
-    end)
-  end
-
-  def query(conn, query, fun) when is_binary(query) and is_function(fun) do
-    query(conn, query, [], fun)
+  def query(conn, query, params \\ []) when is_binary(query) and is_list(params) do
+    stream_lock(conn, {:query, query, params}, &stream_results/1)
   end
 
   @doc """
   TODO.
   """
-  def query(conn, query, params, fun) when is_binary(query) and is_list(params) do
-    stream_lock(conn, {:query, query, params}, fun)
+  def query_pointer(conn, query, params \\ [], fun)
+      when is_binary(query) and is_list(params) and is_function(fun) do
+    stream_lock(conn, {:query, query, params}, fn stream_ref ->
+      fun.(Adbc.Nif.adbc_arrow_array_stream_get_pointer(stream_ref))
+    end)
   end
 
   @doc """
@@ -88,11 +81,10 @@ defmodule Adbc.Connection do
   for ADBC usage. Drivers/vendors will ignore requests for
   unrecognized codes (the row will be omitted from the result).
   """
-  @spec get_info(t(), list(non_neg_integer()), (Adbc.ArrowArrayStream.t() -> value)) ::
-          {:ok, value} | {:error, Exception.t()}
-        when value: var
-  def get_info(conn, info_codes \\ [], fun) when is_list(info_codes) do
-    stream_lock(conn, {:adbc_connection_get_info, [info_codes]}, fun)
+  @spec get_info(t(), list(non_neg_integer())) ::
+          {:ok, result_set} | {:error, Exception.t()}
+  def get_info(conn, info_codes \\ []) when is_list(info_codes) do
+    stream_lock(conn, {:adbc_connection_get_info, [info_codes]}, &stream_results/1)
   end
 
   @doc """
@@ -176,17 +168,13 @@ defmodule Adbc.Connection do
   @spec get_objects(
           t(),
           non_neg_integer(),
-          [
-            catalog: String.t(),
-            db_schema: String.t(),
-            table_name: String.t(),
-            table_type: [String.t()],
-            column_name: String.t()
-          ],
-          (Adbc.ArrowArrayStream.t() -> value)
-        ) :: {:ok, value} | {:error, Exception.t()}
-        when value: var
-  def get_objects(conn, depth, opts \\ [], fun)
+          catalog: String.t(),
+          db_schema: String.t(),
+          table_name: String.t(),
+          table_type: [String.t()],
+          column_name: String.t()
+        ) :: {:ok, result_set} | {:error, Exception.t()}
+  def get_objects(conn, depth, opts \\ [])
       when is_integer(depth) and depth >= 0 do
     opts = Keyword.validate!(opts, [:catalog, :db_schema, :table_name, :table_type, :column_name])
 
@@ -199,7 +187,7 @@ defmodule Adbc.Connection do
       opts[:column_name]
     ]
 
-    stream_lock(conn, {:adbc_connection_get_objects, args}, fun)
+    stream_lock(conn, {:adbc_connection_get_objects, args}, &stream_results/1)
   end
 
   @doc """
@@ -211,11 +199,10 @@ defmodule Adbc.Connection do
   ---------------|--------------
   table_type     | utf8 not null
   """
-  @spec get_table_types(t, (Adbc.ArrowArrayStream.t() -> value)) ::
-          {:ok, value} | {:error, Exception.t()}
-        when value: var
-  def get_table_types(conn, fun) do
-    stream_lock(conn, {:adbc_connection_get_table_types, []}, fun)
+  @spec get_table_types(t) ::
+          {:ok, result_set} | {:error, Exception.t()}
+  def get_table_types(conn) do
+    stream_lock(conn, {:adbc_connection_get_table_types, []}, &stream_results/1)
   end
 
   @doc """
@@ -252,10 +239,29 @@ defmodule Adbc.Connection do
     case GenServer.call(conn, {:lock, command}, :infinity) do
       {:ok, conn, unlock_ref, stream_ref} when is_reference(stream_ref) ->
         try do
-          {:ok, fun.(%Adbc.ArrowArrayStream{reference: stream_ref})}
+          fun.(stream_ref)
         after
           # TODO: force release the arrow array stream on the server
           GenServer.cast(conn, {:unlock, unlock_ref})
+        end
+
+      {:error, reason} ->
+        {:error, error_to_exception(reason)}
+    end
+  end
+
+  defp stream_results(reference) do
+    stream_results(reference, %{})
+  end
+
+  defp stream_results(reference, acc) do
+    case Adbc.Nif.adbc_arrow_array_stream_next(reference) do
+      {:ok, results, done} ->
+        acc = Map.merge(acc, Map.new(results), fn _k, v1, v2 -> v1 ++ v2 end)
+
+        case done do
+          0 -> stream_results(reference, acc)
+          1 -> {:ok, acc}
         end
 
       {:error, reason} ->

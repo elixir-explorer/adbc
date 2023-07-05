@@ -711,9 +711,10 @@ static ERL_NIF_TERM adbc_arrow_array_stream_next(ErlNifEnv *env, int argc, const
 
     if (out.release) {
         out.release(&out);
+        return enif_make_tuple3(env, erlang::nif::ok(env), ret, enif_make_int64(env, 1));
+    } else {
+        return enif_make_tuple3(env, erlang::nif::ok(env), ret, enif_make_int64(env, 0));
     }
-
-    return erlang::nif::ok(env, ret);
 }
 
 static ERL_NIF_TERM adbc_arrow_array_stream_release(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {

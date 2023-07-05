@@ -3,6 +3,8 @@ defmodule Adbc.Connection do
   Documentation for `Adbc.Connection`.
   """
 
+  # TODO: Add prepared queries
+
   @type t :: GenServer.server()
   @type result_set :: map
 
@@ -242,6 +244,7 @@ defmodule Adbc.Connection do
           fun.(stream_ref)
         after
           # TODO: force release the arrow array stream on the server
+          # Adbc.Nif.adbc_arrow_array_stream_release(stream_ref)
           GenServer.cast(conn, {:unlock, unlock_ref})
         end
 

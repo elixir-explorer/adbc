@@ -2,7 +2,6 @@ defmodule Adbc.Connection.Test do
   use ExUnit.Case
   doctest Adbc.Connection
 
-  alias Adbc.ArrowArrayStream
   alias Adbc.Connection
 
   setup do

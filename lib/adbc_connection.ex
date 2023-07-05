@@ -4,6 +4,7 @@ defmodule Adbc.Connection do
   """
 
   # TODO: Add prepared queries
+  # TODO: Result sets
 
   @type t :: GenServer.server()
   @type result_set :: map
@@ -208,13 +209,11 @@ defmodule Adbc.Connection do
   end
 
   defp stream_lock(conn, command, fun) do
-    case GenServer.call(conn, {:lock, command}, :infinity) do
-      {:ok, conn, unlock_ref, stream_ref} when is_reference(stream_ref) ->
+    case GenServer.call(conn, {:stream_lock, command}, :infinity) do
+      {:ok, conn, unlock_ref, stream_ref} ->
         try do
           fun.(stream_ref)
         after
-          # TODO: force release the arrow array stream on the server
-          # Adbc.Nif.adbc_arrow_array_stream_release(stream_ref)
           GenServer.cast(conn, {:unlock, unlock_ref})
         end
 
@@ -257,25 +256,21 @@ defmodule Adbc.Connection do
   end
 
   @impl true
-  def handle_call({:queue, command}, from, state) do
-    state = update_in(state.queue, &:queue.in({:queue, command, from}, &1))
+  def handle_call({:stream_lock, command}, from, state) do
+    state = update_in(state.queue, &:queue.in({:stream_lock, command, from}, &1))
     {:noreply, maybe_dequeue(state)}
   end
 
   @impl true
-  def handle_call({:lock, command}, from, state) do
-    state = update_in(state.queue, &:queue.in({:lock, command, from}, &1))
-    {:noreply, maybe_dequeue(state)}
-  end
-
-  @impl true
-  def handle_cast({:unlock, ref}, %{lock: ref} = state) do
+  def handle_cast({:unlock, ref}, %{lock: {ref, stream_ref}} = state) do
+    Adbc.Nif.adbc_arrow_array_stream_release(stream_ref)
     Process.demonitor(ref, [:flush])
     {:noreply, maybe_dequeue(%{state | lock: :none})}
   end
 
   @impl true
-  def handle_info({:DOWN, ref, _, _, _}, %{lock: ref} = state) do
+  def handle_info({:DOWN, ref, _, _, _}, %{lock: {ref, stream_ref}} = state) do
+    Adbc.Nif.adbc_arrow_array_stream_release(stream_ref)
     {:noreply, maybe_dequeue(%{state | lock: :none})}
   end
 
@@ -302,17 +297,16 @@ defmodule Adbc.Connection do
         GenServer.reply(from, result)
         maybe_dequeue(%{state | queue: queue})
 
-      {{:value, {:lock, command, from}}, queue} ->
+      {{:value, {:stream_lock, command, from}}, queue} ->
         {pid, _} = from
 
         case handle_command(command, state.conn) do
-          {:ok, something} ->
+          {:ok, stream_ref} when is_reference(stream_ref) ->
             unlock_ref = Process.monitor(pid)
-            GenServer.reply(from, {:ok, self(), unlock_ref, something})
-            %{state | lock: unlock_ref, queue: queue}
+            GenServer.reply(from, {:ok, self(), unlock_ref, stream_ref})
+            %{state | lock: {unlock_ref, stream_ref}, queue: queue}
 
           {:error, error} ->
-            # TODO: Test that error dequeues next
             GenServer.reply(from, {:error, error})
             maybe_dequeue(%{state | queue: queue})
         end

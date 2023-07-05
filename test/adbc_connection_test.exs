@@ -79,6 +79,11 @@ defmodule Adbc.Connection.Test do
                Connection.query(conn, "SELECT 123 as num, true as bool")
     end
 
+    test "select with parameters", %{db: db} do
+      conn = start_supervised!({Connection, database: db})
+      assert {:ok, %{"num" => [579]}} = Connection.query(conn, "SELECT 123 + ? as num", [456])
+    end
+
     test "fails on invalid query", %{db: db} do
       conn = start_supervised!({Connection, database: db})
       assert {:error, %Adbc.Error{} = error} = Connection.query(conn, "NOT VALID SQL")

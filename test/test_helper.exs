@@ -1,2 +1,2 @@
-Adbc.Driver.download_driver(:sqlite)
+Adbc.Driver.download(:sqlite)
 ExUnit.start()

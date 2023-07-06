@@ -59,7 +59,7 @@ defmodule Adbc.Database do
   end
 
   defp init_driver(ref, driver) do
-    case Adbc.Driver.driver_filepath(driver) do
+    case Adbc.Driver.so_path(driver) do
       {:ok, path} -> Adbc.Nif.adbc_database_set_option(ref, "driver", path)
       {:error, reason} -> {:error, reason}
     end

@@ -5,5 +5,5 @@ defmodule Adbc do
 end
 
 for driver <- Application.compile_env(:adbc, :drivers, []) do
-  Adbc.Driver.download_driver(driver)
+  Adbc.Driver.download(driver)
 end

@@ -65,7 +65,9 @@ defmodule Adbc.Connection.Test do
   describe "get_table_types" do
     test "get table types from a connection", %{db: db} do
       conn = start_supervised!({Connection, database: db})
-      assert {:ok, %{"table_type" => ["table", "view"]}} = Connection.get_table_types(conn)
+
+      assert {:ok, %Adbc.Result{data: %{"table_type" => ["table", "view"]}}} =
+               Connection.get_table_types(conn)
     end
   end
 
@@ -73,15 +75,18 @@ defmodule Adbc.Connection.Test do
     test "select", %{db: db} do
       conn = start_supervised!({Connection, database: db})
 
-      assert {:ok, %{"num" => [123]}} = Connection.query(conn, "SELECT 123 as num")
+      assert {:ok, %Adbc.Result{data: %{"num" => [123]}}} =
+               Connection.query(conn, "SELECT 123 as num")
 
-      assert {:ok, %{"num" => [123], "bool" => [1]}} =
+      assert {:ok, %Adbc.Result{data: %{"num" => [123], "bool" => [1]}}} =
                Connection.query(conn, "SELECT 123 as num, true as bool")
     end
 
     test "select with parameters", %{db: db} do
       conn = start_supervised!({Connection, database: db})
-      assert {:ok, %{"num" => [579]}} = Connection.query(conn, "SELECT 123 + ? as num", [456])
+
+      assert {:ok, %Adbc.Result{data: %{"num" => [579]}}} =
+               Connection.query(conn, "SELECT 123 + ? as num", [456])
     end
 
     test "fails on invalid query", %{db: db} do
@@ -105,7 +110,7 @@ defmodule Adbc.Connection.Test do
       conn = start_supervised!({Connection, database: db})
 
       assert_raise RuntimeError, fn ->
-        Connection.query_pointer(conn, "SELECT 1", fn _pointer ->
+        Connection.query_pointer(conn, "SELECT 1", fn _pointer, _num_rows ->
           raise "oops"
         end)
       end
@@ -119,7 +124,7 @@ defmodule Adbc.Connection.Test do
 
       child =
         spawn(fn ->
-          Connection.query_pointer(conn, "SELECT 1", fn _pointer ->
+          Connection.query_pointer(conn, "SELECT 1", fn _pointer, _num_rows ->
             send(parent, :ready)
             Process.sleep(:infinity)
           end)

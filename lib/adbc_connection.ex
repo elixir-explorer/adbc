@@ -3,11 +3,12 @@ defmodule Adbc.Connection do
   Documentation for `Adbc.Connection`.
   """
 
-  # TODO: Add prepared queries
-  # TODO: Result sets
+  # TODO: Documentation everywhere (including options)
+  # TODO: Review driver API
+  # TODO: Tests with postgresql
 
   @type t :: GenServer.server()
-  @type result_set :: map
+  @type result_set :: Adbc.Result.t()
 
   use GenServer
   import Adbc.Helper, only: [error_to_exception: 1]
@@ -45,7 +46,7 @@ defmodule Adbc.Connection do
   TODO.
   """
   def query(conn, query, params \\ []) when is_binary(query) and is_list(params) do
-    stream_lock(conn, {:query, query, params}, &stream_results/1)
+    stream_lock(conn, {:query, query, params}, &stream_results/2)
   end
 
   @doc """
@@ -53,8 +54,8 @@ defmodule Adbc.Connection do
   """
   def query_pointer(conn, query, params \\ [], fun)
       when is_binary(query) and is_list(params) and is_function(fun) do
-    stream_lock(conn, {:query, query, params}, fn stream_ref ->
-      fun.(Adbc.Nif.adbc_arrow_array_stream_get_pointer(stream_ref))
+    stream_lock(conn, {:query, query, params}, fn stream_ref, rows_affected ->
+      fun.(Adbc.Nif.adbc_arrow_array_stream_get_pointer(stream_ref), rows_affected)
     end)
   end
 
@@ -87,7 +88,7 @@ defmodule Adbc.Connection do
   @spec get_info(t(), list(non_neg_integer())) ::
           {:ok, result_set} | {:error, Exception.t()}
   def get_info(conn, info_codes \\ []) when is_list(info_codes) do
-    stream_lock(conn, {:adbc_connection_get_info, [info_codes]}, &stream_results/1)
+    stream_lock(conn, {:adbc_connection_get_info, [info_codes]}, &stream_results/2)
   end
 
   @doc """
@@ -190,7 +191,7 @@ defmodule Adbc.Connection do
       opts[:column_name]
     ]
 
-    stream_lock(conn, {:adbc_connection_get_objects, args}, &stream_results/1)
+    stream_lock(conn, {:adbc_connection_get_objects, args}, &stream_results/2)
   end
 
   @doc """
@@ -205,14 +206,14 @@ defmodule Adbc.Connection do
   @spec get_table_types(t) ::
           {:ok, result_set} | {:error, Exception.t()}
   def get_table_types(conn) do
-    stream_lock(conn, {:adbc_connection_get_table_types, []}, &stream_results/1)
+    stream_lock(conn, {:adbc_connection_get_table_types, []}, &stream_results/2)
   end
 
   defp stream_lock(conn, command, fun) do
     case GenServer.call(conn, {:stream_lock, command}, :infinity) do
-      {:ok, conn, unlock_ref, stream_ref} ->
+      {:ok, conn, unlock_ref, stream_ref, rows_affected} ->
         try do
-          fun.(stream_ref)
+          fun.(stream_ref, rows_affected)
         after
           GenServer.cast(conn, {:unlock, unlock_ref})
         end
@@ -222,18 +223,17 @@ defmodule Adbc.Connection do
     end
   end
 
-  defp stream_results(reference) do
-    stream_results(reference, %{})
-  end
+  defp stream_results(reference, -1), do: stream_results(reference, %{}, nil)
+  defp stream_results(reference, num_rows), do: stream_results(reference, %{}, num_rows)
 
-  defp stream_results(reference, acc) do
+  defp stream_results(reference, acc, num_rows) do
     case Adbc.Nif.adbc_arrow_array_stream_next(reference) do
       {:ok, results, done} ->
         acc = Map.merge(acc, Map.new(results), fn _k, v1, v2 -> v1 ++ v2 end)
 
         case done do
-          0 -> stream_results(reference, acc)
-          1 -> {:ok, acc}
+          0 -> stream_results(reference, acc, num_rows)
+          1 -> {:ok, %Adbc.Result{data: acc, num_rows: num_rows}}
         end
 
       {:error, reason} ->
@@ -301,9 +301,9 @@ defmodule Adbc.Connection do
         {pid, _} = from
 
         case handle_command(command, state.conn) do
-          {:ok, stream_ref} when is_reference(stream_ref) ->
+          {:ok, stream_ref, rows_affected} when is_reference(stream_ref) ->
             unlock_ref = Process.monitor(pid)
-            GenServer.reply(from, {:ok, self(), unlock_ref, stream_ref})
+            GenServer.reply(from, {:ok, self(), unlock_ref, stream_ref, rows_affected})
             %{state | lock: {unlock_ref, stream_ref}, queue: queue}
 
           {:error, error} ->
@@ -318,14 +318,15 @@ defmodule Adbc.Connection do
   defp handle_command({:query, query, params}, conn) do
     with {:ok, stmt} <- Adbc.Nif.adbc_statement_new(conn),
          :ok <- Adbc.Nif.adbc_statement_set_sql_query(stmt, query),
-         :ok <- maybe_bind(stmt, params),
-         {:ok, stream_ref, _rows_affected} <- Adbc.Nif.adbc_statement_execute_query(stmt) do
-      {:ok, stream_ref}
+         :ok <- maybe_bind(stmt, params) do
+      Adbc.Nif.adbc_statement_execute_query(stmt)
     end
   end
 
   defp handle_command({name, args}, conn) do
-    apply(Adbc.Nif, name, [conn | args])
+    with {:ok, stream_ref} <- apply(Adbc.Nif, name, [conn | args]) do
+      {:ok, stream_ref, nil}
+    end
   end
 
   defp maybe_bind(_stmt, []), do: :ok

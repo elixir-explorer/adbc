@@ -1,4 +1,6 @@
 defmodule Adbc.Driver do
+  @moduledoc false
+
   alias Adbc.Helper
   require Logger
 

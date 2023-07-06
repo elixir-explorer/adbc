@@ -3,8 +3,8 @@ defmodule Adbc.Connection do
   Documentation for `Adbc.Connection`.
   """
 
+  # TODO: Address get_info/get_objects API
   # TODO: Documentation everywhere (including options)
-  # TODO: Review driver API
   # TODO: Tests with postgresql
 
   @type t :: GenServer.server()

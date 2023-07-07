@@ -511,12 +511,18 @@ void ConnectionTest::TestMetadataGetObjectsDbSchemas() {
         ASSERT_FALSE(ArrowArrayViewIsNull(catalog_db_schemas_list, row))
             << "Row " << row << " should have non-null catalog_db_schemas";
 
+        ArrowStringView catalog_name =
+            ArrowArrayViewGetStringUnsafe(reader.array_view->children[0], row);
+
         const int64_t start_offset =
-            ArrowArrayViewGetOffsetUnsafe(catalog_db_schemas_list, row);
+            ArrowArrayViewListChildOffset(catalog_db_schemas_list, row);
         const int64_t end_offset =
-            ArrowArrayViewGetOffsetUnsafe(catalog_db_schemas_list, row + 1);
-        ASSERT_GT(end_offset, start_offset)
-            << "Row " << row << " should have nonempty catalog_db_schemas";
+            ArrowArrayViewListChildOffset(catalog_db_schemas_list, row + 1);
+        ASSERT_GE(end_offset, start_offset)
+            << "Row " << row << " (Catalog "
+            << std::string(catalog_name.data, catalog_name.size_bytes)
+            << ") should have nonempty catalog_db_schemas ";
+        ASSERT_FALSE(ArrowArrayViewIsNull(catalog_db_schemas_list, row));
         for (int64_t list_index = start_offset; list_index < end_offset; list_index++) {
           ASSERT_TRUE(ArrowArrayViewIsNull(db_schema_tables_list, row + list_index))
               << "Row " << row << " should have null db_schema_tables";
@@ -545,9 +551,9 @@ void ConnectionTest::TestMetadataGetObjectsDbSchemas() {
             << "Row " << row << " should have non-null catalog_db_schemas";
 
         const int64_t start_offset =
-            ArrowArrayViewGetOffsetUnsafe(catalog_db_schemas_list, row);
+            ArrowArrayViewListChildOffset(catalog_db_schemas_list, row);
         const int64_t end_offset =
-            ArrowArrayViewGetOffsetUnsafe(catalog_db_schemas_list, row + 1);
+            ArrowArrayViewListChildOffset(catalog_db_schemas_list, row + 1);
         ASSERT_EQ(start_offset, end_offset);
       }
       ASSERT_NO_FATAL_FAILURE(reader.Next());
@@ -600,17 +606,17 @@ void ConnectionTest::TestMetadataGetObjectsTables() {
             << "Row " << row << " should have non-null catalog_db_schemas";
 
         for (int64_t db_schemas_index =
-                 ArrowArrayViewGetOffsetUnsafe(catalog_db_schemas_list, row);
+                 ArrowArrayViewListChildOffset(catalog_db_schemas_list, row);
              db_schemas_index <
-             ArrowArrayViewGetOffsetUnsafe(catalog_db_schemas_list, row + 1);
+             ArrowArrayViewListChildOffset(catalog_db_schemas_list, row + 1);
              db_schemas_index++) {
           ASSERT_FALSE(ArrowArrayViewIsNull(db_schema_tables_list, db_schemas_index))
               << "Row " << row << " should have non-null db_schema_tables";
 
           for (int64_t tables_index =
-                   ArrowArrayViewGetOffsetUnsafe(db_schema_tables_list, db_schemas_index);
+                   ArrowArrayViewListChildOffset(db_schema_tables_list, db_schemas_index);
                tables_index <
-               ArrowArrayViewGetOffsetUnsafe(db_schema_tables_list, db_schemas_index + 1);
+               ArrowArrayViewListChildOffset(db_schema_tables_list, db_schemas_index + 1);
                tables_index++) {
             ArrowStringView table_name = ArrowArrayViewGetStringUnsafe(
                 db_schema_tables->children[0], tables_index);
@@ -674,17 +680,17 @@ void ConnectionTest::TestMetadataGetObjectsTablesTypes() {
             << "Row " << row << " should have non-null catalog_db_schemas";
 
         for (int64_t db_schemas_index =
-                 ArrowArrayViewGetOffsetUnsafe(catalog_db_schemas_list, row);
+                 ArrowArrayViewListChildOffset(catalog_db_schemas_list, row);
              db_schemas_index <
-             ArrowArrayViewGetOffsetUnsafe(catalog_db_schemas_list, row + 1);
+             ArrowArrayViewListChildOffset(catalog_db_schemas_list, row + 1);
              db_schemas_index++) {
           ASSERT_FALSE(ArrowArrayViewIsNull(db_schema_tables_list, db_schemas_index))
               << "Row " << row << " should have non-null db_schema_tables";
 
-          for (int64_t tables_index = ArrowArrayViewGetOffsetUnsafe(
-                   db_schema_tables_list, row + db_schemas_index);
+          for (int64_t tables_index =
+                   ArrowArrayViewListChildOffset(db_schema_tables_list, db_schemas_index);
                tables_index <
-               ArrowArrayViewGetOffsetUnsafe(db_schema_tables_list, db_schemas_index + 1);
+               ArrowArrayViewListChildOffset(db_schema_tables_list, db_schemas_index + 1);
                tables_index++) {
             ArrowStringView table_name = ArrowArrayViewGetStringUnsafe(
                 db_schema_tables->children[0], tables_index);
@@ -771,17 +777,20 @@ void ConnectionTest::TestMetadataGetObjectsColumns() {
             << "Row " << row << " should have non-null catalog_db_schemas";
 
         for (int64_t db_schemas_index =
-                 ArrowArrayViewGetOffsetUnsafe(catalog_db_schemas_list, row);
+                 ArrowArrayViewListChildOffset(catalog_db_schemas_list, row);
              db_schemas_index <
-             ArrowArrayViewGetOffsetUnsafe(catalog_db_schemas_list, row + 1);
+             ArrowArrayViewListChildOffset(catalog_db_schemas_list, row + 1);
              db_schemas_index++) {
           ASSERT_FALSE(ArrowArrayViewIsNull(db_schema_tables_list, db_schemas_index))
               << "Row " << row << " should have non-null db_schema_tables";
 
+          ArrowStringView db_schema_name = ArrowArrayViewGetStringUnsafe(
+              catalog_db_schemas->children[0], db_schemas_index);
+
           for (int64_t tables_index =
-                   ArrowArrayViewGetOffsetUnsafe(db_schema_tables_list, db_schemas_index);
+                   ArrowArrayViewListChildOffset(db_schema_tables_list, db_schemas_index);
                tables_index <
-               ArrowArrayViewGetOffsetUnsafe(db_schema_tables_list, db_schemas_index + 1);
+               ArrowArrayViewListChildOffset(db_schema_tables_list, db_schemas_index + 1);
                tables_index++) {
             ArrowStringView table_name = ArrowArrayViewGetStringUnsafe(
                 db_schema_tables->children[0], tables_index);
@@ -792,13 +801,15 @@ void ConnectionTest::TestMetadataGetObjectsColumns() {
                 << "Row " << row << " should have non-null table_constraints";
 
             if (iequals(std::string(table_name.data, table_name.size_bytes),
-                        "bulk_ingest")) {
+                        "bulk_ingest") &&
+                iequals(std::string(db_schema_name.data, db_schema_name.size_bytes),
+                        quirks()->db_schema())) {
               found_expected_table = true;
 
               for (int64_t columns_index =
-                       ArrowArrayViewGetOffsetUnsafe(table_columns_list, tables_index);
+                       ArrowArrayViewListChildOffset(table_columns_list, tables_index);
                    columns_index <
-                   ArrowArrayViewGetOffsetUnsafe(table_columns_list, tables_index + 1);
+                   ArrowArrayViewListChildOffset(table_columns_list, tables_index + 1);
                    columns_index++) {
                 ArrowStringView name = ArrowArrayViewGetStringUnsafe(
                     table_columns->children[0], columns_index);
@@ -825,6 +836,79 @@ void ConnectionTest::TestMetadataGetObjectsColumns() {
 
 void ConnectionTest::TestMetadataGetObjectsConstraints() {
   // TODO: can't be done portably (need to create tables with primary keys and such)
+}
+
+void ConnectionTest::TestMetadataGetObjectsPrimaryKey() {
+  ASSERT_THAT(AdbcConnectionNew(&connection, &error), IsOkStatus(&error));
+  ASSERT_THAT(AdbcConnectionInit(&connection, &database, &error), IsOkStatus(&error));
+
+  if (!quirks()->supports_get_objects()) {
+    GTEST_SKIP();
+  }
+
+  std::optional<std::string> maybe_ddl = quirks()->PrimaryKeyTableDdl("adbc_pkey_test");
+  if (!maybe_ddl.has_value()) {
+    GTEST_SKIP();
+  }
+  std::string ddl = std::move(*maybe_ddl);
+
+  ASSERT_THAT(quirks()->DropTable(&connection, "adbc_pkey_test", &error),
+              IsOkStatus(&error));
+
+  {
+    Handle<AdbcStatement> statement;
+    ASSERT_THAT(AdbcStatementNew(&connection, &statement.value, &error),
+                IsOkStatus(&error));
+    ASSERT_THAT(AdbcStatementSetSqlQuery(&statement.value, ddl.c_str(), &error),
+                IsOkStatus(&error));
+    int64_t rows_affected = 0;
+    ASSERT_THAT(
+        AdbcStatementExecuteQuery(&statement.value, nullptr, &rows_affected, &error),
+        IsOkStatus(&error));
+  }
+
+  adbc_validation::StreamReader reader;
+  ASSERT_THAT(
+      AdbcConnectionGetObjects(&connection, ADBC_OBJECT_DEPTH_ALL, nullptr, nullptr,
+                               nullptr, nullptr, nullptr, &reader.stream.value, &error),
+      IsOkStatus(&error));
+  ASSERT_NO_FATAL_FAILURE(reader.GetSchema());
+  ASSERT_NO_FATAL_FAILURE(reader.Next());
+  ASSERT_NE(nullptr, reader.array->release);
+  ASSERT_GT(reader.array->length, 0);
+
+  auto get_objects_data = adbc_validation::GetObjectsReader{&reader.array_view.value};
+  ASSERT_NE(*get_objects_data, nullptr)
+      << "could not initialize the AdbcGetObjectsData object";
+
+  struct AdbcGetObjectsTable* table =
+      AdbcGetObjectsDataGetTableByName(*get_objects_data, quirks()->catalog().c_str(),
+                                       quirks()->db_schema().c_str(), "adbc_pkey_test");
+  ASSERT_NE(table, nullptr) << "could not find adbc_pkey_test table";
+
+  ASSERT_EQ(table->n_table_columns, 1);
+  struct AdbcGetObjectsColumn* column = AdbcGetObjectsDataGetColumnByName(
+      *get_objects_data, quirks()->catalog().c_str(), quirks()->db_schema().c_str(),
+      "adbc_pkey_test", "id");
+  ASSERT_NE(column, nullptr) << "could not find id column on adbc_pkey_test table";
+
+  ASSERT_EQ(table->n_table_constraints, 1)
+      << "expected 1 constraint on adbc_pkey_test table, found: "
+      << table->n_table_constraints;
+
+  struct AdbcGetObjectsConstraint* constraint = table->table_constraints[0];
+
+  std::string_view constraint_type(constraint->constraint_type.data,
+                                   constraint->constraint_type.size_bytes);
+  ASSERT_EQ(constraint_type, "PRIMARY KEY");
+  ASSERT_EQ(constraint->n_column_names, 1)
+      << "expected constraint adbc_pkey_test_pkey to be applied to 1 column, found: "
+      << constraint->n_column_names;
+
+  std::string_view constraint_column_name(
+      constraint->constraint_column_names[0].data,
+      constraint->constraint_column_names[0].size_bytes);
+  ASSERT_EQ(constraint_column_name, "id");
 }
 
 //------------------------------------------------------------
@@ -1248,11 +1332,10 @@ void StatementTest::TestSqlIngestSample() {
               IsOkStatus(&error));
 
   ASSERT_THAT(AdbcStatementNew(&connection, &statement, &error), IsOkStatus(&error));
-  ASSERT_THAT(
-      AdbcStatementSetSqlQuery(
-          &statement, "SELECT * FROM bulk_ingest ORDER BY \"int64s\" ASC NULLS FIRST",
-          &error),
-      IsOkStatus(&error));
+  ASSERT_THAT(AdbcStatementSetSqlQuery(
+                  &statement, "SELECT * FROM bulk_ingest ORDER BY int64s ASC NULLS FIRST",
+                  &error),
+              IsOkStatus(&error));
   StreamReader reader;
   ASSERT_THAT(AdbcStatementExecuteQuery(&statement, &reader.stream.value,
                                         &reader.rows_affected, &error),
@@ -1377,8 +1460,13 @@ void StatementTest::TestSqlPrepareSelectNoParams() {
   ASSERT_THAT(AdbcStatementExecuteQuery(&statement, &reader.stream.value,
                                         &reader.rows_affected, &error),
               IsOkStatus(&error));
-  ASSERT_THAT(reader.rows_affected,
-              ::testing::AnyOf(::testing::Eq(1), ::testing::Eq(-1)));
+  if (quirks()->supports_rows_affected()) {
+    ASSERT_THAT(reader.rows_affected,
+                ::testing::AnyOf(::testing::Eq(1), ::testing::Eq(-1)));
+  } else {
+    ASSERT_THAT(reader.rows_affected,
+                ::testing::Not(::testing::AnyOf(::testing::Eq(1), ::testing::Eq(-1))));
+  }
 
   ASSERT_NO_FATAL_FAILURE(reader.GetSchema());
   ASSERT_EQ(1, reader.schema->n_children);
@@ -1452,6 +1540,9 @@ void StatementTest::TestSqlPrepareSelectParams() {
 
     auto start = nrows;
     auto end = nrows + reader.array->length;
+
+    ASSERT_LT(start, expected_int32.size());
+    ASSERT_LE(end, expected_int32.size());
 
     switch (reader.fields[0].type) {
       case NANOARROW_TYPE_INT32:
@@ -1703,8 +1794,13 @@ void StatementTest::TestSqlQueryInts() {
     ASSERT_THAT(AdbcStatementExecuteQuery(&statement, &reader.stream.value,
                                           &reader.rows_affected, &error),
                 IsOkStatus(&error));
-    ASSERT_THAT(reader.rows_affected,
-                ::testing::AnyOf(::testing::Eq(1), ::testing::Eq(-1)));
+    if (quirks()->supports_rows_affected()) {
+      ASSERT_THAT(reader.rows_affected,
+                  ::testing::AnyOf(::testing::Eq(1), ::testing::Eq(-1)));
+    } else {
+      ASSERT_THAT(reader.rows_affected,
+                  ::testing::Not(::testing::AnyOf(::testing::Eq(1), ::testing::Eq(-1))));
+    }
 
     ASSERT_NO_FATAL_FAILURE(reader.GetSchema());
     ASSERT_EQ(1, reader.schema->n_children);
@@ -1744,8 +1840,13 @@ void StatementTest::TestSqlQueryFloats() {
     ASSERT_THAT(AdbcStatementExecuteQuery(&statement, &reader.stream.value,
                                           &reader.rows_affected, &error),
                 IsOkStatus(&error));
-    ASSERT_THAT(reader.rows_affected,
-                ::testing::AnyOf(::testing::Eq(1), ::testing::Eq(-1)));
+    if (quirks()->supports_rows_affected()) {
+      ASSERT_THAT(reader.rows_affected,
+                  ::testing::AnyOf(::testing::Eq(1), ::testing::Eq(-1)));
+    } else {
+      ASSERT_THAT(reader.rows_affected,
+                  ::testing::Not(::testing::AnyOf(::testing::Eq(1), ::testing::Eq(-1))));
+    }
 
     ASSERT_NO_FATAL_FAILURE(reader.GetSchema());
     ASSERT_EQ(1, reader.schema->n_children);
@@ -1787,8 +1888,13 @@ void StatementTest::TestSqlQueryStrings() {
     ASSERT_THAT(AdbcStatementExecuteQuery(&statement, &reader.stream.value,
                                           &reader.rows_affected, &error),
                 IsOkStatus(&error));
-    ASSERT_THAT(reader.rows_affected,
-                ::testing::AnyOf(::testing::Eq(1), ::testing::Eq(-1)));
+    if (quirks()->supports_rows_affected()) {
+      ASSERT_THAT(reader.rows_affected,
+                  ::testing::AnyOf(::testing::Eq(1), ::testing::Eq(-1)));
+    } else {
+      ASSERT_THAT(reader.rows_affected,
+                  ::testing::Not(::testing::AnyOf(::testing::Eq(1), ::testing::Eq(-1))));
+    }
 
     ASSERT_NO_FATAL_FAILURE(reader.GetSchema());
     ASSERT_EQ(1, reader.schema->n_children);
@@ -1801,6 +1907,7 @@ void StatementTest::TestSqlQueryStrings() {
     ASSERT_FALSE(ArrowArrayViewIsNull(&reader.array_view.value, 0));
     ASSERT_FALSE(ArrowArrayViewIsNull(reader.array_view->children[0], 0));
     switch (reader.fields[0].type) {
+      case NANOARROW_TYPE_LARGE_STRING:
       case NANOARROW_TYPE_STRING: {
         ASSERT_NO_FATAL_FAILURE(
             CompareArray<std::string>(reader.array_view->children[0], {"SaShiSuSeSo"}));

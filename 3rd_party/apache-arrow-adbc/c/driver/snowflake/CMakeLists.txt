@@ -33,6 +33,7 @@ add_go_lib("${REPOSITORY_ROOT}/go/adbc/pkg/snowflake/"
 
 include_directories(SYSTEM ${REPOSITORY_ROOT})
 include_directories(SYSTEM ${REPOSITORY_ROOT}/c/)
+include_directories(SYSTEM ${REPOSITORY_ROOT}/c/driver)
 include_directories(SYSTEM ${REPOSITORY_ROOT}/c/vendor)
 
 if(ADBC_TEST_LINKAGE STREQUAL "shared")
@@ -42,6 +43,7 @@ else()
 endif()
 
 if(ADBC_BUILD_TESTS)
+  include_directories(SYSTEM ${REPOSITORY_ROOT}/c/driver/common)
   add_test_case(driver_snowflake_test
                 PREFIX
                 adbc
@@ -49,9 +51,9 @@ if(ADBC_BUILD_TESTS)
                 driver-snowflake
                 SOURCES
                 snowflake_test.cc
-                ../../validation/adbc_validation.cc
-                ../../validation/adbc_validation_util.cc
                 EXTRA_LINK_LIBS
+                adbc_driver_common
+                adbc_validation
                 nanoarrow
                 ${TEST_LINK_LIBS})
   target_compile_features(adbc-driver-snowflake-test PRIVATE cxx_std_17)

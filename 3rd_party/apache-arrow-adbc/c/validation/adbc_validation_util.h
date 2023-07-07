@@ -31,6 +31,7 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 #include <nanoarrow/nanoarrow.h>
+#include "common/utils.h"
 
 namespace adbc_validation {
 
@@ -41,12 +42,6 @@ std::string StatusCodeToString(AdbcStatusCode code);
 std::string ToString(struct AdbcError* error);
 std::string ToString(struct ArrowError* error);
 std::string ToString(struct ArrowArrayStream* stream);
-
-// ------------------------------------------------------------
-// Nanoarrow helpers
-
-/// \brief Get the array offset for a particular index
-int64_t ArrowArrayViewGetOffsetUnsafe(struct ArrowArrayView* array_view, int64_t i);
 
 // ------------------------------------------------------------
 // Helper to manage C Data Interface/Nanoarrow resources with RAII
@@ -201,6 +196,26 @@ struct StreamReader {
     }
     return 0;
   }
+};
+
+/// \brief Read an AdbcGetInfoData struct with RAII safety
+struct GetObjectsReader {
+  explicit GetObjectsReader(struct ArrowArrayView* array_view) : array_view_(array_view) {
+    // TODO: this swallows any construction errors
+    get_objects_data_ = AdbcGetObjectsDataInit(array_view);
+  }
+  ~GetObjectsReader() { AdbcGetObjectsDataDelete(get_objects_data_); }
+
+  struct AdbcGetObjectsData* operator*() {
+    return get_objects_data_;
+  }
+  struct AdbcGetObjectsData* operator->() {
+    return get_objects_data_;
+  }
+
+ private:
+  struct ArrowArrayView* array_view_;
+  struct AdbcGetObjectsData* get_objects_data_;
 };
 
 struct SchemaField {

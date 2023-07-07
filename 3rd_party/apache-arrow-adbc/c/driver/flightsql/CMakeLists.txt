@@ -33,6 +33,7 @@ add_go_lib("${REPOSITORY_ROOT}/go/adbc/pkg/flightsql/"
 
 include_directories(SYSTEM ${REPOSITORY_ROOT})
 include_directories(SYSTEM ${REPOSITORY_ROOT}/c/)
+include_directories(SYSTEM ${REPOSITORY_ROOT}/c/driver)
 include_directories(SYSTEM ${REPOSITORY_ROOT}/c/vendor)
 
 if(ADBC_TEST_LINKAGE STREQUAL "shared")
@@ -50,9 +51,9 @@ if(ADBC_BUILD_TESTS)
                 SOURCES
                 dremio_flightsql_test.cc
                 sqlite_flightsql_test.cc
-                ../../validation/adbc_validation.cc
-                ../../validation/adbc_validation_util.cc
                 EXTRA_LINK_LIBS
+                adbc_driver_common
+                adbc_validation
                 nanoarrow
                 ${TEST_LINK_LIBS})
   target_compile_features(adbc-driver-flightsql-test PRIVATE cxx_std_17)

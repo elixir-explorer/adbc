@@ -49,7 +49,7 @@ add_arrow_lib(adbc_driver_sqlite
 include_directories(SYSTEM ${REPOSITORY_ROOT})
 include_directories(SYSTEM ${REPOSITORY_ROOT}/c/)
 include_directories(SYSTEM ${REPOSITORY_ROOT}/c/vendor)
-include_directories(SYSTEM ${REPOSITORY_ROOT}/c/driver/common)
+include_directories(SYSTEM ${REPOSITORY_ROOT}/c/driver)
 include_directories(SYSTEM ${SQLite3_INCLUDE_DIRS})
 
 foreach(LIB_TARGET ${ADBC_LIBRARIES})
@@ -70,10 +70,9 @@ if(ADBC_BUILD_TESTS)
                 driver-sqlite
                 SOURCES
                 sqlite_test.cc
-                ../../validation/adbc_validation.cc
-                ../../validation/adbc_validation_util.cc
                 EXTRA_LINK_LIBS
                 adbc_driver_common
+                adbc_validation
                 nanoarrow
                 ${TEST_LINK_LIBS})
   target_compile_features(adbc-driver-sqlite-test PRIVATE cxx_std_17)

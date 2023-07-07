@@ -64,7 +64,17 @@ class SqliteQuirks : public adbc_validation::DriverQuirks {
     }
   }
 
+  std::optional<std::string> PrimaryKeyTableDdl(std::string_view name) const override {
+    std::string ddl = "CREATE TABLE ";
+    ddl += name;
+    ddl += " (id INTEGER PRIMARY KEY)";
+    return ddl;
+  }
+
   bool supports_concurrent_statements() const override { return true; }
+
+  std::string catalog() const override { return "main"; }
+  std::string db_schema() const override { return ""; }
 };
 
 class SqliteDatabaseTest : public ::testing::Test, public adbc_validation::DatabaseTest {
@@ -89,6 +99,68 @@ class SqliteConnectionTest : public ::testing::Test,
   SqliteQuirks quirks_;
 };
 ADBCV_TEST_CONNECTION(SqliteConnectionTest)
+
+TEST_F(SqliteConnectionTest, GetInfoMetadata) {
+  ASSERT_THAT(AdbcConnectionNew(&connection, &error),
+              adbc_validation::IsOkStatus(&error));
+  ASSERT_THAT(AdbcConnectionInit(&connection, &database, &error),
+              adbc_validation::IsOkStatus(&error));
+
+  adbc_validation::StreamReader reader;
+  std::vector<uint32_t> info = {
+      ADBC_INFO_DRIVER_NAME,
+      ADBC_INFO_DRIVER_VERSION,
+      ADBC_INFO_VENDOR_NAME,
+      ADBC_INFO_VENDOR_VERSION,
+  };
+  ASSERT_THAT(AdbcConnectionGetInfo(&connection, info.data(), info.size(),
+                                    &reader.stream.value, &error),
+              adbc_validation::IsOkStatus(&error));
+  ASSERT_NO_FATAL_FAILURE(reader.GetSchema());
+
+  std::vector<uint32_t> seen;
+  while (true) {
+    ASSERT_NO_FATAL_FAILURE(reader.Next());
+    if (!reader.array->release) break;
+
+    for (int64_t row = 0; row < reader.array->length; row++) {
+      ASSERT_FALSE(ArrowArrayViewIsNull(reader.array_view->children[0], row));
+      const uint32_t code =
+          reader.array_view->children[0]->buffer_views[1].data.as_uint32[row];
+      seen.push_back(code);
+
+      int str_child_index = 0;
+      struct ArrowArrayView* str_child =
+          reader.array_view->children[1]->children[str_child_index];
+      switch (code) {
+        case ADBC_INFO_DRIVER_NAME: {
+          ArrowStringView val = ArrowArrayViewGetStringUnsafe(str_child, 0);
+          EXPECT_EQ("ADBC SQLite Driver", std::string(val.data, val.size_bytes));
+          break;
+        }
+        case ADBC_INFO_DRIVER_VERSION: {
+          ArrowStringView val = ArrowArrayViewGetStringUnsafe(str_child, 1);
+          EXPECT_EQ("(unknown)", std::string(val.data, val.size_bytes));
+          break;
+        }
+        case ADBC_INFO_VENDOR_NAME: {
+          ArrowStringView val = ArrowArrayViewGetStringUnsafe(str_child, 2);
+          EXPECT_EQ("SQLite", std::string(val.data, val.size_bytes));
+          break;
+        }
+        case ADBC_INFO_VENDOR_VERSION: {
+          ArrowStringView val = ArrowArrayViewGetStringUnsafe(str_child, 3);
+          EXPECT_THAT(std::string(val.data, val.size_bytes),
+                      ::testing::MatchesRegex("3\\..*"));
+        }
+        default:
+          // Ignored
+          break;
+      }
+    }
+  }
+  ASSERT_THAT(seen, ::testing::UnorderedElementsAreArray(info));
+}
 
 class SqliteStatementTest : public ::testing::Test,
                             public adbc_validation::StatementTest {
@@ -472,6 +544,47 @@ TEST_F(SqliteReaderTest, InferTypedParams) {
   ASSERT_THAT(reader.stream->get_last_error(&reader.stream.value),
               ::testing::HasSubstr(
                   "[SQLite] Type mismatch in column 0: expected INT64 but got DOUBLE"));
+}
+
+TEST_F(SqliteReaderTest, MultiValueParams) {
+  // Regression test for apache/arrow-adbc#734
+  adbc_validation::StreamReader reader;
+  Handle<struct ArrowSchema> schema;
+  Handle<struct ArrowArray> batch;
+
+  ASSERT_NO_FATAL_FAILURE(Exec("CREATE TABLE foo (col)"));
+  ASSERT_NO_FATAL_FAILURE(
+      Exec("INSERT INTO foo VALUES (1), (2), (2), (3), (3), (3), (4), (4), (4), (4)"));
+
+  ASSERT_THAT(adbc_validation::MakeSchema(&schema.value, {{"", NANOARROW_TYPE_INT64}}),
+              IsOkErrno());
+  ASSERT_THAT(adbc_validation::MakeBatch<int64_t>(&schema.value, &batch.value,
+                                                  /*error=*/nullptr, {4, 1, 3, 2}),
+              IsOkErrno());
+
+  ASSERT_NO_FATAL_FAILURE(Bind(&batch.value, &schema.value));
+  ASSERT_NO_FATAL_FAILURE(
+      Exec("SELECT col FROM foo WHERE col = ?", /*infer_rows=*/3, &reader));
+  ASSERT_EQ(1, reader.schema->n_children);
+  ASSERT_EQ(NANOARROW_TYPE_INT64, reader.fields[0].type);
+
+  ASSERT_NO_FATAL_FAILURE(reader.Next());
+  ASSERT_NO_FATAL_FAILURE(
+      CompareArray<int64_t>(reader.array_view->children[0], {4, 4, 4}));
+
+  ASSERT_NO_FATAL_FAILURE(reader.Next());
+  ASSERT_NO_FATAL_FAILURE(
+      CompareArray<int64_t>(reader.array_view->children[0], {4, 1, 3}));
+
+  ASSERT_NO_FATAL_FAILURE(reader.Next());
+  ASSERT_NO_FATAL_FAILURE(
+      CompareArray<int64_t>(reader.array_view->children[0], {3, 3, 2}));
+
+  ASSERT_NO_FATAL_FAILURE(reader.Next());
+  ASSERT_NO_FATAL_FAILURE(CompareArray<int64_t>(reader.array_view->children[0], {2}));
+
+  ASSERT_NO_FATAL_FAILURE(reader.Next());
+  ASSERT_EQ(nullptr, reader.array->release);
 }
 
 template <typename CType>

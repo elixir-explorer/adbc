@@ -33,7 +33,7 @@ add_arrow_lib(adbc_driver_manager
 include_directories(SYSTEM ${REPOSITORY_ROOT})
 include_directories(SYSTEM ${REPOSITORY_ROOT}/c/)
 include_directories(SYSTEM ${REPOSITORY_ROOT}/c/vendor)
-include_directories(SYSTEM ${REPOSITORY_ROOT}/c/driver/common)
+include_directories(SYSTEM ${REPOSITORY_ROOT}/c/driver)
 
 foreach(LIB_TARGET ${ADBC_LIBRARIES})
   target_compile_definitions(${LIB_TARGET} PRIVATE ADBC_EXPORTING)
@@ -58,6 +58,7 @@ if(ADBC_BUILD_TESTS)
                 ../validation/adbc_validation.cc
                 ../validation/adbc_validation_util.cc
                 EXTRA_LINK_LIBS
+                adbc_driver_common
                 nanoarrow
                 ${TEST_LINK_LIBS})
   target_compile_features(adbc-driver-manager-test PRIVATE cxx_std_17)

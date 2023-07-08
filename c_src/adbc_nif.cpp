@@ -441,9 +441,14 @@ int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct 
         } else {
             format_processed = false;
         }
-    } else if (format_len >= 4) {
+    } else if (format_len >= 3) {
         if (strncmp("+w:", format, 3) == 0) {
             children_term = get_arrow_array_list_children(env, schema, values, level);
+        } else if (format_len > 3 && strncmp("w:", format, 2) == 0) {
+            if (get_arrow_array_children_as_list(env, schema, values, level, children, error) == 1) {
+                return 1;
+            }
+            children_term = enif_make_list_from_array(env, children.data(), (unsigned)schema->n_children); 
         } else if (format_len > 4 && (strncmp("+ud:", format, 4) == 0 || strncmp("+us:", format, 4) == 0)) {
             children_term = get_arrow_array_union_children(env, schema, values, level);
         } else {

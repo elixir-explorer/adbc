@@ -57,7 +57,7 @@ defmodule Adbc.Connection.Test do
              {"int64_value", []},
              {"int32_bitmask", []},
              {"string_list", [{"item", []}]},
-             {"int32_to_int32_list_map", [[{"key", []}, {"value", [{"item", []}]}]]}
+             {"int32_to_int32_list_map", %{}}
            ]
          }
        }} = Connection.get_info(conn)
@@ -77,7 +77,7 @@ defmodule Adbc.Connection.Test do
              {"int64_value", []},
              {"int32_bitmask", []},
              {"string_list", [{"item", []}]},
-             {"int32_to_int32_list_map", [[{"key", []}, {"value", [{"item", []}]}]]}
+             {"int32_to_int32_list_map", %{}}
            ]
          }
        }} = Connection.get_info(conn, [0])

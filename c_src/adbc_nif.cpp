@@ -96,7 +96,101 @@ template <typename M> static ERL_NIF_TERM strings_from_buffer(
     return enif_make_list_from_array(env, values.data(), (unsigned)values.size());
 }
 
-static ERL_NIF_TERM arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct ArrowArray * values, uint64_t level) {
+static ERL_NIF_TERM arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct ArrowArray * values, uint64_t level);
+
+static int get_arrow_array_children_as_list(ErlNifEnv *env, struct ArrowSchema * schema, struct ArrowArray * values, uint64_t level, std::vector<ERL_NIF_TERM> &children, ERL_NIF_TERM &error) {
+    ERL_NIF_TERM children_term{};
+    if (schema->n_children > 0 && schema->children == nullptr) {
+        error = erlang::nif::error(env, "invalid ArrowSchema, schema->children == nullptr, however, schema->n_children > 0");
+        return 1;
+    }
+    if (values->n_children > 0 && values->children == nullptr) {
+        error =  erlang::nif::error(env, "invalid ArrowArray, values->children == nullptr, however, values->n_children > 0");
+        return 1;
+    }
+    if (values->n_children != schema->n_children) {
+        error =  erlang::nif::error(env, "invalid ArrowArray or ArrowSchema, values->n_children != schema->n_children");
+        return 1;
+    }
+
+    children.reserve(schema->n_children);
+    if (schema->n_children > 0) {
+        for (int64_t child_i = 0; child_i < schema->n_children; child_i++) {
+            struct ArrowSchema * child_schema = schema->children[child_i];
+            struct ArrowArray * child_values = values->children[child_i];
+            children[child_i] = arrow_array_to_nif_term(env, child_schema, child_values, level + 1);
+        }   
+    }
+    // children_term = enif_make_list_from_array(env, children.data(), (unsigned)schema->n_children);
+
+    return 0;
+}
+
+static ERL_NIF_TERM get_arrow_array_map_children(ErlNifEnv *env, struct ArrowSchema * schema, struct ArrowArray * values, uint64_t level) {
+    // From https://arrow.apache.org/docs/format/CDataInterface.html#data-type-description-format-strings
+    //
+    //   As specified in the Arrow columnar format, the map type has a single child type named entries, 
+    //   itself a 2-child struct type of (key, value).
+
+    ERL_NIF_TERM error{}, map_out{};
+    if (schema->children == nullptr) {
+        return erlang::nif::error(env, "invalid ArrowSchema (map), schema->children == nullptr");
+    }
+    if (schema->n_children != 1) {
+        return erlang::nif::error(env, "invalid ArrowSchema (map), schema->n_children != 1");
+    }
+    if (values->children == nullptr) {
+        return erlang::nif::error(env, "invalid ArrowArray (map), values->children == nullptr");
+    }
+    if (schema->n_children != 1) {
+        return erlang::nif::error(env, "invalid ArrowArray (map), values->n_children != 1");
+    }
+
+    struct ArrowSchema * entries_schema = schema->children[0];
+    struct ArrowArray * entries_values = values->children[0];
+    if (strncmp("entries", entries_schema->name, 7) != 0) {
+        return erlang::nif::error(env, "invalid ArrowSchema (map), its single child is not named entries");
+    }
+
+    printf("entries_values->n_children: %d\r\n", entries_values->n_children);
+    std::vector<ERL_NIF_TERM> nif_keys, nif_values;
+    bool failed = false;
+    for (int64_t child_i = 0; child_i < entries_values->n_children; child_i++) {
+        struct ArrowSchema * entry_schema = entries_schema->children[child_i];
+        struct ArrowArray * entry_values = entries_values->children[child_i];
+        if (strncmp("key", entry_schema->name, 3) == 0) {
+            if (get_arrow_array_children_as_list(env, entry_schema, entry_values, level + 1, nif_keys, error) == 1) {
+                failed = true;
+                break;
+            }
+        } else if (strncmp("value", entry_schema->name, 5) == 0 && entry_schema->n_children == 1) {
+            struct ArrowSchema * item_schema = entry_schema->children[0];
+            struct ArrowArray * item_values = entry_values->children[0];
+            if (get_arrow_array_children_as_list(env, item_schema, item_values, level + 1, nif_values, error) == 1) {
+                failed = true;
+                break;
+            }
+        } else {
+            failed = true;
+        }
+    }
+
+    if (!failed) {
+        if (nif_keys.size() != nif_values.size()) {
+            return erlang::nif::error(env, "map contains duplicated keys");
+        }
+
+        if (!enif_make_map_from_arrays(env, nif_keys.data(), nif_values.data(), (unsigned)nif_keys.size(), &map_out)) {
+            return erlang::nif::error(env, "map contains duplicated keys");
+        } else {
+            return map_out;
+        }
+    } else {
+        return erlang::nif::error(env, "invalid map");
+    }
+}
+
+ERL_NIF_TERM arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct ArrowArray * values, uint64_t level) {
     if (schema == nullptr) {
         return erlang::nif::error(env, "invalid ArrowSchema (nullptr) when invoking next");
     }
@@ -107,31 +201,8 @@ static ERL_NIF_TERM arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema *
     const char* format = schema->format ? schema->format : "";
     const char* name = schema->name ? schema->name : "";
 
-    ERL_NIF_TERM children_term{};
-    if (schema->n_children > 0 && schema->children == nullptr) {
-        return erlang::nif::error(env, "invalid ArrowSchema, schema->children == nullptr, however, schema->n_children > 0");
-    }
-    if (values->n_children > 0 && values->children == nullptr) {
-        return erlang::nif::error(env, "invalid ArrowArray, values->children == nullptr, however, values->n_children > 0");
-    }
-    if (values->n_children != schema->n_children) {
-        return erlang::nif::error(env, "invalid ArrowArray or ArrowSchema, values->n_children != schema->n_children");
-    }
-
+    ERL_NIF_TERM current_term{}, children_term{}, error{};
     std::vector<ERL_NIF_TERM> children;
-    if (schema->n_children > 0) {
-        children.reserve(schema->n_children);
-        for (int64_t child_i = 0; child_i < schema->n_children; child_i++) {
-            struct ArrowSchema * child_schema = schema->children[child_i];
-            struct ArrowArray * child_values = values->children[child_i];
-            children[child_i] = arrow_array_to_nif_term(env, child_schema, child_values, level + 1);
-        }
-        children_term = enif_make_list_from_array(env, children.data(), (unsigned)schema->n_children);
-    } else {
-        children_term = enif_make_list_from_array(env, nullptr, 0);
-    }
-
-    ERL_NIF_TERM current_term{};
 
     bool has_validity_bitmap = values->null_count != 0 && values->null_count != -1;
     const uint8_t * bitmap_buffer = nullptr;
@@ -270,20 +341,40 @@ static ERL_NIF_TERM arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema *
         if (strncmp("+s", format, 2) == 0) {
             // only handle and return children if this is a struct
             is_struct = true;
+            if (get_arrow_array_children_as_list(env, schema, values, level, children, error) == 1) {
+                return error;
+            }
+            children_term = enif_make_list_from_array(env, children.data(), (unsigned)schema->n_children); 
+            //get_arrow_array_children_as_list(env, schema, values, level, children, error);
         } else if (strncmp("+m", format, 2) == 0) {
-            // only handle and return children if this is a struct
-            // is_struct = true;
-
+            // if (get_arrow_array_children_as_list(env, schema, values, level, children, error) == 1) {
+            //     return error;
+            // }
+            // children_term = enif_make_list_from_array(env, children.data(), (unsigned)schema->n_children); 
+            children_term = get_arrow_array_map_children(env, schema, values, level);
         } else if (strncmp("+l", format, 2) == 0 || strncmp("+L", format, 2) == 0) {
-            current_term = children_term;
+            if (get_arrow_array_children_as_list(env, schema, values, level, children, error) == 1) {
+                return error;
+            }
+            children_term = enif_make_list_from_array(env, children.data(), (unsigned)schema->n_children); 
+            // children_term = get_arrow_array_children_as_list(env, schema, values, level);
         } else {
             format_processed = false;
         }
     } else if (format_len >= 4) {
         if (strncmp("+w:", format, 3) == 0) {
-            current_term = children_term;
+            if (get_arrow_array_children_as_list(env, schema, values, level, children, error) == 1) {
+                return error;
+            }
+            children_term = enif_make_list_from_array(env, children.data(), (unsigned)schema->n_children); 
+            // children_term = get_arrow_array_children_as_list(env, schema, values, level);
         } else if (format_len > 4 && (strncmp("+ud:", format, 4) == 0 || strncmp("+us:", format, 4) == 0)) {
-            current_term = children_term;
+            // todo: get as map
+            if (get_arrow_array_children_as_list(env, schema, values, level, children, error) == 1) {
+                return error;
+            }
+            children_term = enif_make_list_from_array(env, children.data(), (unsigned)schema->n_children); 
+            // children_term = get_arrow_array_children_as_list(env, schema, values, level);
         } else {
             format_processed = false;
         }

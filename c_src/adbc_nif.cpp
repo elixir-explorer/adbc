@@ -118,15 +118,18 @@ static ERL_NIF_TERM arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema *
         return erlang::nif::error(env, "invalid ArrowArray or ArrowSchema, values->n_children != schema->n_children");
     }
 
-    std::vector<ERL_NIF_TERM> children(schema->n_children < 0 ? 0 : schema->n_children);
+    std::vector<ERL_NIF_TERM> children;
     if (schema->n_children > 0) {
+        children.reserve(schema->n_children);
         for (int64_t child_i = 0; child_i < schema->n_children; child_i++) {
             struct ArrowSchema * child_schema = schema->children[child_i];
             struct ArrowArray * child_values = values->children[child_i];
             children[child_i] = arrow_array_to_nif_term(env, child_schema, child_values, level + 1);
         }
+        children_term = enif_make_list_from_array(env, children.data(), (unsigned)schema->n_children);
+    } else {
+        children_term = enif_make_list_from_array(env, nullptr, 0);
     }
-    children_term = enif_make_list_from_array(env, children.data(), (unsigned)schema->n_children);
 
     ERL_NIF_TERM current_term{};
 
@@ -141,115 +144,157 @@ static ERL_NIF_TERM arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema *
     }
 
     bool is_struct = false;
-    if (strncmp("l", format, 1) == 0) {
-        using value_type = int64_t;
-        current_term = values_from_buffer(
-            env,
-            values->length,
-            bitmap_buffer,
-            (const value_type *)values->buffers[1],
-            enif_make_int64
-        );
-    } else if (strncmp("c", format, 1) == 0) {
-        using value_type = int8_t;
-        current_term = values_from_buffer(
-            env,
-            values->length,
-            bitmap_buffer,
-            (const value_type *)values->buffers[1],
-            enif_make_int64
-        );
-    } else if (strncmp("s", format, 1) == 0) {
-        using value_type = int16_t;
-        current_term = values_from_buffer(
-            env,
-            values->length,
-            bitmap_buffer,
-            (const value_type *)values->buffers[1],
-            enif_make_int64
-        );
-    } else if (strncmp("i", format, 1) == 0) {
-        using value_type = int32_t;
-        current_term = values_from_buffer(
-            env,
-            values->length,
-            bitmap_buffer,
-            (const value_type *)values->buffers[1],
-            enif_make_int64
-        );
-    } else if (strncmp("L", format, 1) == 0) {
-        using value_type = uint64_t;
-        current_term = values_from_buffer(
-            env,
-            values->length,
-            bitmap_buffer,
-            (const value_type *)values->buffers[1],
-            enif_make_uint64
-        );
-    } else if (strncmp("C", format, 1) == 0) {
-        using value_type = uint8_t;
-        current_term = values_from_buffer(
-            env,
-            values->length,
-            bitmap_buffer,
-            (const value_type *)values->buffers[1],
-            enif_make_uint64
-        );
-    } else if (strncmp("S", format, 1) == 0) {
-        using value_type = uint16_t;
-        current_term = values_from_buffer(
-            env,
-            values->length,
-            bitmap_buffer,
-            (const value_type *)values->buffers[1],
-            enif_make_uint64
-        );
-    } else if (strncmp("I", format, 1) == 0) {
-        using value_type = uint32_t;
-        current_term = values_from_buffer(
-            env,
-            values->length,
-            bitmap_buffer,
-            (const value_type *)values->buffers[1],
-            enif_make_uint64
-        );
-    } else if (strncmp("f", format, 1) == 0) {
-        using value_type = float;
-        current_term = values_from_buffer(
-            env,
-            values->length,
-            bitmap_buffer,
-            (const value_type *)values->buffers[1],
-            enif_make_double
-        );
-    } else if (strncmp("g", format, 1) == 0) {
-        using value_type = double;
-        current_term = values_from_buffer(
-            env,
-            values->length,
-            bitmap_buffer,
-            (const value_type *)values->buffers[1],
-            enif_make_double
-        );
-    } else if (strncmp("u", format, 1) == 0) {
-        int64_t length = values->length;
-        current_term = strings_from_buffer(
-            env,
-            values->length,
-            bitmap_buffer,
-            offsets_buffer,
-            (const uint8_t *)values->buffers[2],
-            [](ErlNifEnv *env, const uint8_t * string_buffers, int32_t offset, size_t nbytes) -> ERL_NIF_TERM {
-                return erlang::nif::make_binary(env, (const char *)(string_buffers + offset), nbytes);
-            }
-        );
-    } else if (strncmp("+s", format, 1) == 0) {
-        // only handle and return children if this is a struct
-        is_struct = true;
+    size_t format_len = strlen(format);
+    bool format_processed = true;
+    if (format_len == 1) {
+        if (format[0] == 'l') {
+            using value_type = int64_t;
+            current_term = values_from_buffer(
+                env,
+                values->length,
+                bitmap_buffer,
+                (const value_type *)values->buffers[1],
+                enif_make_int64
+            );
+        } else if (format[0] == 'c') {
+            using value_type = int8_t;
+            current_term = values_from_buffer(
+                env,
+                values->length,
+                bitmap_buffer,
+                (const value_type *)values->buffers[1],
+                enif_make_int64
+            );
+        } else if (format[0] == 's') {
+            using value_type = int16_t;
+            current_term = values_from_buffer(
+                env,
+                values->length,
+                bitmap_buffer,
+                (const value_type *)values->buffers[1],
+                enif_make_int64
+            );
+        } else if (format[0] == 'i') {
+            using value_type = int32_t;
+            current_term = values_from_buffer(
+                env,
+                values->length,
+                bitmap_buffer,
+                (const value_type *)values->buffers[1],
+                enif_make_int64
+            );
+        } else if (format[0] == 'L') {
+            using value_type = uint64_t;
+            current_term = values_from_buffer(
+                env,
+                values->length,
+                bitmap_buffer,
+                (const value_type *)values->buffers[1],
+                enif_make_uint64
+            );
+        } else if (format[0] == 'C') {
+            using value_type = uint8_t;
+            current_term = values_from_buffer(
+                env,
+                values->length,
+                bitmap_buffer,
+                (const value_type *)values->buffers[1],
+                enif_make_uint64
+            );
+        } else if (format[0] == 'S') {
+            using value_type = uint16_t;
+            current_term = values_from_buffer(
+                env,
+                values->length,
+                bitmap_buffer,
+                (const value_type *)values->buffers[1],
+                enif_make_uint64
+            );
+        } else if (format[0] == 'I') {
+            using value_type = uint32_t;
+            current_term = values_from_buffer(
+                env,
+                values->length,
+                bitmap_buffer,
+                (const value_type *)values->buffers[1],
+                enif_make_uint64
+            );
+        } else if (format[0] == 'f') {
+            using value_type = float;
+            current_term = values_from_buffer(
+                env,
+                values->length,
+                bitmap_buffer,
+                (const value_type *)values->buffers[1],
+                enif_make_double
+            );
+        } else if (format[0] == 'g') {
+            using value_type = double;
+            current_term = values_from_buffer(
+                env,
+                values->length,
+                bitmap_buffer,
+                (const value_type *)values->buffers[1],
+                enif_make_double
+            );
+        } else if (format[0] == 'b') {
+            using value_type = bool;
+            current_term = values_from_buffer(
+                env,
+                values->length,
+                bitmap_buffer,
+                (const value_type *)values->buffers[1],
+                [](ErlNifEnv *env, bool val) -> ERL_NIF_TERM {
+                    if (val) {
+                        return erlang::nif::atom(env, "true");
+                    }
+                    return erlang::nif::atom(env, "false");
+                }
+            );
+        } else if (format[0] == 'u' || format[0] == 'U' || format[0] == 'z' || format[0] == 'Z') {
+            int64_t length = values->length;
+            current_term = strings_from_buffer(
+                env,
+                values->length,
+                bitmap_buffer,
+                offsets_buffer,
+                (const uint8_t *)values->buffers[2],
+                [](ErlNifEnv *env, const uint8_t * string_buffers, int32_t offset, size_t nbytes) -> ERL_NIF_TERM {
+                    return erlang::nif::make_binary(env, (const char *)(string_buffers + offset), nbytes);
+                }
+            );
+        } else {
+            format_processed = false;
+        }
+    } else if (format_len == 2) {
+        if (strncmp("+s", format, 2) == 0) {
+            // only handle and return children if this is a struct
+            is_struct = true;
+        } else if (strncmp("+m", format, 2) == 0) {
+            // only handle and return children if this is a struct
+            // is_struct = true;
+
+        } else if (strncmp("+l", format, 2) == 0 || strncmp("+L", format, 2) == 0) {
+            current_term = children_term;
+        } else {
+            format_processed = false;
+        }
+    } else if (format_len >= 4) {
+        if (strncmp("+w:", format, 3) == 0) {
+            current_term = children_term;
+        } else if (format_len > 4 && (strncmp("+ud:", format, 4) == 0 || strncmp("+us:", format, 4) == 0)) {
+            current_term = children_term;
+        } else {
+            format_processed = false;
+        }
     } else {
+        format_processed = false;
+    }
+
+    if (!format_processed) {
         char buf[256] = { '\0' };
-        snprintf(buf, 256, "not implemented for format: `%s`", schema->format);
-        children_term = erlang::nif::error(env, buf);
+        snprintf(buf, 255, "not implemented for format: `%s`", schema->format);
+        children_term = erlang::nif::error(env, erlang::nif::make_binary(env, buf));
         // printf("not implemented for format: `%s`\r\n", schema->format);
         // printf("length: %lld\r\n", values->length);
         // printf("null_count: %lld\r\n", values->null_count);
@@ -489,7 +534,7 @@ static ERL_NIF_TERM adbc_connection_get_info(ErlNifEnv *env, int argc, const ERL
     }
 
     ERL_NIF_TERM ret = array_stream->make_resource(env);
-    return enif_make_tuple2(env, erlang::nif::ok(env), ret);
+    return erlang::nif::ok(env, ret);
 }
 
 static ERL_NIF_TERM adbc_connection_get_objects(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {

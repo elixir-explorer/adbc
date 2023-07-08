@@ -41,16 +41,46 @@ defmodule Adbc.Connection.Test do
   end
 
   describe "get_info" do
-    @tag skip: "fails with bad tag"
     test "get all info from a connection", %{db: db} do
       conn = start_supervised!({Connection, database: db})
-      {:ok, :done} = Connection.get_info(conn)
+
+      {:ok,
+       %Adbc.Result{
+         num_rows: nil,
+         data: %{
+           "info_name" => [0, 1, 100, 101, 102],
+           "info_value" => [
+             {"string_value",
+              # ["SQLite", "3.39.2", "ADBC SQLite Driver", "(unknown)", "0.2.0-SNAPSHOT"]},
+              ["SQLite", _, "ADBC SQLite Driver", _, _]},
+             {"bool_value", []},
+             {"int64_value", []},
+             {"int32_bitmask", []},
+             {"string_list", [{"item", []}]},
+             {"int32_to_int32_list_map", [[{"key", []}, {"value", [{"item", []}]}]]}
+           ]
+         }
+       }} = Connection.get_info(conn)
     end
 
-    @tag skip: "fails with bad tag"
     test "get some info from a connection", %{db: db} do
       conn = start_supervised!({Connection, database: db})
-      {:ok, :done} = Connection.get_info(conn, [1])
+
+      {:ok,
+       %Adbc.Result{
+         num_rows: nil,
+         data: %{
+           "info_name" => [0],
+           "info_value" => [
+             {"string_value", ["SQLite"]},
+             {"bool_value", []},
+             {"int64_value", []},
+             {"int32_bitmask", []},
+             {"string_list", [{"item", []}]},
+             {"int32_to_int32_list_map", [[{"key", []}, {"value", [{"item", []}]}]]}
+           ]
+         }
+       }} = Connection.get_info(conn, [0])
     end
   end
 

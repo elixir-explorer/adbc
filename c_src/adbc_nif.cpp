@@ -460,8 +460,9 @@ int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct 
 
     if (!format_processed) {
         char buf[256] = { '\0' };
-        snprintf(buf, 255, "not implemented for format: `%s`", schema->format);
-        children_term = erlang::nif::error(env, erlang::nif::make_binary(env, buf));
+        snprintf(buf, 255, "not yet implemented for format: `%s`", schema->format);
+        error = erlang::nif::error(env, erlang::nif::make_binary(env, buf));
+        return 1;
         // printf("not implemented for format: `%s`\r\n", schema->format);
         // printf("length: %lld\r\n", values->length);
         // printf("null_count: %lld\r\n", values->null_count);

@@ -3,10 +3,6 @@ defmodule Adbc.Connection do
   Documentation for `Adbc.Connection`.
   """
 
-  # TODO: Driver download idempotent/cache
-  # TODO: Documentation everywhere (including options)
-  # TODO: Tests with postgresql
-
   @type t :: GenServer.server()
   @type result_set :: Adbc.Result.t()
 

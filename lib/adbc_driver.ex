@@ -14,6 +14,7 @@ defmodule Adbc.Driver do
     ignore_proxy = opts[:ignore_proxy] || false
 
     with {:ok, triplet} <- current_triplet(),
+         :missing <- driver_status(driver_name, version, triplet),
          {:ok, wheel} <- driver_wheel(driver_name, version, triplet),
          url = base_url <> version <> "/" <> wheel,
          {:ok, cache_path} <- cached_download(url, ignore_proxy, driver_name, version, triplet) do
@@ -23,6 +24,14 @@ defmodule Adbc.Driver do
 
   defp current_triplet do
     current_target(:os.type())
+  end
+
+  defp driver_status(driver_name, version, triplet) do
+    if File.exists?(adbc_driver_so(driver_name, version, triplet)) do
+      :ok
+    else
+      :missing
+    end
   end
 
   defp current_target({:win32, _}) do
@@ -148,11 +157,7 @@ defmodule Adbc.Driver do
 
     case current_triplet() do
       {:ok, triplet} ->
-        expected_filepath =
-          Path.join(
-            adbc_so_priv_dir(),
-            "#{triplet}-#{version}-libadbc_driver_#{driver_name}.so"
-          )
+        expected_filepath = adbc_driver_so(driver_name, version, triplet)
 
         if File.exists?(expected_filepath) do
           {:ok, expected_filepath}
@@ -168,6 +173,13 @@ defmodule Adbc.Driver do
 
   def so_path(driver_name, _opts) do
     {:error, "unknown driver #{inspect(driver_name)}"}
+  end
+
+  defp adbc_driver_so(driver_name, version, triplet) do
+    Path.join(
+      adbc_so_priv_dir(),
+      "#{triplet}-#{version}-libadbc_driver_#{driver_name}.so"
+    )
   end
 
   defp adbc_so_priv_dir do

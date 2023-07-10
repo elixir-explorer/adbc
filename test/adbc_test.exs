@@ -16,7 +16,9 @@ defmodule AdbcTest do
 
     test "runs queries" do
       db =
-        start_supervised!({Database, driver: :postgresql, uri: "postgres://postgres@localhost"})
+        start_supervised!(
+          {Database, driver: :postgresql, uri: "postgres://postgres:postgres@localhost"}
+        )
 
       conn = start_supervised!({Connection, database: db})
 

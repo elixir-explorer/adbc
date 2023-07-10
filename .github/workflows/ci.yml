@@ -51,6 +51,7 @@ jobs:
           arch: x64
 
       - name: Compile and Test
+        timeout-minutes: 5
         shell: bash
         run: |
           mix deps.get

@@ -21,6 +21,17 @@ jobs:
     env:
       MIX_ENV: test
 
+    services:
+      pg:
+        image: postgres:11
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5
+
     steps:
       - uses: actions/checkout@v3
       - uses: erlef/setup-beam@v1
@@ -55,7 +66,7 @@ jobs:
         shell: bash
         run: |
           mix deps.get
-          mix test
+          mix test --exclude postgresql
 
   macos:
     if: "!contains(github.event.pull_request.labels.*.name, 'skip ci')"
@@ -75,4 +86,4 @@ jobs:
       - name: Compile and Test
         run: |
           mix deps.get
-          mix test
+          mix test --exclude postgresql

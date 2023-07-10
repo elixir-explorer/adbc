@@ -12,6 +12,8 @@ defmodule AdbcTest do
   end
 
   describe "postgresql smoke tests" do
+    @describetag :postgresql
+
     test "runs queries" do
       db =
         start_supervised!({Database, driver: :postgresql, uri: "postgres://postgres@localhost"})

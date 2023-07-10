@@ -3,7 +3,7 @@ defmodule Adbc.Connection do
   Documentation for `Adbc.Connection`.
   """
 
-  # TODO: Address get_info/get_objects API
+  # TODO: Driver download idempotent/cache
   # TODO: Documentation everywhere (including options)
   # TODO: Tests with postgresql
 

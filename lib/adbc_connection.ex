@@ -51,7 +51,7 @@ defmodule Adbc.Connection do
   def query_pointer(conn, query, params \\ [], fun)
       when is_binary(query) and is_list(params) and is_function(fun) do
     stream_lock(conn, {:query, query, params}, fn stream_ref, rows_affected ->
-      fun.(Adbc.Nif.adbc_arrow_array_stream_get_pointer(stream_ref), rows_affected)
+      {:ok, fun.(Adbc.Nif.adbc_arrow_array_stream_get_pointer(stream_ref), rows_affected)}
     end)
   end
 
@@ -209,7 +209,7 @@ defmodule Adbc.Connection do
     case GenServer.call(conn, {:stream_lock, command}, :infinity) do
       {:ok, conn, unlock_ref, stream_ref, rows_affected} ->
         try do
-          fun.(stream_ref, rows_affected)
+          fun.(stream_ref, normalize_rows(rows_affected))
         after
           GenServer.cast(conn, {:unlock, unlock_ref})
         end
@@ -219,7 +219,9 @@ defmodule Adbc.Connection do
     end
   end
 
-  defp stream_results(reference, -1), do: stream_results(reference, %{}, nil)
+  defp normalize_rows(-1), do: nil
+  defp normalize_rows(rows) when is_integer(rows) and rows >= 0, do: rows
+
   defp stream_results(reference, num_rows), do: stream_results(reference, %{}, num_rows)
 
   defp stream_results(reference, acc, num_rows) do
@@ -321,7 +323,7 @@ defmodule Adbc.Connection do
 
   defp handle_command({name, args}, conn) do
     with {:ok, stream_ref} <- apply(Adbc.Nif, name, [conn | args]) do
-      {:ok, stream_ref, nil}
+      {:ok, stream_ref, -1}
     end
   end
 

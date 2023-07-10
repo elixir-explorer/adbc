@@ -50,11 +50,6 @@ jobs:
         with:
           arch: x64
 
-      - name: Test download SQLite driver
-        shell: bash
-        run: |
-          curl -fSL -vvv https://github.com/apache/arrow-adbc/releases/download/apache-arrow-adbc-0.5.1/adbc_driver_sqlite-0.5.1-py3-none-win_amd64.whl -o adbc_driver_sqlite-0.5.1-py3-none-win_amd64.whl | true
-
       - name: Compile and Test
         shell: bash
         run: |

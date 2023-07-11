@@ -1,0 +1,128 @@
+name: precompile
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  linux:
+    runs-on: ubuntu-latest
+    env:
+      MIX_ENV: prod
+    strategy:
+      matrix:
+        otp_version: [25, 26]
+    
+    name: Linux x86_64 - OTP ${{ matrix.otp_version }}
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: erlef/setup-beam@v1
+        with:
+          otp-version: ${{ matrix.otp_version }}
+          elixir-version: 1.15
+
+      - name: Install system dependecies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential automake autoconf pkg-config bc m4 unzip zip \
+            gcc g++ \
+            gcc-i686-linux-gnu g++-i686-linux-gnu \
+            gcc-aarch64-linux-gnu g++-aarch64-linux-gnu \
+            gcc-arm-linux-gnueabihf g++-arm-linux-gnueabihf \
+            gcc-riscv64-linux-gnu g++-riscv64-linux-gnu \
+            gcc-powerpc64le-linux-gnu g++-powerpc64le-linux-gnu \
+            gcc-s390x-linux-gnu g++-s390x-linux-gnu
+
+      - name: Precompile
+        run: |
+          export ELIXIR_MAKE_CACHE_DIR=$(pwd)/cache
+          mkdir -p "${ELIXIR_MAKE_CACHE_DIR}"
+          mix deps.get
+          mix elixir_make.precompile
+
+      - uses: softprops/action-gh-release@v1
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: |
+            cache/*.tar.gz
+
+  macos:
+    runs-on: macos-11
+    env:
+      MIX_ENV: prod
+      elixir_version: "1.15.2"
+    strategy:
+      matrix:
+        otp_version: ["25.3.2.3", "26.0.2"]
+
+    name: macOS x86_64 - OTP ${{ matrix.otp_version }}
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Install erlang and elixir
+        run: |
+          brew install autoconf coreutils curl git openssl asdf
+          asdf plugin add erlang https://github.com/asdf-vm/asdf-erlang.git
+          asdf plugin-add elixir https://github.com/asdf-vm/asdf-elixir.git
+          export KERL_CONFIGURE_OPTIONS="--disable-debug --without-javac"
+          asdf install erlang ${{ matrix.otp_version }}
+          asdf install elixir ${{ env.elixir_version }}
+          asdf global erlang ${{ matrix.otp_version }}
+          asdf global elixir ${{ env.elixir_version }}
+          source $(brew --prefix asdf)/libexec/asdf.sh
+          mix local.hex --force
+          mix local.rebar --force
+
+      - name: Precompile
+        run: |
+          source $(brew --prefix asdf)/libexec/asdf.sh
+          export ELIXIR_MAKE_CACHE_DIR=$(pwd)/cache
+          mkdir -p "${ELIXIR_MAKE_CACHE_DIR}"
+          mix deps.get
+          mix elixir_make.precompile
+
+      - uses: softprops/action-gh-release@v1
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: |
+            cache/*.tar.gz
+
+  windows:
+    runs-on: windows-latest
+    env:
+      MIX_ENV: prod
+    strategy:
+      matrix:
+        otp_version: [25, 26]
+    
+    name: Windows x86_64 - OTP ${{ matrix.otp_version }}
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: erlef/setup-beam@v1
+        with:
+          otp-version: ${{ matrix.otp_version }}
+          elixir-version: 1.15
+
+      - uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - name: Precompile
+        shell: bash
+        run: |
+          export ELIXIR_MAKE_CACHE_DIR=$(pwd)/cache
+          mkdir -p "${ELIXIR_MAKE_CACHE_DIR}"
+          mix deps.get
+          mix elixir_make.precompile
+
+      - uses: softprops/action-gh-release@v1
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: |
+            cache/*.tar.gz

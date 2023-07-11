@@ -17,7 +17,8 @@ defmodule Adbc.MixProject do
       compilers: [:elixir_make] ++ Mix.compilers(),
       make_precompiler: {:nif, CCPrecompiler},
       make_precompiler_url: "#{@github_url}/releases/download/v#{@version}/@{artefact_filename}",
-      make_precompiler_filename: "adbc_nif"
+      make_precompiler_filename: "adbc_nif",
+      make_precompiler_nif_versions: [versions: ["2.16", "2.17"]]
     ]
   end
 

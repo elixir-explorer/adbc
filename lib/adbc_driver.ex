@@ -8,7 +8,9 @@ defmodule Adbc.Driver do
   @official_driver_base_url "https://github.com/apache/arrow-adbc/releases/download/apache-arrow-adbc-"
   @version "0.5.1"
 
-  def download(driver_name, opts \\ []) when driver_name in @official_drivers do
+  def download(driver_name, opts \\ [])
+
+  def download(driver_name, opts) when driver_name in @official_drivers and is_list(opts) do
     base_url = opts[:base_url] || @official_driver_base_url
     version = opts[:version] || @version
     ignore_proxy = opts[:ignore_proxy] || false
@@ -20,6 +22,11 @@ defmodule Adbc.Driver do
          {:ok, cache_path} <- cached_download(url, ignore_proxy, driver_name, version, triplet) do
       extract!(cache_path, driver_name, version, triplet)
     end
+  end
+
+  def download(_driver_name, opts) when is_list(opts) do
+    known = Enum.map_join(@official_drivers, ", ", &inspect/1)
+    {:error, "unknown driver, expected one of #{known}"}
   end
 
   defp current_triplet do

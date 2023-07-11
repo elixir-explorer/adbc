@@ -6,8 +6,13 @@ defmodule AdbcTest do
 
   describe "download_driver" do
     test "multiple times" do
-      assert Adbc.download_driver!(:sqlite) == :ok
-      assert Adbc.download_driver!(:sqlite) == :ok
+      assert Adbc.download_driver(:sqlite) == :ok
+      assert Adbc.download_driver(:sqlite) == :ok
+    end
+
+    test "returns errors" do
+      assert {:error, "unknown driver, expected one of :sqlite, :postgresql, " <> _} =
+               Adbc.download_driver(:unknown)
     end
   end
 

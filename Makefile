@@ -35,6 +35,9 @@ MAKE_BUILD_FLAGS ?= -j$(DEFAULT_JOBS)
 build: $(NIF_SO_REL)
 	@echo > /dev/null
 
+clean:
+	@rm -rf "$(PRIV_DIR)"
+
 priv_dir:
 	@ if [ ! -e "$(PRIV_DIR)" ]; then \
 		mkdir -p "$(PRIV_DIR)" ; \

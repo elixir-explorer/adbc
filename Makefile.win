@@ -44,6 +44,9 @@ build: $(NIF_SO)
 priv_dir:
     @ if not exist "$(PRIV_DIR)" mkdir "$(PRIV_DIR)"
 
+clean:
+	@ if exist "$(PRIV_DIR)" rmdir "$(PRIV_DIR)" /s /q
+
 adbc: priv_dir
     @ if not exist "$(ADBC_DRIVER_COMMON_LIB)" ( \
 		if not exist "$(CMAKE_ADBC_BUILD_DIR)" mkdir "$(CMAKE_ADBC_BUILD_DIR)" && \

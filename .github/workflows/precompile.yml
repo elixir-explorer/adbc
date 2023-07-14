@@ -17,7 +17,7 @@ jobs:
       matrix:
         otp_version: [25, 26]
     
-    name: Linux - OTP ${{ matrix.otp_version }}
+    name: Linux GNU - OTP ${{ matrix.otp_version }}
 
     steps:
       - uses: actions/checkout@v3

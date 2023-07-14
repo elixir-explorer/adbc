@@ -1,13 +1,42 @@
 defmodule Adbc.Database do
   @moduledoc """
   Documentation for `Adbc.Database`.
+
+  Databases are modelled as processes. They required
+  a driver to be started.
   """
 
   use GenServer
   import Adbc.Helper, only: [error_to_exception: 1]
 
   @doc """
-  TODO.
+  Starts a database process.
+
+  ## Options
+
+    * `:driver` (required) - the driver to use for this database.
+      See `Adbc` module documentation for support drivers and information
+
+    * `:process_options` - the options to be given to the underlying
+      process. See `GenServer.start_link/3` for all options
+
+  All other options are given as database options to the underlying driver.
+
+  ## Examples
+
+      Adbc.Database.start_link(
+        database: :sqlite,
+        process_options: [name: MyApp.DB]
+      )
+
+  In your supervision tree it would be started like this:
+
+      children = [
+        {Adbc.Database,
+         driver: :sqlite,
+         process_options: [name: MyApp.DB]},
+      ]
+
   """
   def start_link(opts \\ []) do
     {driver, opts} = Keyword.pop(opts, :driver, nil)

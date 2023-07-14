@@ -1,6 +1,9 @@
 defmodule Adbc.Connection do
   @moduledoc """
   Documentation for `Adbc.Connection`.
+
+  Connection are modelled as processes. They require
+  an `Adbc.Database` to be started.
   """
 
   @type t :: GenServer.server()
@@ -10,7 +13,30 @@ defmodule Adbc.Connection do
   import Adbc.Helper, only: [error_to_exception: 1]
 
   @doc """
-  TODO.
+  Starts a connection process.
+
+  ## Options
+
+    * `:database` (required) - the database process to connect to
+
+    * `:process_options` - the options to be given to the underlying
+      process. See `GenServer.start_link/3` for all options
+
+  ## Examples
+
+      Adbc.Connection.start_link(
+        database: MyApp.DB,
+        process_options: [name: MyApp.Conn]
+      )
+
+  In your supervision tree it would be started like this:
+
+      children = [
+        {Adbc.Connection,
+         database: MyApp.DB,
+         process_options: [name: MyApp.Conn]}
+      ]
+
   """
   def start_link(opts) do
     {db, opts} = Keyword.pop(opts, :database, nil)
@@ -39,14 +65,20 @@ defmodule Adbc.Connection do
   end
 
   @doc """
-  TODO.
+  Runs the given `query` with `params`.
   """
+  @spec query(t(), binary, [term]) :: {:ok, result_set} | {:error, Exception.t()}
   def query(conn, query, params \\ []) when is_binary(query) and is_list(params) do
     stream_lock(conn, {:query, query, params}, &stream_results/2)
   end
 
   @doc """
-  TODO.
+  Runs the given `query` with `params` and
+  pass the ArrowStream pointer to the given function.
+
+  The pointer will point to a valid ArrowStream through
+  the duration of the function. The function may call
+  native code that consumes the ArrowStream accordingly.
   """
   def query_pointer(conn, query, params \\ [], fun)
       when is_binary(query) and is_list(params) and is_function(fun) do

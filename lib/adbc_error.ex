@@ -1,4 +1,5 @@
 defmodule Adbc.Error do
+  @derive {Inspect, only: [:message, :vendor_code]}
   defexception [:message, :vendor_code, :state]
 
   @type t :: %Adbc.Error{

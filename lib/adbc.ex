@@ -23,8 +23,12 @@ defmodule Adbc do
   in your supervision tree:
 
       children = [
-        {Adbc.Database, driver: :sqlite, name: MyApp.DB},
-        {Adbc.Connection, database: MyApp.DB, name: MyApp.Conn}
+        {Adbc.Database,
+         driver: :sqlite,
+         process_options: [name: MyApp.DB]},
+        {Adbc.Connection,
+         database: MyApp.DB,
+         process_options: [name: MyApp.Conn]}
       ]
 
       Supervisor.start_link(children, strategy: :one_for_one)
@@ -34,7 +38,15 @@ defmodule Adbc do
       db = Kino.start_child!({Adbc.Database, driver: :sqlite})
       conn = Kino.start_child!({Adbc.Connection, database: db})
 
-  ## Support drivers
+  And now you can make queries with:
+
+      # For named connections
+      {:ok, _} = Adbc.Connection.query(MyApp.Conn, "SELECT 123")
+
+      # When using the conn PID directly
+      {:ok, _} = Adbc.Connection.query(conn, "SELECT 123")
+
+  ## Supported drivers
 
   The following drivers are supported.
 

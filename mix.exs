@@ -1,13 +1,12 @@
 defmodule Adbc.MixProject do
   use Mix.Project
 
-  @app :adbc
   @version "0.1.0-dev"
-  @github_url "https://github.com/cocoa-xu/adbc"
+  @github_url "https://github.com/elixir-explorer/adbc"
 
   def project do
     [
-      app: @app,
+      app: :adbc,
       version: @version,
       elixir: "~> 1.12",
       start_permanent: Mix.env() == :prod,

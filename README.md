@@ -1,81 +1,76 @@
 # Adbc
 
-### SQLite Example
+Elixir bindings for Arrow Database Connectivity (ADBC).
+
+Adbc provides a standard database interface using the
+Apache Arrow format. See [`Adbc`](https://hexdocs.pm/adbc/Adbc.html)
+documentation for setting it up and the available drivers.
+
+## Quick run-through
+
+First, add `:adbc` as a dependency in your `mix.exs`:
 
 ```elixir
-iex> alias Adbc.Database
-Adbc.Database
-iex> alias Adbc.Connection
-Adbc.Connection
-iex> alias Adbc.Statement
-Adbc.Statement
-
-# new and init an SQLite database with filename as my_db.db
-iex> {:ok, database} = Database.new()
-{:ok, %Adbc.Database{reference: #Reference<0.1918355494.3778674689.52121>}}
-iex> Database.set_option(database, "driver", "adbc_driver_sqlite")
-:ok
-iex> Database.set_option(database, "uri", "file:my_db1.db")
-:ok
-iex> Database.it(database)
-:ok
-
-# init the connection
-iex> {:ok, connection} = Connection.new()
-{:ok, %Adbc.Connection{reference: #Reference<0.1918355494.3778674689.52179>}}
-iex> :ok = Connection.init(connection, database)
-:ok
-
-# init statement with the connection
-iex> {:ok, statement} = Statement.new(connection)
-{:ok, %Adbc.Statement{reference: #Reference<0.1918355494.3778674689.52210>}}
-
-# execute query
-# this creates a table if not exists
-iex> Statement.set_sql_query(statement, "CREATE TABLE IF NOT EXISTS foo (col REAL, str TEXT)")
-:ok
-iex> Statement.prepare(statement)
-:ok
-iex> {:ok, _stream, _row_affected} = Statement.execute_query(statement)
-{:ok,
- %Adbc.ArrowArrayStream{reference: #Reference<0.1918355494.3778674689.52253>},
- -1}
-
-# execute another query
-# this inserts a row with value 42 into the foo table
-iex> Statement.set_sql_query(statement, "INSERT INTO foo (col,str) VALUES (?,?)")
-:ok
-iex> Statement.prepare(statement)
-:ok
-iex> r = :random.uniform(1000)
-iex> :ok = Statement.bind(statement, [r, "value = #{r + 1}"])
-iex> {:ok, _stream, _row_affected} = Statement.execute_query(statement)
-{:ok,
- %Adbc.ArrowArrayStream{reference: #Reference<0.1918355494.3778674689.52300>},
- -1}
-
-# release resources
-iex> Statement.release(statement)
-:ok
-iex> Connection.release(connection)
-:ok
-iex> Database.release(database)
-:ok
+{:adbc, "~> 0.1"}
 ```
 
-## Installation
-
-If [available in Hex](https://hex.pm/docs/publish), the package can be installed
-by adding `adbc` to your list of dependencies in `mix.exs`:
+Now, in your config/config.exs, configure the drivers you
+are going to use. Let's use sqlite3 as an example
+(see [`Adbc`](https://hexdocs.pm/adbc/Adbc.html) for all
+supported drivers):
 
 ```elixir
-def deps do
-  [
-    {:adbc, "~> 0.1.0"}
-  ]
-end
+config :adbc, :drivers, [:sqlite3]
 ```
 
-Documentation can be generated with [ExDoc](https://github.com/elixir-lang/ex_doc)
-and published on [HexDocs](https://hexdocs.pm). Once published, the docs can
-be found at <https://hexdocs.pm/adbc>.
+If you are using a notebook or scripting, you can also use
+`Adbc.download_driver!/1` to dynamically download one.
+
+Then start the database and the relevant connection processes
+in your supervision tree:
+
+```elixir
+children = [
+  {Adbc.Database,
+   driver: :sqlite,
+   process_options: [name: MyApp.DB]},
+  {Adbc.Connection,
+   database: MyApp.DB,
+   process_options: [name: MyApp.Conn]}
+]
+
+Supervisor.start_link(children, strategy: :one_for_one)
+```
+
+In a notebook, the above would look like this:
+
+```elixir
+db = Kino.start_child!({Adbc.Database, driver: :sqlite})
+conn = Kino.start_child!({Adbc.Connection, database: db})
+```
+
+And now you can make queries with:
+
+```elixir
+# For named connections
+{:ok, _} = Adbc.Connection.query(MyApp.Conn, "SELECT 123")
+
+# When using the conn PID directly
+{:ok, _} = Adbc.Connection.query(conn, "SELECT 123")
+```
+
+## License
+
+Copyright 2023 Cocoa Xu, José Valim
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+   http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.

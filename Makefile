@@ -19,7 +19,7 @@ endif
 C_SRC = $(shell pwd)/c_src
 C_SRC_REL = c_src
 ifdef CC_PRECOMPILER_CURRENT_TARGET
-	CMAKE_TOOLCHAIN_FILE=$(shell pwd)/cc_toolchain/$(CC_PRECOMPILER_CURRENT_TARGET).cmake
+	CMAKE_CONFIGURE_FLAGS=-D CMAKE_TOOLCHAIN_FILE="$(shell pwd)/cc_toolchain/$(CC_PRECOMPILER_CURRENT_TARGET).cmake"
 endif
 ifdef CMAKE_TOOLCHAIN_FILE
 	CMAKE_CONFIGURE_FLAGS=-D CMAKE_TOOLCHAIN_FILE="$(CMAKE_TOOLCHAIN_FILE)"
@@ -47,6 +47,7 @@ priv_dir:
 	fi
 
 adbc: priv_dir
+	@ echo "CMAKE_CONFIGURE_FLAGS: $(CMAKE_CONFIGURE_FLAGS)"
 	@ if [ ! -f "$(ADBC_DRIVER_COMMON_LIB)" ]; then \
 		mkdir -p "$(CMAKE_ADBC_BUILD_DIR)" && \
 		cd "$(CMAKE_ADBC_BUILD_DIR)" && \
@@ -64,7 +65,7 @@ adbc: priv_dir
 			-DCMAKE_BUILD_TYPE="$(CMAKE_BUILD_TYPE)" \
 			-DCMAKE_INSTALL_PREFIX="$(PRIV_DIR)" \
 			-DADBC_DEPENDENCY_SOURCE=BUNDLED \
-			$(CMAKE_CONFIGURE_FLAGS) $(CMAKE_ADBC_OPTIONS) "$(ADBC_C_SRC)" && \
+			$(CMAKE_CONFIGURE_FLAGS) $(CMAKE_ADBC_OPTIONS) "$(ADBC_C_SRC_22)" && \
 		cmake --build . --target install -j ; \
 	fi
 

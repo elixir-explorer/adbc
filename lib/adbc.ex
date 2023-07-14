@@ -1,13 +1,110 @@
 defmodule Adbc do
   @moduledoc """
-  Documentation for `Adbc`.
+  Bindings for Arrow Database Connectivity (ADBC).
+
+  Adbc provides a standard database interface using the
+  Apache Arrow format.
+
+  ## Installation
+
+  First, add `:adbc` as a dependency in your `mix.exs`:
+
+      {:adbc, "~> 0.1"}
+
+  Now, in your config/config.exs, configure the drivers you
+  are going to use:
+
+      config :adbc, :drivers, [:sqlite3]
+
+  If you are using a notebook or scripting, you can also use
+  `Adbc.download_driver!/1` to dynamically download one.
+
+  Then start the database and the relevant connection processes
+  in your supervision tree:
+
+      children = [
+        {Adbc.Database, driver: :sqlite, name: MyApp.DB},
+        {Adbc.Connection, database: MyApp.DB, name: MyApp.Conn}
+      ]
+
+      Supervisor.start_link(children, strategy: :one_for_one)
+
+  In a notebook, the above would look like this:
+
+      db = Kino.start_child!({Adbc.Database, driver: :sqlite})
+      conn = Kino.start_child!({Adbc.Connection, database: db})
+
+  ## Support drivers
+
+  The following drivers are supported.
+
+  ### PostgreSQL
+
+  The PostgreSQL driver provides access to any database that supports
+  the PostgreSQL wire format. It is implemented as a wrapper around
+  `libpq`.
+
+  #### Examples
+
+      {Adbc.Database, driver: :postgresql, uri: "postgresql://postgres@localhost"}
+
+  You must pass the `:uri` option using Postgres'
+  [connection URI](https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-CONNSTRING):
+
+  ### Sqlite
+
+  The SQLite driver provides access to SQLite databases.
+
+  #### Examples
+
+      {Adbc.Database, driver: :sqlite, uri: ":memory:"}
+      {Adbc.Database, driver: :sqlite, uri: "./db/my.db"}
+      {Adbc.Database, driver: :sqlite, uri: "file:/path/to/file/in/disk.db"}
+
+  The `:uri` option should be, ":memory:", a filename or
+  [URI filename](https://www.sqlite.org/c3ref/open.html#urifilenamesinsqlite3open).
+  If omitted, it will default to an in-memory database, but
+  one that is shared across all connections.
+
+  ### Snowflake
+
+  The Snowflake driver provides access to Snowflake Database Warehouses.
+
+  #### Examples
+
+      {Adbc.Database, driver: :snowflake, uri: "..."}
+
+  The Snowflake URI should be of one of the following formats:
+
+      user[:password]@account/database/schema[?param1=value1&paramN=valueN]
+      user[:password]@account/database[?param1=value1&paramN=valueN]
+      user[:password]@host:port/database/schema?account=user_account[&param1=value1&paramN=valueN]
+      host:port/database/schema?account=user_account[&param1=value1&paramN=valueN]
+
+  Alternately, instead of providing a full URI, the configuration can be
+  entirely supplied using the other available options or some combination
+  of the URI and other options. If a URI is provided, it will be parsed
+  first and any explicit options provided will override anything parsed
+  from the URI. See [Client options](https://arrow.apache.org/adbc/0.5.1/driver/snowflake.html#client-options).
   """
 
+  @doc """
+  Downloads a driver.
+
+  See `Adbc` module doc for all supports drivers.
+  It returns `:ok` or `{:error, binary}`.
+  """
   @spec download_driver(atom, keyword) :: :ok | {:error, binary}
   def download_driver(driver, opts \\ []) when is_atom(driver) and is_list(opts) do
     Adbc.Driver.download(driver, opts)
   end
 
+  @doc """
+  Downloads a driver and raises in case of errors.
+
+  See `Adbc` module doc for all supports drivers.
+  It returns `:ok`.
+  """
   @spec download_driver!(atom, keyword) :: :ok
   def download_driver!(driver, opts \\ []) when is_atom(driver) and is_list(opts) do
     case download_driver(driver, opts) do

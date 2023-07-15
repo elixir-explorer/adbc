@@ -65,7 +65,7 @@ adbc: priv_dir
 			-DCMAKE_BUILD_TYPE="$(CMAKE_BUILD_TYPE)" \
 			-DCMAKE_INSTALL_PREFIX="$(PRIV_DIR)" \
 			-DADBC_DEPENDENCY_SOURCE=BUNDLED \
-			$(CMAKE_CONFIGURE_FLAGS) $(CMAKE_ADBC_OPTIONS) "$(ADBC_C_SRC_22)" && \
+			$(CMAKE_CONFIGURE_FLAGS) $(CMAKE_ADBC_OPTIONS) "$(ADBC_C_SRC)" && \
 		cmake --build . --target install -j ; \
 	fi
 

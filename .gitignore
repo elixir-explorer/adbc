@@ -33,3 +33,6 @@ adbc-*.tar
 
 # cache
 3rd_party/cache
+
+# checksum
+checksum.exs

@@ -18,8 +18,17 @@ endif
 
 C_SRC = $(shell pwd)/c_src
 C_SRC_REL = c_src
+FIND_RET = $(findstring darwin, $(CC_PRECOMPILER_CURRENT_TARGET))
 ifdef CC_PRECOMPILER_CURRENT_TARGET
-	CMAKE_CONFIGURE_FLAGS=-D CMAKE_TOOLCHAIN_FILE="$(shell pwd)/cc_toolchain/$(CC_PRECOMPILER_CURRENT_TARGET).cmake"
+	ifeq ($(findstring darwin, $(CC_PRECOMPILER_CURRENT_TARGET)), darwin)
+		ifeq ($(findstring aarch64, $(CC_PRECOMPILER_CURRENT_TARGET)), aarch64)
+			CMAKE_CONFIGURE_FLAGS=-D CMAKE_OSX_ARCHITECTURES=arm64
+		else
+			CMAKE_CONFIGURE_FLAGS=-D CMAKE_OSX_ARCHITECTURES=x86_64
+		endif
+	else
+		CMAKE_CONFIGURE_FLAGS=-D CMAKE_TOOLCHAIN_FILE="$(shell pwd)/cc_toolchain/$(CC_PRECOMPILER_CURRENT_TARGET).cmake"
+	endif
 endif
 ifdef CMAKE_TOOLCHAIN_FILE
 	CMAKE_CONFIGURE_FLAGS=-D CMAKE_TOOLCHAIN_FILE="$(CMAKE_TOOLCHAIN_FILE)"
@@ -48,6 +57,7 @@ priv_dir:
 
 adbc: priv_dir
 	@ echo "CMAKE_CONFIGURE_FLAGS: $(CMAKE_CONFIGURE_FLAGS)"
+	@ echo "FIND_RET: $(FIND_RET)"
 	@ if [ ! -f "$(ADBC_DRIVER_COMMON_LIB)" ]; then \
 		mkdir -p "$(CMAKE_ADBC_BUILD_DIR)" && \
 		cd "$(CMAKE_ADBC_BUILD_DIR)" && \

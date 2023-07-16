@@ -20,7 +20,7 @@ are going to use. Let's use sqlite3 as an example
 supported drivers):
 
 ```elixir
-config :adbc, :drivers, [:sqlite3]
+config :adbc, :drivers, [:sqlite]
 ```
 
 If you are using a notebook or scripting, you can also use

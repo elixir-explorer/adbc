@@ -26,6 +26,12 @@ defmodule Adbc.MixProject do
               "x86_64-linux-gnu-gcc",
               "x86_64-linux-gnu-g++"
             }
+          },
+          {:unix, :darwin} => %{
+            :include_default_ones => true
+          },
+          {:win32, :nt} => %{
+            :include_default_ones => true
           }
         }
       ]

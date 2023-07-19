@@ -52,7 +52,7 @@ defmodule Adbc.Helper do
 
     case :os.type() do
       {:win32, :nt} ->
-        :httpc.set_options([verbose: :verbose])
+        :httpc.set_options([verbose: :debug])
       _ ->
         :ok
     end

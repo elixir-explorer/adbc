@@ -66,6 +66,12 @@ jobs:
         timeout-minutes: 10
         shell: bash
         run: |
+          export ADBC_CACHE_DIR="$(pwd)/cache"
+          mkdir -p "${ADBC_CACHE_DIR}"
+          export DRIVER_NAME=sqlite
+          export TRIPLET="x86_64-windows-msvc"
+          export DRIVER_VERSION="0.5.1"
+          curl -fSL "https://github.com/apache/arrow-adbc/releases/download/apache-arrow-adbc-${DRIVER_VERSION}/adbc_driver_${DRIVER_NAME}-${DRIVER_VERSION}-py3-none-win_amd64.whl" -o "${ADBC_CACHE_DIR}/${DRIVER_NAME}-${TRIPLET}-${DRIVER_VERSION}.zip"
           mix deps.get
           mix test --exclude postgresql
 

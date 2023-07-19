@@ -48,7 +48,7 @@ defmodule Adbc.MixProject do
   defp deps do
     [
       # compilation
-      {:cc_precompiler, "~> 0.1", runtime: false},
+      {:cc_precompiler, "~> 0.1.8 or ~> 0.2", runtime: false},
       {:elixir_make, "~> 0.7.0", runtime: false},
 
       # runtime

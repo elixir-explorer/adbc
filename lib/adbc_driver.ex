@@ -14,23 +14,12 @@ defmodule Adbc.Driver do
     base_url = opts[:base_url] || @official_driver_base_url
     version = opts[:version] || @version
     ignore_proxy = opts[:ignore_proxy] || false
-    timeout = opts[:timeout] || 120
-    connect_timeout = opts[:connect_timeout] || 120
 
     with {:ok, triplet} <- current_triplet(),
          :missing <- driver_status(driver_name, version, triplet),
          {:ok, wheel} <- driver_wheel(driver_name, version, triplet),
          url = base_url <> version <> "/" <> wheel,
-         {:ok, cache_path} <-
-           cached_download(
-             url,
-             ignore_proxy,
-             timeout,
-             connect_timeout,
-             driver_name,
-             version,
-             triplet
-           ) do
+         {:ok, cache_path} <- cached_download(url, ignore_proxy, driver_name, version, triplet) do
       extract!(cache_path, driver_name, version, triplet)
     end
   end
@@ -117,7 +106,7 @@ defmodule Adbc.Driver do
     end
   end
 
-  defp cached_download(url, ignore_proxy, timeout, connect_timeout, driver_name, version, triplet) do
+  defp cached_download(url, ignore_proxy, driver_name, version, triplet) do
     cache_dir = adbc_cache_dir()
     cache_path = Path.join(cache_dir, "#{driver_name}-#{triplet}-#{version}.zip")
 
@@ -126,7 +115,7 @@ defmodule Adbc.Driver do
     else
       Logger.debug("Downloading Adbc driver for #{driver_name} from #{url}...")
 
-      with {:ok, body} <- Helper.download(url, ignore_proxy, timeout, connect_timeout) do
+      with {:ok, body} <- Helper.download(url, ignore_proxy) do
         File.mkdir_p!(cache_dir)
         File.write!(cache_path, body)
         {:ok, cache_path}

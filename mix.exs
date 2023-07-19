@@ -13,6 +13,7 @@ defmodule Adbc.MixProject do
       deps: deps(),
       package: package(),
       docs: docs(),
+      description: "Apache Arrow ADBC bindings for Elixir",
       compilers: [:elixir_make] ++ Mix.compilers(),
       make_precompiler: {:nif, CCPrecompiler},
       make_precompiler_url: "#{@github_url}/releases/download/v#{@version}/@{artefact_filename}",
@@ -47,7 +48,7 @@ defmodule Adbc.MixProject do
   defp deps do
     [
       # compilation
-      {:cc_precompiler, "~> 0.1.0", runtime: false},
+      {:cc_precompiler, "~> 0.1", runtime: false},
       {:elixir_make, "~> 0.7.0", runtime: false},
 
       # runtime

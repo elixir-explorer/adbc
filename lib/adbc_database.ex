@@ -25,7 +25,7 @@ defmodule Adbc.Database do
   ## Examples
 
       Adbc.Database.start_link(
-        database: :sqlite,
+        driver: :sqlite,
         process_options: [name: MyApp.DB]
       )
 

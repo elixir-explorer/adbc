@@ -17,6 +17,15 @@ defmodule Adbc.Driver do
     timeout = opts[:timeout] || 120
     connect_timeout = opts[:connect_timeout] || 120
 
+    version =
+      case :os.type() do
+        {:win32, :nt} ->
+          "0.4.0"
+
+        _ ->
+          version
+      end
+
     with {:ok, triplet} <- current_triplet(),
          :missing <- driver_status(driver_name, version, triplet),
          {:ok, wheel} <- driver_wheel(driver_name, version, triplet),

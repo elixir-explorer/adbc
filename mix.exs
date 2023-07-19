@@ -52,7 +52,7 @@ defmodule Adbc.MixProject do
       {:elixir_make, "~> 0.7.0", runtime: false},
 
       # runtime
-      {:dll_loader_helper, "~> 0.1"},
+      {:dll_loader_helper, "~> 0.1 or ~> 1.0"},
       {:castore, "~> 0.1 or ~> 1.0"},
 
       # docs

@@ -113,7 +113,7 @@ static int get_arrow_array_children_as_list(ErlNifEnv *env, struct ArrowSchema *
         return 1;
     }
 
-    children.reserve(schema->n_children);
+    children.resize(schema->n_children);
     if (schema->n_children > 0) {
         for (int64_t child_i = 0; child_i < schema->n_children; child_i++) {
             struct ArrowSchema * child_schema = schema->children[child_i];

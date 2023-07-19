@@ -50,6 +50,13 @@ defmodule Adbc.Helper do
 
     options = [body_format: :binary]
 
+    case :os.type() do
+      {:win32, :nt} ->
+        :httpc.set_options([verbose: :verbose])
+      _ ->
+        :ok
+    end
+
     case :httpc.request(:get, {url_charlist, []}, https_options, options) do
       {:ok, {{_, 200, _}, _headers, body}} ->
         {:ok, body}

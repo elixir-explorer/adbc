@@ -40,7 +40,7 @@ defmodule Adbc.MixProject do
 
   def application do
     [
-      extra_applications: [:logger, inets: :optional, ssl: :optional]
+      extra_applications: [:logger, :runtime_tools, inets: :optional, ssl: :optional]
     ]
   end
 

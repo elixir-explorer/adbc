@@ -44,7 +44,8 @@ defmodule Adbc.Helper do
             match_fun: :public_key.pkix_verify_hostname_match_fun(:https)
           ]
         ] ++ cacerts_options(),
-      timeout: timeout
+      timeout: timeout,
+      connect_timeout: timeout
     ]
 
     options = [body_format: :binary]

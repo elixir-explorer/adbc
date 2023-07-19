@@ -15,7 +15,7 @@ defmodule Adbc.Helper do
   end
 
   @doc false
-  def download(url, ignore_proxy, timeout) do
+  def download(url, ignore_proxy, timeout, connect_timeout) do
     url_charlist = String.to_charlist(url)
 
     {:ok, _} = Application.ensure_all_started(:inets)
@@ -44,18 +44,11 @@ defmodule Adbc.Helper do
             match_fun: :public_key.pkix_verify_hostname_match_fun(:https)
           ]
         ] ++ cacerts_options(),
-      timeout: timeout,
-      connect_timeout: timeout
+      timeout: :timer.seconds(timeout),
+      connect_timeout: :timer.seconds(connect_timeout)
     ]
 
     options = [body_format: :binary]
-
-    case :os.type() do
-      {:win32, :nt} ->
-        :httpc.set_options([verbose: :debug])
-      _ ->
-        :ok
-    end
 
     case :httpc.request(:get, {url_charlist, []}, https_options, options) do
       {:ok, {{_, 200, _}, _headers, body}} ->

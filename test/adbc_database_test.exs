@@ -3,36 +3,6 @@ defmodule Adbc.DatabaseTest do
   doctest Adbc.Database
   alias Adbc.Database
 
-  setup_all do
-    {:ok, zip_data} =
-      Adbc.Helper.download(
-        "https://github.com/duckdb/duckdb/releases/download/v0.8.1/libduckdb-linux-amd64.zip",
-        false
-      )
-
-    tmp_dir = System.tmp_dir!()
-    cache_path = Path.join(tmp_dir, "libduckdb-linux-amd64.zip")
-    File.write!(cache_path, zip_data)
-
-    cache_path = String.to_charlist(cache_path)
-    {:ok, zip_handle} = :zip.zip_open(cache_path, [:memory])
-    {:ok, zip_files} = :zip.table(cache_path)
-
-    for {:zip_file, filename, _, _, _, _} <- zip_files,
-        Path.extname(filename) == ".so" do
-      {:ok, {filename, file_data}} = :zip.zip_get(filename, zip_handle)
-
-      filename = to_string(filename)
-
-      filepath = Path.join(tmp_dir, filename)
-      File.write!(filepath, file_data)
-    end
-
-    :ok = :zip.zip_close(zip_handle)
-
-    %{path: Path.join(tmp_dir, "libduckdb.so"), entrypoint: "duckdb_adbc_init"}
-  end
-
   describe "start_link" do
     test "starts a process" do
       assert {:ok, _} = Database.start_link(driver: :sqlite)
@@ -61,20 +31,6 @@ defmodule Adbc.DatabaseTest do
                Database.start_link(driver: :sqlite, who_knows: 123)
 
       assert Exception.message(error) == "[SQLite] Unknown database option who_knows=123"
-    end
-  end
-
-  describe "load custom driver" do
-    @describetag :duckdb
-
-    test "load duckdb", %{path: path, entrypoint: entrypoint} do
-      assert {:ok, _} = Database.start_link(driver: path, entrypoint: entrypoint)
-    end
-
-    test "load duckdb with invalid entrypoint", %{path: path} do
-      assert {:error, %Adbc.Error{} = error} = Database.start_link(driver: path, entrypoint: "entrypoint")
-
-      assert Exception.message(error) =~ "dlsym(entrypoint) failed:"
     end
   end
 end

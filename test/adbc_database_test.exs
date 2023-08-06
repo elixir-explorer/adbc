@@ -10,10 +10,9 @@ defmodule Adbc.DatabaseTest do
         false
       )
 
-    cache_path = Path.join(File.cwd!(), "libduckdb-linux-amd64.zip")
-    File.write!(cache_path, zip_data)
-
     tmp_dir = System.tmp_dir!()
+    cache_path = Path.join(tmp_dir, "libduckdb-linux-amd64.zip")
+    File.write!(cache_path, zip_data)
 
     cache_path = String.to_charlist(cache_path)
     {:ok, zip_handle} = :zip.zip_open(cache_path, [:memory])

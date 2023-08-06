@@ -43,7 +43,7 @@ jobs:
       - name: Compile and Test
         run: |
           mix deps.get
-          mix test
+          mix test --include duckdb
 
   windows:
     if: "!contains(github.event.pull_request.labels.*.name, 'skip ci')"

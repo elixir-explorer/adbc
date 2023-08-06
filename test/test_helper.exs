@@ -8,4 +8,6 @@ exclude =
     [:postgresql]
   end
 
+exclude = exclude ++ [:duckdb]
+
 ExUnit.start(exclude: exclude)

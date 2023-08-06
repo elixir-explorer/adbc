@@ -15,9 +15,15 @@ defmodule Adbc.DatabaseTest do
       assert Process.whereis(:who_knows_db) == pid
     end
 
+    test "accepts driver from path" do
+      {:ok, path} = Adbc.Driver.so_path(:sqlite)
+      assert {:ok, pid} = Database.start_link(driver: path)
+      assert Process.alive?(pid)
+    end
+
     test "errors with invalid driver" do
       assert {:error, %ArgumentError{} = error} = Database.start_link(driver: :who_knows)
-      assert Exception.message(error) == "unknown driver :who_knows"
+      assert Exception.message(error) =~ "unknown driver :who_knows"
     end
 
     test "errors with invalid option" do

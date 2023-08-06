@@ -24,9 +24,9 @@ defmodule Adbc.Driver do
     end
   end
 
-  def download(_driver_name, opts) when is_list(opts) do
+  def download(driver_name, opts) when is_list(opts) do
     known = Enum.map_join(@official_drivers, ", ", &inspect/1)
-    {:error, "unknown driver, expected one of #{known}"}
+    {:error, "unknown driver #{inspect(driver_name)}, expected one of #{known}"}
   end
 
   defp current_triplet do
@@ -178,8 +178,15 @@ defmodule Adbc.Driver do
     end
   end
 
+  def so_path(driver_name, _opts) when is_binary(driver_name) do
+    {:ok, driver_name}
+  end
+
   def so_path(driver_name, _opts) do
-    {:error, "unknown driver #{inspect(driver_name)}"}
+    known = Enum.map_join(@official_drivers, ", ", &inspect/1)
+
+    {:error,
+     "unknown driver #{inspect(driver_name)}, expected one of #{known} or a string representing the full path to a driver"}
   end
 
   defp adbc_driver_so(driver_name, version, triplet) do

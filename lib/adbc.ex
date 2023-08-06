@@ -48,7 +48,9 @@ defmodule Adbc do
 
   ## Supported drivers
 
-  The following drivers are supported.
+  Below we list all drivers supported out of the box. You may also
+  give the full path to a driver in the `:driver` option to load other
+  existing drivers.
 
   ### PostgreSQL
 

@@ -15,7 +15,8 @@ defmodule Adbc.Database do
   ## Options
 
     * `:driver` (required) - the driver to use for this database.
-      See `Adbc` module documentation for support drivers and information
+      It must be an atom (see `Adbc` module documentation for all
+      built-in drivers) or a string representing the path to a driver
 
     * `:process_options` - the options to be given to the underlying
       process. See `GenServer.start_link/3` for all options

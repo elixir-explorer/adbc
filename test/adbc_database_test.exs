@@ -47,11 +47,7 @@ defmodule Adbc.DatabaseTest do
       cache_path = Path.join(File.cwd!(), "libduckdb-linux-amd64.zip")
       File.write!(cache_path, zip_data)
 
-      adbc_so_priv_dir =
-        case :os.type() do
-          {:win32, _} -> Application.app_dir(:adbc, "priv/bin")
-          _ -> Application.app_dir(:adbc, "priv/lib")
-        end
+      tmp_dir = System.tmp_dir!()
 
       cache_path = String.to_charlist(cache_path)
       {:ok, zip_handle} = :zip.zip_open(cache_path, [:memory])
@@ -63,13 +59,13 @@ defmodule Adbc.DatabaseTest do
 
         filename = to_string(filename)
 
-        filepath = Path.join(adbc_so_priv_dir, filename)
+        filepath = Path.join(tmp_dir, filename)
         File.write!(filepath, file_data)
       end
 
       :ok = :zip.zip_close(zip_handle)
 
-      %{path: Path.join(adbc_so_priv_dir, "libduckdb.so"), entrypoint: "duckdb_adbc_init"}
+      %{path: Path.join(tmp_dir, "libduckdb.so"), entrypoint: "duckdb_adbc_init"}
     end
 
     test "load duckdb", %{path: path, entrypoint: entrypoint} do
@@ -79,7 +75,7 @@ defmodule Adbc.DatabaseTest do
     test "load duckdb with invalid entrypoint", %{path: path} do
       assert {:error, %Adbc.Error{} = error} = Database.start_link(driver: path, entrypoint: "entrypoint")
 
-      assert String.starts_with?(Exception.message(error), "dlsym(entrypoint) failed:")
+      assert Exception.message(error) =~ "dlsym(entrypoint) failed:"
     end
   end
 end

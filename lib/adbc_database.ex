@@ -52,7 +52,7 @@ defmodule Adbc.Database do
          :ok <- init_driver(ref, driver),
          :ok <- init_options(ref, opts),
          :ok <- Adbc.Nif.adbc_database_init(ref) do
-      GenServer.start_link(__MODULE__, ref, process_options)
+      GenServer.start_link(__MODULE__, {driver, ref}, process_options)
     else
       {:error, reason} -> {:error, error_to_exception(reason)}
     end
@@ -61,20 +61,20 @@ defmodule Adbc.Database do
   ## Callbacks
 
   @impl true
-  def init(db) do
+  def init({driver, db}) do
     Process.flag(:trap_exit, true)
-    {:ok, db}
+    {:ok, {driver, db}}
   end
 
   @impl true
-  def handle_call({:initialize_connection, conn_ref}, {pid, _}, db) do
+  def handle_call({:initialize_connection, conn_ref}, {pid, _}, {driver, db}) do
     case Adbc.Nif.adbc_connection_init(conn_ref, db) do
       :ok ->
         Process.link(pid)
-        {:reply, :ok, db}
+        {:reply, {:ok, driver}, {driver, db}}
 
       {:error, reason} ->
-        {:reply, {:error, reason}, db}
+        {:reply, {:error, reason}, {driver, db}}
     end
   end
 
@@ -84,7 +84,7 @@ defmodule Adbc.Database do
   end
 
   @impl true
-  def terminate(_, db) do
+  def terminate(_, {_driver, db}) do
     Adbc.Nif.adbc_database_release(db)
   end
 

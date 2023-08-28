@@ -83,6 +83,21 @@ defmodule Adbc.Connection.Test do
     end
   end
 
+  describe "get_driver" do
+    test "returns the driver", %{db: db} do
+      conn = start_supervised!({Connection, database: db})
+      assert Connection.get_driver(conn) == {:ok, :sqlite}
+    end
+
+    test "returns :error for non ADBC connection" do
+      assert Connection.get_driver(self()) == :error
+    end
+
+    test "returns :error for dead process" do
+      assert Connection.get_driver(:not_really_a_process) == :error
+    end
+  end
+
   describe "get_objects" do
     test "get all objects from a connection", %{db: db} do
       conn = start_supervised!({Connection, database: db})

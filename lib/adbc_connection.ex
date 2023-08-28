@@ -223,6 +223,23 @@ defmodule Adbc.Connection do
   end
 
   @doc """
+  Gets the underlying driver of a connection process.
+
+  ## Examples
+
+      ADBC.Connection.get_driver(conn)
+      #=> {:ok, :sqlite}
+  """
+  @spec get_driver(t()) :: {:ok, atom() | String.t()} | :error
+  def get_driver(conn) do
+    with pid when pid != nil <- GenServer.whereis(conn),
+         {:dictionary, dictionary} <- Process.info(pid, :dictionary),
+         {:adbc_driver, module} <- List.keyfind(dictionary, :adbc_driver, 0),
+         do: {:ok, module},
+         else: (_ -> :error)
+  end
+
+  @doc """
   Get a list of table types in the database.
 
   The result is an Arrow dataset with the following schema:
@@ -276,8 +293,9 @@ defmodule Adbc.Connection do
   @impl true
   def init({db, conn}) do
     case GenServer.call(db, {:initialize_connection, conn}, :infinity) do
-      :ok ->
+      {:ok, driver} ->
         Process.flag(:trap_exit, true)
+        Process.put(:adbc_driver, driver)
         {:ok, %{conn: conn, lock: :none, queue: :queue.new()}}
 
       {:error, reason} ->

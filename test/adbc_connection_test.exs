@@ -189,6 +189,33 @@ defmodule Adbc.Connection.Test do
     end
   end
 
+  describe "query!" do
+    test "select", %{db: db} do
+      conn = start_supervised!({Connection, database: db})
+
+      assert %Adbc.Result{data: %{"num" => [123]}} =
+               Connection.query!(conn, "SELECT 123 as num")
+
+      assert %Adbc.Result{data: %{"num" => [123], "bool" => [1]}} =
+               Connection.query!(conn, "SELECT 123 as num, true as bool")
+    end
+
+    test "select with parameters", %{db: db} do
+      conn = start_supervised!({Connection, database: db})
+
+      assert %Adbc.Result{data: %{"num" => [579]}} =
+               Connection.query!(conn, "SELECT 123 + ? as num", [456])
+    end
+
+    test "fails on invalid query", %{db: db} do
+      conn = start_supervised!({Connection, database: db})
+
+      assert_raise Adbc.Error,
+                   ~s([SQLite] Failed to prepare query: near "NOT": syntax error\nQuery:NOT VALID SQL),
+                   fn -> Connection.query!(conn, "NOT VALID SQL") end
+    end
+  end
+
   describe "query_pointer" do
     test "select", %{db: db} do
       conn = start_supervised!({Connection, database: db})

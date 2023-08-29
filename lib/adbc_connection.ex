@@ -79,7 +79,7 @@ defmodule Adbc.Connection do
   def query!(conn, query, params \\ []) when is_binary(query) and is_list(params) do
     case query(conn, query, params) do
       {:ok, result} -> result
-      {:error, reason} -> raise "#{inspect(reason)}"
+      {:error, reason} -> raise reason
     end
   end
 

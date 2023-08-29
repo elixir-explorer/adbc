@@ -73,6 +73,17 @@ defmodule Adbc.Connection do
   end
 
   @doc """
+  Same as `query/3` but raises an exception on error.
+  """
+  @spec query!(t(), binary, [term]) :: result_set
+  def query!(conn, query, params \\ []) when is_binary(query) and is_list(params) do
+    case query(conn, query, params) do
+      {:ok, result} -> result
+      {:error, reason} -> raise reason
+    end
+  end
+
+  @doc """
   Runs the given `query` with `params` and
   pass the ArrowStream pointer to the given function.
 

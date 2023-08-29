@@ -45,8 +45,8 @@ Supervisor.start_link(children, strategy: :one_for_one)
 In a notebook, the above would look like this:
 
 ```elixir
-db = Kino.start_child!({Adbc.Database, driver: :sqlite})
-conn = Kino.start_child!({Adbc.Connection, database: db})
+{:ok, db} = Kino.start_child({Adbc.Database, driver: :sqlite})
+{:ok, conn} = Kino.start_child({Adbc.Connection, database: db})
 ```
 
 And now you can make queries with:

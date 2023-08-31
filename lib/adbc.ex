@@ -95,11 +95,8 @@ defmodule Adbc do
       user[:password]@host:port/database/schema?account=user_account[&param1=value1&paramN=valueN]
       host:port/database/schema?account=user_account[&param1=value1&paramN=valueN]
 
-  Alternately, instead of providing a full URI, the configuration can be
-  entirely supplied using the other available options or some combination
-  of the URI and other options. If a URI is provided, it will be parsed
-  first and any explicit options provided will override anything parsed
-  from the URI. See [Client options](https://arrow.apache.org/adbc/0.5.1/driver/snowflake.html#client-options).
+  The first two are the most recommended formats. The schema, database and parameters are optional.
+  See [Account identifiers](https://docs.snowflake.com/en/user-guide/admin-account-identifier) for more information.
   """
 
   @doc """

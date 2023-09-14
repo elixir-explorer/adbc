@@ -8,7 +8,7 @@ defmodule Adbc.Nif do
     :ok =
       case :os.type() do
         {:win32, _} ->
-          DLLLoaderHelper.addDLLDirectory("#{:code.priv_dir(:adbc)}/bin")
+          :dll_loader_helper_beam.add_dll_directory("#{:code.priv_dir(:adbc)}/bin")
 
         _ ->
           :ok
@@ -17,7 +17,7 @@ defmodule Adbc.Nif do
     case :erlang.load_nif(nif_file, 0) do
       :ok -> :ok
       {:error, {:reload, _}} -> :ok
-      {:error, reason} -> IO.puts("Failed to load nif: #{reason}")
+      {:error, reason} -> IO.puts("Failed to load nif: #{inspect(reason)}")
     end
   end
 

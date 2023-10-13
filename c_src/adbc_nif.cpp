@@ -597,19 +597,22 @@ int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct 
                     unit = 1;
             }
 
-            // TODO: handle timezones (Snowflake always returns naive datetimes)
-            // std::string timezone (&format[4]);
-
-            using value_type = uint64_t;
-            current_term = values_from_buffer(
-                env,
-                values->length,
-                bitmap_buffer,
-                (const value_type *)values->buffers[1],
-                [unit](ErlNifEnv *env, uint64_t val) -> ERL_NIF_TERM {
-                    return unix_timestamp_to_naive_datetime(env, val * unit);
-                }
-            );
+            if (format_len > 4) {
+                // TODO: handle timezones (Snowflake always returns naive datetimes)
+                // std::string timezone (&format[4]);
+                format_processed = false;
+            } else {
+                using value_type = uint64_t;
+                current_term = values_from_buffer(
+                    env,
+                    values->length,
+                    bitmap_buffer,
+                    (const value_type *)values->buffers[1],
+                    [unit](ErlNifEnv *env, uint64_t val) -> ERL_NIF_TERM {
+                        return unix_timestamp_to_naive_datetime(env, val * unit);
+                    }
+                );
+            }
         // duration
         } else if (strncmp("tD", format, 2) == 0) {
             // TODO: parse duration (not supported by Snowflake)

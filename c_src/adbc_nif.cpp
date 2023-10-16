@@ -300,14 +300,13 @@ static ERL_NIF_TERM unix_second_offset_to_date(ErlNifEnv *env, uint64_t seconds)
     return date;
 }
 
-static ERL_NIF_TERM nanoseconds_to_time(ErlNifEnv *env, uint64_t ns) {
+static ERL_NIF_TERM nanoseconds_to_time(ErlNifEnv *env, uint64_t ns, uint8_t us_precision) {
     // Elixir only supports microsecond precision
     uint64_t us = ns / 1000;
     time_t s = (time_t)(us / 1000000);
     tm* time = gmtime(&s);
 
     us = us % 1000000;
-    uint64_t us_precision = 6;
 
     ERL_NIF_TERM t;
     ERL_NIF_TERM keys[] = {
@@ -330,14 +329,13 @@ static ERL_NIF_TERM nanoseconds_to_time(ErlNifEnv *env, uint64_t ns) {
     return t;
 }
 
-static ERL_NIF_TERM unix_timestamp_to_naive_datetime(ErlNifEnv *env, uint64_t timestamp) {
+static ERL_NIF_TERM unix_timestamp_to_naive_datetime(ErlNifEnv *env, uint64_t timestamp, uint8_t us_precision) {
     // Elixir only supports microsecond precision
     uint64_t us = timestamp / 1000;
     time_t t = (time_t)(us / 1000000);
     tm* time = gmtime(&t);
 
     us = us % 1000000;
-    uint64_t us_precision = 6;
 
     ERL_NIF_TERM date_time;
     ERL_NIF_TERM keys[] = {
@@ -544,72 +542,104 @@ int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct 
         } else if (strncmp("td", format, 2) == 0) {
             char unit = format[2];
 
-            using value_type = uint64_t;
-            current_term = values_from_buffer(
-                env,
-                values->length,
-                bitmap_buffer,
-                (const value_type *)values->buffers[1],
-                [unit](ErlNifEnv *env, uint64_t val) -> ERL_NIF_TERM {
-                    switch (unit) {
-                        case 'D': // days
-                            return unix_second_offset_to_date(env, val * 24 * 60 * 60);
-                        case 'm': // milliseconds
-                            return unix_second_offset_to_date(env, val / 1000);
-                    }
-                }
-            );
+            if (unit == 'D' || unit == 'm') {
+              using value_type = uint64_t;
+              current_term = values_from_buffer(
+                  env,
+                  values->length,
+                  bitmap_buffer,
+                  (const value_type *)values->buffers[1],
+                  [unit](ErlNifEnv *env, uint64_t val) -> ERL_NIF_TERM {
+                      switch (unit) {
+                          case 'D': // days
+                              return unix_second_offset_to_date(env, val * 24 * 60 * 60);
+                          case 'm': // milliseconds
+                              return unix_second_offset_to_date(env, val / 1000);
+                          default:
+                              __builtin_unreachable();
+                      }
+                  }
+              );
+            } else {
+              format_processed = false;
+            }
         // time
         } else if (strncmp("tt", format, 2) == 0) {
             uint64_t unit;
+            uint8_t us_precision;
             switch (format[2]) {
                 case 's': // seconds
                     unit = 1000000000;
+                    us_precision = 0;
+                    break;
                 case 'm': // milliseconds
                     unit = 1000000;
+                    us_precision = 3;
+                    break;
                 case 'u': // microseconds
                     unit = 1000;
+                    us_precision = 6;
+                    break;
                 case 'n': // nanoseconds
                     unit = 1;
+                    us_precision = 6;
+                    break;
+                default:
+                    format_processed = false;
             }
 
-            using value_type = uint64_t;
-            current_term = values_from_buffer(
-                env,
-                values->length,
-                bitmap_buffer,
-                (const value_type *)values->buffers[1],
-                [unit](ErlNifEnv *env, uint64_t val) -> ERL_NIF_TERM {
-                    return nanoseconds_to_time(env, val * unit);
-                }
-            );
+            if (format_processed) {
+              using value_type = uint64_t;
+              current_term = values_from_buffer(
+                  env,
+                  values->length,
+                  bitmap_buffer,
+                  (const value_type *)values->buffers[1],
+                  [unit, us_precision](ErlNifEnv *env, uint64_t val) -> ERL_NIF_TERM {
+                      return nanoseconds_to_time(env, val * unit, us_precision);
+                  }
+              );
+            }
         // timestamp
         } else if (strncmp("ts", format, 2) == 0) {
             uint64_t unit;
+            uint8_t us_precision;
             switch (format[2]) {
                 case 's': // seconds
                     unit = 1000000000;
+                    us_precision = 0;
+                    break;
                 case 'm': // milliseconds
                     unit = 1000000;
+                    us_precision = 3;
+                    break;
                 case 'u': // microseconds
                     unit = 1000;
+                    us_precision = 6;
+                    break;
                 case 'n': // nanoseconds
                     unit = 1;
+                    us_precision = 6;
+                    break;
+                default:
+                    format_processed = false;
             }
 
             if (format_len > 4) {
                 // TODO: handle timezones (Snowflake always returns naive datetimes)
                 // std::string timezone (&format[4]);
                 format_processed = false;
-            } else {
+            }
+
+            if (format_processed) {
                 using value_type = uint64_t;
                 current_term = values_from_buffer(
                     env,
                     values->length,
                     bitmap_buffer,
                     (const value_type *)values->buffers[1],
-                    [unit](ErlNifEnv *env, uint64_t val) -> ERL_NIF_TERM {
-                        return unix_timestamp_to_naive_datetime(env, val * unit);
+                    [unit, us_precision](ErlNifEnv *env, uint64_t val) -> ERL_NIF_TERM {
+                        return unix_timestamp_to_naive_datetime(env, val * unit, us_precision);
                     }
                 );
             }

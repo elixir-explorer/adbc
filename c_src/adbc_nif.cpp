@@ -277,58 +277,6 @@ static ERL_NIF_TERM get_arrow_array_list_children(ErlNifEnv *env, struct ArrowSc
     return enif_make_list_from_array(env, children.data(), (unsigned)items_values->n_children);
 }
 
-ERL_NIF_TERM unix_second_offset_to_date(ErlNifEnv *env, uint64_t seconds) {
-    time_t t = (time_t)seconds;
-    tm* time = gmtime(&t);
-
-    ERL_NIF_TERM date;
-    ERL_NIF_TERM keys[] = {
-        erlang::nif::atom(env, "__struct__"),
-        erlang::nif::atom(env, "calendar"),
-        erlang::nif::atom(env, "year"),
-        erlang::nif::atom(env, "month"),
-        erlang::nif::atom(env, "day")
-    };
-    ERL_NIF_TERM values[] = {
-        erlang::nif::atom(env, "Elixir.Date"),
-        erlang::nif::atom(env, "Elixir.Calendar.ISO"),
-        enif_make_int(env, time->tm_year + 1900),
-        enif_make_int(env, time->tm_mon + 1),
-        enif_make_int(env, time->tm_mday)
-    };
-    enif_make_map_from_arrays(env, keys, values, sizeof(keys)/sizeof(keys[0]), &date);
-    return date;
-}
-
-ERL_NIF_TERM nanoseconds_to_time(ErlNifEnv *env, uint64_t ns, uint8_t us_precision) {
-    // Elixir only supports microsecond precision
-    uint64_t us = ns / 1000;
-    time_t s = (time_t)(us / 1000000);
-    tm* time = gmtime(&s);
-
-    us = us % 1000000;
-
-    ERL_NIF_TERM t;
-    ERL_NIF_TERM keys[] = {
-        erlang::nif::atom(env, "__struct__"),
-        erlang::nif::atom(env, "calendar"),
-        erlang::nif::atom(env, "hour"),
-        erlang::nif::atom(env, "minute"),
-        erlang::nif::atom(env, "second"),
-        erlang::nif::atom(env, "microsecond")
-    };
-    ERL_NIF_TERM values[] = {
-        erlang::nif::atom(env, "Elixir.Time"),
-        erlang::nif::atom(env, "Elixir.Calendar.ISO"),
-        enif_make_int(env, time->tm_hour),
-        enif_make_int(env, time->tm_min),
-        enif_make_int(env, time->tm_sec),
-        enif_make_tuple2(env, enif_make_int(env, us), enif_make_int(env, us_precision))
-    };
-    enif_make_map_from_arrays(env, keys, values, sizeof(keys)/sizeof(keys[0]), &t);
-    return t;
-}
-
 ERL_NIF_TERM unix_timestamp_to_naive_datetime(ErlNifEnv *env, uint64_t timestamp, uint8_t us_precision) {
     // Elixir only supports microsecond precision
     uint64_t us = timestamp / 1000;
@@ -569,7 +517,7 @@ int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct 
                         }
                         time_t t = (time_t)seconds;
                         tm* time = gmtime(&t);
-                        ERL_NIF_TERM date;
+                        ERL_NIF_TERM ex_date;
                         ERL_NIF_TERM values[] = {
                             date_module,
                             calendar_iso,
@@ -577,8 +525,8 @@ int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct 
                             enif_make_int(env, time->tm_mon + 1),
                             enif_make_int(env, time->tm_mday)
                         };
-                        enif_make_map_from_arrays(env, keys, values, 5, &date);
-                        return date;
+                        enif_make_map_from_arrays(env, keys, values, 5, &ex_date);
+                        return ex_date;
                     }
               );
             } else {
@@ -610,15 +558,44 @@ int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct 
             }
 
             if (format_processed) {
-              using value_type = uint64_t;
-              current_term = values_from_buffer(
-                  env,
-                  values->length,
-                  bitmap_buffer,
-                  (const value_type *)values->buffers[1],
-                  [unit, us_precision](ErlNifEnv *env, uint64_t val) -> ERL_NIF_TERM {
-                      return nanoseconds_to_time(env, val * unit, us_precision);
-                  }
+                using value_type = uint64_t;
+
+                ERL_NIF_TERM keys[] = {
+                    erlang::nif::atom(env, "__struct__"),
+                    erlang::nif::atom(env, "calendar"),
+                    erlang::nif::atom(env, "hour"),
+                    erlang::nif::atom(env, "minute"),
+                    erlang::nif::atom(env, "second"),
+                    erlang::nif::atom(env, "microsecond")
+                };
+
+                ERL_NIF_TERM time_module = erlang::nif::atom(env, "Elixir.Time");
+                ERL_NIF_TERM calendar_iso = erlang::nif::atom(env, "Elixir.Calendar.ISO");
+
+                current_term = values_from_buffer(
+                    env,
+                    values->length,
+                    bitmap_buffer,
+                    (const value_type *)values->buffers[1],
+                    [unit, us_precision, time_module, calendar_iso, &keys](ErlNifEnv *env, uint64_t val) -> ERL_NIF_TERM {
+                        // Elixir only supports microsecond precision
+                        uint64_t us = val * unit / 1000;
+                        time_t s = (time_t)(us / 1000000);
+                        tm* time = gmtime(&s);
+                        us = us % 1000000;
+
+                        ERL_NIF_TERM ex_time;
+                        ERL_NIF_TERM values[] = {
+                            time_module,
+                            calendar_iso,
+                            enif_make_int(env, time->tm_hour),
+                            enif_make_int(env, time->tm_min),
+                            enif_make_int(env, time->tm_sec),
+                            enif_make_tuple2(env, enif_make_int(env, us), enif_make_int(env, us_precision))
+                        };
+                        enif_make_map_from_arrays(env, keys, values, 6, &ex_time);
+                        return ex_time;
+                    }
               );
             }
         // timestamp

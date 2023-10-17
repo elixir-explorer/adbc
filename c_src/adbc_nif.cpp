@@ -277,6 +277,93 @@ static ERL_NIF_TERM get_arrow_array_list_children(ErlNifEnv *env, struct ArrowSc
     return enif_make_list_from_array(env, children.data(), (unsigned)items_values->n_children);
 }
 
+static ERL_NIF_TERM unix_second_offset_to_date(ErlNifEnv *env, uint64_t seconds) {
+    time_t t = (time_t)seconds;
+    tm* time = gmtime(&t);
+
+    ERL_NIF_TERM date;
+    ERL_NIF_TERM keys[] = {
+        erlang::nif::atom(env, "__struct__"),
+        erlang::nif::atom(env, "calendar"),
+        erlang::nif::atom(env, "year"),
+        erlang::nif::atom(env, "month"),
+        erlang::nif::atom(env, "day")
+    };
+    ERL_NIF_TERM values[] = {
+        erlang::nif::atom(env, "Elixir.Date"),
+        erlang::nif::atom(env, "Elixir.Calendar.ISO"),
+        enif_make_int(env, time->tm_year + 1900),
+        enif_make_int(env, time->tm_mon + 1),
+        enif_make_int(env, time->tm_mday)
+    };
+    enif_make_map_from_arrays(env, keys, values, sizeof(keys)/sizeof(keys[0]), &date);
+    return date;
+}
+
+static ERL_NIF_TERM nanoseconds_to_time(ErlNifEnv *env, uint64_t ns, uint8_t us_precision) {
+    // Elixir only supports microsecond precision
+    uint64_t us = ns / 1000;
+    time_t s = (time_t)(us / 1000000);
+    tm* time = gmtime(&s);
+
+    us = us % 1000000;
+
+    ERL_NIF_TERM t;
+    ERL_NIF_TERM keys[] = {
+        erlang::nif::atom(env, "__struct__"),
+        erlang::nif::atom(env, "calendar"),
+        erlang::nif::atom(env, "hour"),
+        erlang::nif::atom(env, "minute"),
+        erlang::nif::atom(env, "second"),
+        erlang::nif::atom(env, "microsecond")
+    };
+    ERL_NIF_TERM values[] = {
+        erlang::nif::atom(env, "Elixir.Time"),
+        erlang::nif::atom(env, "Elixir.Calendar.ISO"),
+        enif_make_int(env, time->tm_hour),
+        enif_make_int(env, time->tm_min),
+        enif_make_int(env, time->tm_sec),
+        enif_make_tuple2(env, enif_make_int(env, us), enif_make_int(env, us_precision))
+    };
+    enif_make_map_from_arrays(env, keys, values, sizeof(keys)/sizeof(keys[0]), &t);
+    return t;
+}
+
+static ERL_NIF_TERM unix_timestamp_to_naive_datetime(ErlNifEnv *env, uint64_t timestamp, uint8_t us_precision) {
+    // Elixir only supports microsecond precision
+    uint64_t us = timestamp / 1000;
+    time_t t = (time_t)(us / 1000000);
+    tm* time = gmtime(&t);
+
+    us = us % 1000000;
+
+    ERL_NIF_TERM date_time;
+    ERL_NIF_TERM keys[] = {
+        erlang::nif::atom(env, "__struct__"),
+        erlang::nif::atom(env, "calendar"),
+        erlang::nif::atom(env, "year"),
+        erlang::nif::atom(env, "month"),
+        erlang::nif::atom(env, "day"),
+        erlang::nif::atom(env, "hour"),
+        erlang::nif::atom(env, "minute"),
+        erlang::nif::atom(env, "second"),
+        erlang::nif::atom(env, "microsecond"),
+    };
+    ERL_NIF_TERM values[] = {
+        erlang::nif::atom(env, "Elixir.NaiveDateTime"),
+        erlang::nif::atom(env, "Elixir.Calendar.ISO"),
+        enif_make_int(env, time->tm_year + 1900),
+        enif_make_int(env, time->tm_mon + 1),
+        enif_make_int(env, time->tm_mday),
+        enif_make_int(env, time->tm_hour),
+        enif_make_int(env, time->tm_min),
+        enif_make_int(env, time->tm_sec),
+        enif_make_tuple2(env, enif_make_int(env, us), enif_make_int(env, us_precision))
+    };
+    enif_make_map_from_arrays(env, keys, values, sizeof(keys)/sizeof(keys[0]), &date_time);
+    return date_time;
+}
+
 int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct ArrowArray * values, uint64_t level, std::vector<ERL_NIF_TERM> &out_terms, ERL_NIF_TERM &error) {
     if (schema == nullptr) {
         error = erlang::nif::error(env, "invalid ArrowSchema (nullptr) when invoking next");
@@ -451,6 +538,111 @@ int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct 
             children_term = enif_make_list_from_array(env, children.data(), (unsigned)schema->n_children); 
         } else if (format_len > 4 && (strncmp("+ud:", format, 4) == 0 || strncmp("+us:", format, 4) == 0)) {
             children_term = get_arrow_array_union_children(env, schema, values, level);
+        // date
+        } else if (strncmp("td", format, 2) == 0) {
+            char unit = format[2];
+
+            if (unit == 'D' || unit == 'm') {
+              using value_type = uint64_t;
+              current_term = values_from_buffer(
+                  env,
+                  values->length,
+                  bitmap_buffer,
+                  (const value_type *)values->buffers[1],
+                  [unit](ErlNifEnv *env, uint64_t val) -> ERL_NIF_TERM {
+                      switch (unit) {
+                          case 'D': // days
+                              return unix_second_offset_to_date(env, val * 24 * 60 * 60);
+                          case 'm': // milliseconds
+                              return unix_second_offset_to_date(env, val / 1000);
+                          default:
+                              __builtin_unreachable();
+                      }
+                  }
+              );
+            } else {
+              format_processed = false;
+            }
+        // time
+        } else if (strncmp("tt", format, 2) == 0) {
+            uint64_t unit;
+            uint8_t us_precision;
+            switch (format[2]) {
+                case 's': // seconds
+                    unit = 1000000000;
+                    us_precision = 0;
+                    break;
+                case 'm': // milliseconds
+                    unit = 1000000;
+                    us_precision = 3;
+                    break;
+                case 'u': // microseconds
+                    unit = 1000;
+                    us_precision = 6;
+                    break;
+                case 'n': // nanoseconds
+                    unit = 1;
+                    us_precision = 6;
+                    break;
+                default:
+                    format_processed = false;
+            }
+
+            if (format_processed) {
+              using value_type = uint64_t;
+              current_term = values_from_buffer(
+                  env,
+                  values->length,
+                  bitmap_buffer,
+                  (const value_type *)values->buffers[1],
+                  [unit, us_precision](ErlNifEnv *env, uint64_t val) -> ERL_NIF_TERM {
+                      return nanoseconds_to_time(env, val * unit, us_precision);
+                  }
+              );
+            }
+        // timestamp
+        } else if (strncmp("ts", format, 2) == 0) {
+            uint64_t unit;
+            uint8_t us_precision;
+            switch (format[2]) {
+                case 's': // seconds
+                    unit = 1000000000;
+                    us_precision = 0;
+                    break;
+                case 'm': // milliseconds
+                    unit = 1000000;
+                    us_precision = 3;
+                    break;
+                case 'u': // microseconds
+                    unit = 1000;
+                    us_precision = 6;
+                    break;
+                case 'n': // nanoseconds
+                    unit = 1;
+                    us_precision = 6;
+                    break;
+                default:
+                    format_processed = false;
+            }
+
+            if (format_len > 4) {
+                // TODO: handle timezones (Snowflake always returns naive datetimes)
+                // std::string timezone (&format[4]);
+                format_processed = false;
+            }
+
+            if (format_processed) {
+                using value_type = uint64_t;
+                current_term = values_from_buffer(
+                    env,
+                    values->length,
+                    bitmap_buffer,
+                    (const value_type *)values->buffers[1],
+                    [unit, us_precision](ErlNifEnv *env, uint64_t val) -> ERL_NIF_TERM {
+                        return unix_timestamp_to_naive_datetime(env, val * unit, us_precision);
+                    }
+                );
+            }
         } else {
             format_processed = false;
         }

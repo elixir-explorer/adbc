@@ -550,13 +550,12 @@ int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct 
                   bitmap_buffer,
                   (const value_type *)values->buffers[1],
                   [unit](ErlNifEnv *env, uint64_t val) -> ERL_NIF_TERM {
-                      switch (unit) {
-                          case 'D': // days
-                              return unix_second_offset_to_date(env, val * 24 * 60 * 60);
-                          case 'm': // milliseconds
-                              return unix_second_offset_to_date(env, val / 1000);
-                          default:
-                              __builtin_unreachable();
+                      if (unit == 'D') {
+                          // days
+                          return unix_second_offset_to_date(env, val * 24 * 60 * 60);
+                      } else {
+                          // milliseconds
+                          return unix_second_offset_to_date(env, val / 1000);
                       }
                   }
               );

@@ -456,8 +456,6 @@ int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct 
             char unit = format[2];
 
             if (unit == 'D' || unit == 'm') {
-                using value_type = uint64_t;
-
                 ERL_NIF_TERM date_module = erlang::nif::atom(env, "Elixir.Date");
                 ERL_NIF_TERM calendar_iso = erlang::nif::atom(env, "Elixir.Calendar.ISO");
                 ERL_NIF_TERM keys[] = {
@@ -468,32 +466,45 @@ int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct 
                     erlang::nif::atom(env, "day")
                 };
 
-                current_term = values_from_buffer(
-                    env,
-                    values->length,
-                    bitmap_buffer,
-                    (const value_type *)values->buffers[1],
-                    [unit, date_module, calendar_iso, &keys](ErlNifEnv *env, uint64_t val) -> ERL_NIF_TERM {
-                        uint64_t seconds;
-                        if (unit == 'D') {
-                            seconds = val * 24 * 60 * 60; // days
-                        } else {
-                            seconds = val / 1000; // milliseconds
-                        }
-                        time_t t = (time_t)seconds;
-                        tm* time = gmtime(&t);
-                        ERL_NIF_TERM ex_date;
-                        ERL_NIF_TERM values[] = {
-                            date_module,
-                            calendar_iso,
-                            enif_make_int(env, time->tm_year + 1900),
-                            enif_make_int(env, time->tm_mon + 1),
-                            enif_make_int(env, time->tm_mday)
-                        };
-                        enif_make_map_from_arrays(env, keys, values, 5, &ex_date);
-                        return ex_date;
+                auto convert = [unit, date_module, calendar_iso, &keys](ErlNifEnv *env, uint64_t val) -> ERL_NIF_TERM {
+                    uint64_t seconds;
+                    if (unit == 'D') {
+                        seconds = val * 24 * 60 * 60; // days
+                    } else {
+                        seconds = val / 1000; // milliseconds
                     }
-              );
+                    time_t t = (time_t)seconds;
+                    tm* time = gmtime(&t);
+                    ERL_NIF_TERM ex_date;
+                    ERL_NIF_TERM values[] = {
+                        date_module,
+                        calendar_iso,
+                        enif_make_int(env, time->tm_year + 1900),
+                        enif_make_int(env, time->tm_mon + 1),
+                        enif_make_int(env, time->tm_mday)
+                    };
+                    enif_make_map_from_arrays(env, keys, values, 5, &ex_date);
+                    return ex_date;
+                };
+                if (unit == 'D') {
+                    using value_type = uint32_t;
+                    current_term = values_from_buffer(
+                        env,
+                        values->length,
+                        bitmap_buffer,
+                        (const value_type *)values->buffers[1],
+                        convert
+                    );
+                } else {
+                    using value_type = uint64_t;
+                    current_term = values_from_buffer(
+                        env,
+                        values->length,
+                        bitmap_buffer,
+                        (const value_type *)values->buffers[1],
+                        convert
+                    );
+                }
             } else {
               format_processed = false;
             }

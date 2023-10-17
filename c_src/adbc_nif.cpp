@@ -643,14 +643,6 @@ int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct 
                     }
                 );
             }
-        // duration
-        } else if (strncmp("tD", format, 2) == 0) {
-            // TODO: parse duration (not supported by Snowflake)
-            format_processed = false;
-        // interval
-        } else if (strncmp("ti", format, 2) == 0) {
-            // TODO: parse interval (not supported by Snowflake)
-            format_processed = false;
         } else {
             format_processed = false;
         }

@@ -107,13 +107,14 @@ defmodule AdbcTest do
       select
         1 as one,
         2 as two,
-        3 as three
+        3 as three,
+        '10:23:45'::time as time
         
       """
 
       assert %Adbc.Result{
                data: %{
-
+                 "time" => [~T[10:23:45.000000]],
                  "one" => [1],
                  "two" => [2],
                  "three" => [3],

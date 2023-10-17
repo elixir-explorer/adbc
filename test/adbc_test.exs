@@ -35,24 +35,68 @@ defmodule AdbcTest do
                Connection.query(conn, "SELECT 123 as num")
     end
 
-    test "select with temporal types", %{conn: conn} do
+    test "select with temporal types 1", %{conn: conn} do
       query = """
       select
-        '2023-03-01T10:23:45'::timestamp as datetime,
-        '2023-03-01T10:23:45.123456'::timestamp as datetime_usec,
-        -- timestamp support is not yet implemented
-        -- '2023-03-01T10:23:45 PST'::timestamptz as datetime_tz,
-        '2023-03-01'::date as date,
-        '10:23:45'::time as time,
+        '2023-03-01T10:23:45'::timestamp as datetime
+        
+      """
+
+      assert %Adbc.Result{
+               data: %{
+
+                 "datetime" => [~N[2023-03-01 10:23:45.000000]],
+               }
+             } = Connection.query!(conn, query)
+    end
+        test "select with temporal types 2", %{conn: conn} do
+      query = """
+      select
+        '2023-03-01T10:23:45.123456'::timestamp as datetime_usec
+        
+      """
+
+      assert %Adbc.Result{
+               data: %{
+                 "datetime_usec" => [~N[2023-03-01 10:23:45.123456]]
+                 
+               }
+             } = Connection.query!(conn, query)
+    end
+        test "select with temporal types 3", %{conn: conn} do
+      query = """
+      select
+        
+        '2023-03-01'::date as date
+      """
+
+      assert %Adbc.Result{
+               data: %{
+                 "date" => [~D[2023-03-01]]
+               }
+             } = Connection.query!(conn, query)
+    end
+        test "select with temporal types 4", %{conn: conn} do
+      query = """
+      select
+        
+        '10:23:45'::time as time
+      """
+
+      assert %Adbc.Result{
+               data: %{
+                 "time" => [~T[10:23:45.000000]],
+               }
+             } = Connection.query!(conn, query)
+    end
+        test "select with temporal types 5", %{conn: conn} do
+      query = """
+      select
         '10:23:45.123456'::time as time_usec
       """
 
       assert %Adbc.Result{
                data: %{
-                 "date" => [~D[2023-03-01]],
-                 "datetime" => [~N[2023-03-01 10:23:45.000000]],
-                 "datetime_usec" => [~N[2023-03-01 10:23:45.123456]],
-                 "time" => [~T[10:23:45.000000]],
                  "time_usec" => [~T[10:23:45.123456]]
                }
              } = Connection.query!(conn, query)

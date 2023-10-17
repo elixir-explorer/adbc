@@ -43,7 +43,7 @@ jobs:
       - name: Compile and Test
         run: |
           mix deps.get
-          mix test
+          mix test --trace
 
       - name: Test custom driver
         run: |

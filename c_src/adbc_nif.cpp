@@ -277,41 +277,6 @@ static ERL_NIF_TERM get_arrow_array_list_children(ErlNifEnv *env, struct ArrowSc
     return enif_make_list_from_array(env, children.data(), (unsigned)items_values->n_children);
 }
 
-ERL_NIF_TERM unix_timestamp_to_naive_datetime(ErlNifEnv *env, uint64_t timestamp, uint8_t us_precision) {
-    // Elixir only supports microsecond precision
-    uint64_t us = timestamp / 1000;
-    time_t t = (time_t)(us / 1000000);
-    tm* time = gmtime(&t);
-
-    us = us % 1000000;
-
-    ERL_NIF_TERM date_time;
-    ERL_NIF_TERM keys[] = {
-        erlang::nif::atom(env, "__struct__"),
-        erlang::nif::atom(env, "calendar"),
-        erlang::nif::atom(env, "year"),
-        erlang::nif::atom(env, "month"),
-        erlang::nif::atom(env, "day"),
-        erlang::nif::atom(env, "hour"),
-        erlang::nif::atom(env, "minute"),
-        erlang::nif::atom(env, "second"),
-        erlang::nif::atom(env, "microsecond"),
-    };
-    ERL_NIF_TERM values[] = {
-        erlang::nif::atom(env, "Elixir.NaiveDateTime"),
-        erlang::nif::atom(env, "Elixir.Calendar.ISO"),
-        enif_make_int(env, time->tm_year + 1900),
-        enif_make_int(env, time->tm_mon + 1),
-        enif_make_int(env, time->tm_mday),
-        enif_make_int(env, time->tm_hour),
-        enif_make_int(env, time->tm_min),
-        enif_make_int(env, time->tm_sec),
-        enif_make_tuple2(env, enif_make_int(env, us), enif_make_int(env, us_precision))
-    };
-    enif_make_map_from_arrays(env, keys, values, sizeof(keys)/sizeof(keys[0]), &date_time);
-    return date_time;
-}
-
 int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct ArrowArray * values, uint64_t level, std::vector<ERL_NIF_TERM> &out_terms, ERL_NIF_TERM &error) {
     if (schema == nullptr) {
         error = erlang::nif::error(env, "invalid ArrowSchema (nullptr) when invoking next");
@@ -631,13 +596,49 @@ int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct 
 
             if (format_processed) {
                 using value_type = uint64_t;
+
+                ERL_NIF_TERM naive_dt_module = erlang::nif::atom(env, "Elixir.NaiveDateTime");
+                ERL_NIF_TERM calendar_iso = erlang::nif::atom(env, "Elixir.Calendar.ISO");
+
+                ERL_NIF_TERM keys[] = {
+                    erlang::nif::atom(env, "__struct__"),
+                    erlang::nif::atom(env, "calendar"),
+                    erlang::nif::atom(env, "year"),
+                    erlang::nif::atom(env, "month"),
+                    erlang::nif::atom(env, "day"),
+                    erlang::nif::atom(env, "hour"),
+                    erlang::nif::atom(env, "minute"),
+                    erlang::nif::atom(env, "second"),
+                    erlang::nif::atom(env, "microsecond"),
+                };
+
                 current_term = values_from_buffer(
                     env,
                     values->length,
                     bitmap_buffer,
                     (const value_type *)values->buffers[1],
-                    [unit, us_precision](ErlNifEnv *env, uint64_t val) -> ERL_NIF_TERM {
-                        return unix_timestamp_to_naive_datetime(env, val * unit, us_precision);
+                    [unit, us_precision, naive_dt_module, calendar_iso, &keys](ErlNifEnv *env, uint64_t val) -> ERL_NIF_TERM {
+                        // Elixir only supports microsecond precision
+                        uint64_t us = val * unit / 1000;
+                        time_t t = (time_t)(us / 1000000);
+                        tm* time = gmtime(&t);
+                        us = us % 1000000;
+
+                        ERL_NIF_TERM ex_dt;
+                        ERL_NIF_TERM values[] = {
+                            naive_dt_module,
+                            calendar_iso,
+                            enif_make_int(env, time->tm_year + 1900),
+                            enif_make_int(env, time->tm_mon + 1),
+                            enif_make_int(env, time->tm_mday),
+                            enif_make_int(env, time->tm_hour),
+                            enif_make_int(env, time->tm_min),
+                            enif_make_int(env, time->tm_sec),
+                            enif_make_tuple2(env, enif_make_int(env, us), enif_make_int(env, us_precision))
+                        };
+
+                        enif_make_map_from_arrays(env, keys, values, 9, &ex_dt);
+                        return ex_dt;
                     }
                 );
             }

@@ -101,6 +101,25 @@ defmodule AdbcTest do
                }
              } = Connection.query!(conn, query)
     end
+
+        test "select many", %{conn: conn} do
+      query = """
+      select
+        1 as one,
+        2 as two,
+        3 as three
+        
+      """
+
+      assert %Adbc.Result{
+               data: %{
+
+                 "one" => [1],
+                 "two" => [2],
+                 "three" => [3],
+               }
+             } = Connection.query!(conn, query)
+    end
   end
 
   describe "duckdb smoke tests" do

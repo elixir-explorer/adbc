@@ -277,7 +277,7 @@ static ERL_NIF_TERM get_arrow_array_list_children(ErlNifEnv *env, struct ArrowSc
     return enif_make_list_from_array(env, children.data(), (unsigned)items_values->n_children);
 }
 
-static ERL_NIF_TERM unix_second_offset_to_date(ErlNifEnv *env, uint64_t seconds) {
+ERL_NIF_TERM unix_second_offset_to_date(ErlNifEnv *env, uint64_t seconds) {
     time_t t = (time_t)seconds;
     tm* time = gmtime(&t);
 
@@ -300,7 +300,7 @@ static ERL_NIF_TERM unix_second_offset_to_date(ErlNifEnv *env, uint64_t seconds)
     return date;
 }
 
-static ERL_NIF_TERM nanoseconds_to_time(ErlNifEnv *env, uint64_t ns, uint8_t us_precision) {
+ERL_NIF_TERM nanoseconds_to_time(ErlNifEnv *env, uint64_t ns, uint8_t us_precision) {
     // Elixir only supports microsecond precision
     uint64_t us = ns / 1000;
     time_t s = (time_t)(us / 1000000);
@@ -329,7 +329,7 @@ static ERL_NIF_TERM nanoseconds_to_time(ErlNifEnv *env, uint64_t ns, uint8_t us_
     return t;
 }
 
-static ERL_NIF_TERM unix_timestamp_to_naive_datetime(ErlNifEnv *env, uint64_t timestamp, uint8_t us_precision) {
+ERL_NIF_TERM unix_timestamp_to_naive_datetime(ErlNifEnv *env, uint64_t timestamp, uint8_t us_precision) {
     // Elixir only supports microsecond precision
     uint64_t us = timestamp / 1000;
     time_t t = (time_t)(us / 1000000);
@@ -550,13 +550,12 @@ int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct 
                   bitmap_buffer,
                   (const value_type *)values->buffers[1],
                   [unit](ErlNifEnv *env, uint64_t val) -> ERL_NIF_TERM {
-                      switch (unit) {
-                          case 'D': // days
-                              return unix_second_offset_to_date(env, val * 24 * 60 * 60);
-                          case 'm': // milliseconds
-                              return unix_second_offset_to_date(env, val / 1000);
-                          default:
-                              __builtin_unreachable();
+                      if (unit == 'D') {
+                          // days
+                          return unix_second_offset_to_date(env, val * 24 * 60 * 60);
+                      } else {
+                          // milliseconds
+                          return unix_second_offset_to_date(env, val / 1000);
                       }
                   }
               );

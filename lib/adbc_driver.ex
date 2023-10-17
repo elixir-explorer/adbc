@@ -6,7 +6,7 @@ defmodule Adbc.Driver do
 
   @official_drivers ~w(sqlite postgresql flightsql snowflake)a
   @official_driver_base_url "https://github.com/apache/arrow-adbc/releases/download/apache-arrow-adbc-"
-  @version "0.5.1"
+  @version "0.7.0"
 
   def download(driver_name, opts \\ [])
 

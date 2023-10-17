@@ -17,31 +17,40 @@
 
 #pragma once
 
+#include <stdarg.h>
 #include <stdbool.h>
 #include <stdint.h>
 
 #include <adbc.h>
 #include "nanoarrow/nanoarrow.h"
 
-#if defined(__GNUC__)
-#define SET_ERROR_ATTRIBUTE __attribute__((format(printf, 2, 3)))
-#else
-#define SET_ERROR_ATTRIBUTE
-#endif
-
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-/// Set error details using a format string.
-void SetError(struct AdbcError* error, const char* format, ...) SET_ERROR_ATTRIBUTE;
+int AdbcStatusCodeToErrno(AdbcStatusCode code);
 
-#undef SET_ERROR_ATTRIBUTE
+// The printf checking attribute doesn't work properly on gcc 4.8
+// and results in spurious compiler warnings
+#if defined(__clang__) || (defined(__GNUC__) && __GNUC__ >= 5)
+#define ADBC_CHECK_PRINTF_ATTRIBUTE __attribute__((format(printf, 2, 3)))
+#else
+#define ADBC_CHECK_PRINTF_ATTRIBUTE
+#endif
 
-/// Wrap a single batch as a stream.
-AdbcStatusCode BatchToArrayStream(struct ArrowArray* values, struct ArrowSchema* schema,
-                                  struct ArrowArrayStream* stream,
-                                  struct AdbcError* error);
+/// Set error message using a format string.
+void SetError(struct AdbcError* error, const char* format,
+              ...) ADBC_CHECK_PRINTF_ATTRIBUTE;
+
+/// Set error message using a format string.
+void SetErrorVariadic(struct AdbcError* error, const char* format, va_list args);
+
+/// Add an error detail.
+void AppendErrorDetail(struct AdbcError* error, const char* key, const uint8_t* detail,
+                       size_t detail_length);
+
+int CommonErrorGetDetailCount(const struct AdbcError* error);
+struct AdbcErrorDetail CommonErrorGetDetail(const struct AdbcError* error, int index);
 
 struct StringBuilder {
   char* buffer;
@@ -51,14 +60,16 @@ struct StringBuilder {
 };
 int StringBuilderInit(struct StringBuilder* builder, size_t initial_size);
 
-#if defined(__GNUC__)
-#define ADBC_STRING_BUILDER_FORMAT_CHECK __attribute__((format(printf, 2, 3)))
-#else
-#define ADBC_STRING_BUILDER_FORMAT_CHECK
-#endif
-int ADBC_STRING_BUILDER_FORMAT_CHECK StringBuilderAppend(struct StringBuilder* builder,
-                                                         const char* fmt, ...);
+int ADBC_CHECK_PRINTF_ATTRIBUTE StringBuilderAppend(struct StringBuilder* builder,
+                                                    const char* fmt, ...);
 void StringBuilderReset(struct StringBuilder* builder);
+
+#undef ADBC_CHECK_PRINTF_ATTRIBUTE
+
+/// Wrap a single batch as a stream.
+AdbcStatusCode BatchToArrayStream(struct ArrowArray* values, struct ArrowSchema* schema,
+                                  struct ArrowArrayStream* stream,
+                                  struct AdbcError* error);
 
 /// Check an NanoArrow status code.
 #define CHECK_NA(CODE, EXPR, ERROR)                                                 \
@@ -119,6 +130,9 @@ AdbcStatusCode AdbcConnectionGetInfoAppendString(struct ArrowArray* array,
                                                  uint32_t info_code,
                                                  const char* info_value,
                                                  struct AdbcError* error);
+AdbcStatusCode AdbcConnectionGetInfoAppendInt(struct ArrowArray* array,
+                                              uint32_t info_code, int64_t info_value,
+                                              struct AdbcError* error);
 
 AdbcStatusCode AdbcInitConnectionObjectsSchema(struct ArrowSchema* schema,
                                                struct AdbcError* error);

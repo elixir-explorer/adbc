@@ -29,8 +29,10 @@ endif()
 add_arrow_lib(adbc_driver_postgresql
               SOURCES
               connection.cc
+              error.cc
               database.cc
               postgresql.cc
+              result_helper.cc
               statement.cc
               OUTPUTS
               ADBC_LIBRARIES

@@ -19,7 +19,7 @@ defmodule AdbcTest do
   describe "postgresql smoke tests" do
     @describetag :postgresql
 
-    test "runs queries" do
+    setup do
       db =
         start_supervised!(
           {Database, driver: :postgresql, uri: "postgres://postgres:postgres@localhost"}
@@ -27,8 +27,35 @@ defmodule AdbcTest do
 
       conn = start_supervised!({Connection, database: db})
 
+      %{db: db, conn: conn}
+    end
+
+    test "runs queries", %{conn: conn} do
       assert {:ok, %Adbc.Result{data: %{"num" => [123]}}} =
                Connection.query(conn, "SELECT 123 as num")
+    end
+
+    test "select with temporal types", %{conn: conn} do
+      query = """
+      select
+        '2023-03-01T10:23:45'::timestamp as datetime,
+        '2023-03-01T10:23:45.123456'::timestamp as datetime_usec,
+        -- timestamp support is not yet implemented
+        -- '2023-03-01T10:23:45 PST'::timestamptz as datetime_tz,
+        '2023-03-01'::date as date,
+        '10:23:45'::time as time,
+        '10:23:45.123456'::time as time_usec
+      """
+
+      assert %Adbc.Result{
+               data: %{
+                 "date" => [~D[2023-03-01]],
+                 "datetime" => [~N[2023-03-01 10:23:45.000000]],
+                 "datetime_usec" => [~N[2023-03-01 10:23:45.123456]],
+                 "time" => [~T[10:23:45.000000]],
+                 "time_usec" => [~T[10:23:45.123456]]
+               }
+             } = Connection.query!(conn, query)
     end
   end
 

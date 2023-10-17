@@ -43,7 +43,11 @@ jobs:
       - name: Compile and Test
         run: |
           mix deps.get
-          mix test --include duckdb
+          mix test
+
+      - name: Test custom driver
+        run: |
+          mix test --only duckdb
 
   windows:
     if: "!contains(github.event.pull_request.labels.*.name, 'skip ci')"

@@ -59,6 +59,15 @@ And now you can make queries with:
 {:ok, _} = Adbc.Connection.query(conn, "SELECT 123")
 ```
 
+## Updating ADBC
+
+This library vendors ADBC C implementation inside the 3rd_party folder.
+In order to update it:
+
+  1. Download source for [latest ADBC release](https://github.com/apache/arrow-adbc/releases/)
+  2. Copy root files and c/ directory from ADBC into 3rd_party/apache-arrow-adbc
+  3. Update the driver version in `lib/adbc_driver.ex`
+
 ## License
 
 Copyright 2023 Cocoa Xu, José Valim

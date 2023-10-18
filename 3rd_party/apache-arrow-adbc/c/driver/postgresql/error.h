@@ -15,46 +15,28 @@
 // specific language governing permissions and limitations
 // under the License.
 
+// Error handling utilities.
+
 #pragma once
 
-#include <stddef.h>
-#include <stdint.h>
-
 #include <adbc.h>
-#include <sqlite3.h>
+#include <libpq-fe.h>
 
-#include "statement_reader.h"
+namespace adbcpq {
 
-struct SqliteDatabase {
-  sqlite3* db;
-  char* uri;
-  size_t connection_count;
-};
+// The printf checking attribute doesn't work properly on gcc 4.8
+// and results in spurious compiler warnings
+#if defined(__clang__) || (defined(__GNUC__) && __GNUC__ >= 5)
+#define ADBC_CHECK_PRINTF_ATTRIBUTE(x, y) __attribute__((format(printf, x, y)))
+#else
+#define ADBC_CHECK_PRINTF_ATTRIBUTE(x, y)
+#endif
 
-struct SqliteConnection {
-  sqlite3* conn;
-  char active_transaction;
-};
+/// \brief Set an error based on a PGresult, inferring the proper ADBC status
+///   code from the PGresult.
+AdbcStatusCode SetError(struct AdbcError* error, PGresult* result, const char* format,
+                        ...) ADBC_CHECK_PRINTF_ATTRIBUTE(3, 4);
 
-struct SqliteStatement {
-  sqlite3* conn;
+#undef ADBC_CHECK_PRINTF_ATTRIBUTE
 
-  // -- Query state -----------------------------------------
-
-  sqlite3_stmt* stmt;
-  char prepared;
-  char* query;
-  size_t query_len;
-
-  // -- Bind state ------------------------------------------
-  struct AdbcSqliteBinder binder;
-
-  // -- Ingest state ----------------------------------------
-  char* target_catalog;
-  char* target_table;
-  char append;
-  char temporary;
-
-  // -- Query options ---------------------------------------
-  int batch_size;
-};
+}  // namespace adbcpq

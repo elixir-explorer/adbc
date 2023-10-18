@@ -55,8 +55,9 @@ class SnowflakeQuirks : public adbc_validation::DriverQuirks {
     adbc_validation::Handle<struct AdbcStatement> statement;
     CHECK_OK(AdbcStatementNew(connection, &statement.value, error));
 
-    std::string drop = "DROP TABLE IF EXISTS ";
+    std::string drop = "DROP TABLE IF EXISTS \"";
     drop += name;
+    drop += "\"";
     CHECK_OK(AdbcStatementSetSqlQuery(&statement.value, drop.c_str(), error));
     CHECK_OK(AdbcStatementExecuteQuery(&statement.value, nullptr, nullptr, error));
 
@@ -100,17 +101,22 @@ class SnowflakeQuirks : public adbc_validation::DriverQuirks {
       case NANOARROW_TYPE_FLOAT:
       case NANOARROW_TYPE_DOUBLE:
         return NANOARROW_TYPE_DOUBLE;
+      case NANOARROW_TYPE_STRING:
+      case NANOARROW_TYPE_LARGE_STRING:
+        return NANOARROW_TYPE_STRING;
       default:
         return ingest_type;
     }
   }
 
   std::string BindParameter(int index) const override { return "?"; }
+  bool supports_bulk_ingest(const char* /*mode*/) const override { return true; }
   bool supports_concurrent_statements() const override { return true; }
   bool supports_transactions() const override { return true; }
   bool supports_get_sql_info() const override { return false; }
   bool supports_get_objects() const override { return true; }
-  bool supports_bulk_ingest() const override { return true; }
+  bool supports_metadata_current_catalog() const override { return false; }
+  bool supports_metadata_current_db_schema() const override { return false; }
   bool supports_partitioned_data() const override { return false; }
   bool supports_dynamic_parameter_binding() const override { return false; }
   bool ddl_implicit_commit_txn() const override { return true; }
@@ -156,6 +162,10 @@ class SnowflakeConnectionTest : public ::testing::Test,
     }
   }
 
+  // Supported, but we don't validate the values
+  void TestMetadataCurrentCatalog() { GTEST_SKIP(); }
+  void TestMetadataCurrentDbSchema() { GTEST_SKIP(); }
+
  protected:
   SnowflakeQuirks quirks_;
 };
@@ -177,7 +187,41 @@ class SnowflakeStatementTest : public ::testing::Test,
     }
   }
 
+  void TestSqlIngestInterval() { GTEST_SKIP(); }
+  void TestSqlIngestDuration() { GTEST_SKIP(); }
+
+  void TestSqlIngestColumnEscaping() { GTEST_SKIP(); }
+
  protected:
+  void ValidateIngestedTemporalData(struct ArrowArrayView* values, ArrowType type,
+                                    enum ArrowTimeUnit unit,
+                                    const char* timezone) override {
+    switch (type) {
+      case NANOARROW_TYPE_TIMESTAMP: {
+        std::vector<std::optional<int64_t>> expected;
+        switch (unit) {
+          case NANOARROW_TIME_UNIT_SECOND:
+            expected = {std::nullopt, -42, 0, 42};
+            break;
+          case NANOARROW_TIME_UNIT_MILLI:
+            expected = {std::nullopt, -42000, 0, 42000};
+            break;
+          case NANOARROW_TIME_UNIT_MICRO:
+            expected = {std::nullopt, -42, 0, 42};
+            break;
+          case NANOARROW_TIME_UNIT_NANO:
+            expected = {std::nullopt, -42, 0, 42};
+            break;
+        }
+        ASSERT_NO_FATAL_FAILURE(
+            adbc_validation::CompareArray<std::int64_t>(values, expected));
+        break;
+      }
+      default:
+        FAIL() << "ValidateIngestedTemporalData not implemented for type " << type;
+    }
+  }
+
   SnowflakeQuirks quirks_;
 };
 ADBCV_TEST_STATEMENT(SnowflakeStatementTest)

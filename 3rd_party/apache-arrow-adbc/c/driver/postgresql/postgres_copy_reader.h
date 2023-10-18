@@ -17,7 +17,9 @@
 
 #pragma once
 
+#include <algorithm>
 #include <cerrno>
+#include <cinttypes>
 #include <cstdint>
 #include <memory>
 #include <string>
@@ -29,12 +31,41 @@
 #include "postgres_type.h"
 #include "postgres_util.h"
 
+// R 3.6 / Windows builds on a very old toolchain that does not define ENODATA
+#if defined(_WIN32) && !defined(MSVC) && !defined(ENODATA)
+#define ENODATA 120
+#endif
+
 namespace adbcpq {
 
 // "PGCOPY\n\377\r\n\0"
 static int8_t kPgCopyBinarySignature[] = {0x50, 0x47, 0x43, 0x4F,
                                           0x50, 0x59, 0x0A, static_cast<int8_t>(0xFF),
                                           0x0D, 0x0A, 0x00};
+
+// The maximum value in seconds that can be converted into microseconds
+// without overflow
+constexpr int64_t kMaxSafeSecondsToMicros = 9223372036854L;
+
+// The minimum value in seconds that can be converted into microseconds
+// without overflow
+constexpr int64_t kMinSafeSecondsToMicros = -9223372036854L;
+
+// The maximum value in milliseconds that can be converted into microseconds
+// without overflow
+constexpr int64_t kMaxSafeMillisToMicros = 9223372036854775L;
+
+// The minimum value in milliseconds that can be converted into microseconds
+// without overflow
+constexpr int64_t kMinSafeMillisToMicros = -9223372036854775L;
+
+// The maximum value in microseconds that can be converted into nanoseconds
+// without overflow
+constexpr int64_t kMaxSafeMicrosToNanos = 9223372036854775L;
+
+// The minimum value in microseconds that can be converted into nanoseconds
+// without overflow
+constexpr int64_t kMinSafeMicrosToNanos = -9223372036854775L;
 
 // Read a value from the buffer without checking the buffer size. Advances
 // the cursor of data and reduces its size by sizeof(T).
@@ -204,6 +235,212 @@ class PostgresCopyNetworkEndianFieldReader : public PostgresCopyFieldReader {
     NANOARROW_RETURN_NOT_OK(ArrowBufferAppend(data_, &value, sizeof(T)));
     return AppendValid(array);
   }
+};
+
+// Reader for Intervals
+class PostgresCopyIntervalFieldReader : public PostgresCopyFieldReader {
+ public:
+  ArrowErrorCode Read(ArrowBufferView* data, int32_t field_size_bytes, ArrowArray* array,
+                      ArrowError* error) override {
+    if (field_size_bytes <= 0) {
+      return ArrowArrayAppendNull(array, 1);
+    }
+
+    if (field_size_bytes != 16) {
+      ArrowErrorSet(error, "Expected field with %d bytes but found field with %d bytes",
+                    16,
+                    static_cast<int>(field_size_bytes));  // NOLINT(runtime/int)
+      return EINVAL;
+    }
+
+    // postgres stores time as usec, arrow stores as ns
+    const int64_t time_usec = ReadUnsafe<int64_t>(data);
+    int64_t time;
+
+    if (time_usec > kMaxSafeMicrosToNanos || time_usec < kMinSafeMicrosToNanos) {
+      ArrowErrorSet(error,
+                    "[libpq] Interval with time value %" PRId64
+                    " usec would overflow when converting to nanoseconds",
+                    time_usec);
+      return EINVAL;
+    }
+
+    time = time_usec * 1000;
+
+    const int32_t days = ReadUnsafe<int32_t>(data);
+    const int32_t months = ReadUnsafe<int32_t>(data);
+
+    NANOARROW_RETURN_NOT_OK(ArrowBufferAppend(data_, &months, sizeof(int32_t)));
+    NANOARROW_RETURN_NOT_OK(ArrowBufferAppend(data_, &days, sizeof(int32_t)));
+    NANOARROW_RETURN_NOT_OK(ArrowBufferAppend(data_, &time, sizeof(int64_t)));
+    return AppendValid(array);
+  }
+};
+
+// // Converts COPY resulting from the Postgres NUMERIC type into a string.
+// Rewritten based on the Postgres implementation of NUMERIC cast to string in
+// src/backend/utils/adt/numeric.c : get_str_from_var() (Note that in the initial source,
+// DEC_DIGITS is always 4 and DBASE is always 10000).
+//
+// Briefly, the Postgres representation of "numeric" is an array of int16_t ("digits")
+// from most significant to least significant. Each "digit" is a value between 0000 and
+// 9999. There are weight + 1 digits before the decimal point and dscale digits after the
+// decimal point. Both of those values can be zero or negative. A "sign" component
+// encodes the positive or negativeness of the value and is also used to encode special
+// values (inf, -inf, and nan).
+class PostgresCopyNumericFieldReader : public PostgresCopyFieldReader {
+ public:
+  ArrowErrorCode Read(ArrowBufferView* data, int32_t field_size_bytes, ArrowArray* array,
+                      ArrowError* error) override {
+    // -1 for NULL
+    if (field_size_bytes < 0) {
+      return ArrowArrayAppendNull(array, 1);
+    }
+
+    // Read the input
+    if (data->size_bytes < static_cast<int64_t>(4 * sizeof(int16_t))) {
+      ArrowErrorSet(error,
+                    "Expected at least %d bytes of field data for numeric copy data but "
+                    "only %d bytes of input remain",
+                    static_cast<int>(4 * sizeof(int16_t)),
+                    static_cast<int>(data->size_bytes));  // NOLINT(runtime/int)
+      return EINVAL;
+    }
+
+    int16_t ndigits = ReadUnsafe<int16_t>(data);
+    int16_t weight = ReadUnsafe<int16_t>(data);
+    uint16_t sign = ReadUnsafe<uint16_t>(data);
+    uint16_t dscale = ReadUnsafe<uint16_t>(data);
+
+    if (data->size_bytes < static_cast<int64_t>(ndigits * sizeof(int16_t))) {
+      ArrowErrorSet(error,
+                    "Expected at least %d bytes of field data for numeric digits copy "
+                    "data but only %d bytes of input remain",
+                    static_cast<int>(ndigits * sizeof(int16_t)),
+                    static_cast<int>(data->size_bytes));  // NOLINT(runtime/int)
+      return EINVAL;
+    }
+
+    digits_.clear();
+    for (int16_t i = 0; i < ndigits; i++) {
+      digits_.push_back(ReadUnsafe<int16_t>(data));
+    }
+
+    // Handle special values
+    std::string special_value;
+    switch (sign) {
+      case kNumericNAN:
+        special_value = std::string("nan");
+        break;
+      case kNumericPinf:
+        special_value = std::string("inf");
+        break;
+      case kNumericNinf:
+        special_value = std::string("-inf");
+        break;
+      case kNumericPos:
+      case kNumericNeg:
+        special_value = std::string("");
+        break;
+      default:
+        ArrowErrorSet(error,
+                      "Unexpected value for sign read from Postgres numeric field: %d",
+                      static_cast<int>(sign));
+        return EINVAL;
+    }
+
+    if (!special_value.empty()) {
+      NANOARROW_RETURN_NOT_OK(
+          ArrowBufferAppend(data_, special_value.data(), special_value.size()));
+      NANOARROW_RETURN_NOT_OK(ArrowBufferAppendInt32(offsets_, data_->size_bytes));
+      return AppendValid(array);
+    }
+
+    // Calculate string space requirement
+    int64_t max_chars_required = std::max<int64_t>(1, (weight + 1) * kDecDigits);
+    max_chars_required += dscale + kDecDigits + 2;
+    NANOARROW_RETURN_NOT_OK(ArrowBufferReserve(data_, max_chars_required));
+    char* out0 = reinterpret_cast<char*>(data_->data + data_->size_bytes);
+    char* out = out0;
+
+    // Build output string in-place, starting with the negative sign
+    if (sign == kNumericNeg) {
+      *out++ = '-';
+    }
+
+    // ...then digits before the decimal point
+    int d;
+    int d1;
+    int16_t dig;
+
+    if (weight < 0) {
+      d = weight + 1;
+      *out++ = '0';
+    } else {
+      for (d = 0; d <= weight; d++) {
+        if (d < ndigits) {
+          dig = digits_[d];
+        } else {
+          dig = 0;
+        }
+
+        // To strip leading zeroes
+        int append = (d > 0);
+
+        for (const auto pow10 : {1000, 100, 10, 1}) {
+          d1 = dig / pow10;
+          dig -= d1 * pow10;
+          append |= (d1 > 0);
+          if (append) {
+            *out++ = d1 + '0';
+          }
+        }
+      }
+    }
+
+    // ...then the decimal point + digits after it. This may write more digits
+    // than specified by dscale so we need to keep track of how many we want to
+    // keep here.
+    int64_t actual_chars_required = out - out0;
+
+    if (dscale > 0) {
+      *out++ = '.';
+      actual_chars_required += dscale + 1;
+
+      for (int i = 0; i < dscale; i++, d++, i += kDecDigits) {
+        if (d >= 0 && d < ndigits) {
+          dig = digits_[d];
+        } else {
+          dig = 0;
+        }
+
+        for (const auto pow10 : {1000, 100, 10, 1}) {
+          d1 = dig / pow10;
+          dig -= d1 * pow10;
+          *out++ = d1 + '0';
+        }
+      }
+    }
+
+    // Update data buffer size and add offsets
+    data_->size_bytes += actual_chars_required;
+    NANOARROW_RETURN_NOT_OK(ArrowBufferAppendInt32(offsets_, data_->size_bytes));
+    return AppendValid(array);
+  }
+
+ private:
+  std::vector<int16_t> digits_;
+
+  // Number of decimal digits per Postgres digit
+  static const int kDecDigits = 4;
+  // The "base" of the Postgres representation (i.e., each "digit" is 0 to 9999)
+  static const int kNBase = 10000;
+  // Valid values for the sign component
+  static const uint16_t kNumericPos = 0x0000;
+  static const uint16_t kNumericNeg = 0x4000;
+  static const uint16_t kNumericNAN = 0xC000;
+  static const uint16_t kNumericPinf = 0xD000;
+  static const uint16_t kNumericNinf = 0xF000;
 };
 
 // Reader for Pg->Arrow conversions whose Arrow representation is simply the
@@ -569,6 +806,9 @@ static inline ArrowErrorCode MakeCopyFieldReader(const PostgresType& pg_type,
         case PostgresTypeId::kName:
           *out = new PostgresCopyBinaryFieldReader();
           return NANOARROW_OK;
+        case PostgresTypeId::kNumeric:
+          *out = new PostgresCopyNumericFieldReader();
+          return NANOARROW_OK;
         default:
           return ErrorCantConvert(error, pg_type, schema_view);
       }
@@ -661,6 +901,16 @@ static inline ArrowErrorCode MakeCopyFieldReader(const PostgresType& pg_type,
         default:
           return ErrorCantConvert(error, pg_type, schema_view);
       }
+    case NANOARROW_TYPE_INTERVAL_MONTH_DAY_NANO:
+      switch (pg_type.type_id()) {
+        case PostgresTypeId::kInterval: {
+          *out = new PostgresCopyIntervalFieldReader();
+          return NANOARROW_OK;
+        }
+        default:
+          return ErrorCantConvert(error, pg_type, schema_view);
+      }
+
     default:
       return ErrorCantConvert(error, pg_type, schema_view);
   }
@@ -668,14 +918,18 @@ static inline ArrowErrorCode MakeCopyFieldReader(const PostgresType& pg_type,
 
 class PostgresCopyStreamReader {
  public:
-  ArrowErrorCode Init(const PostgresType& pg_type) {
+  ArrowErrorCode Init(PostgresType pg_type) {
     if (pg_type.type_id() != PostgresTypeId::kRecord) {
       return EINVAL;
     }
 
-    root_reader_.Init(pg_type);
+    pg_type_ = std::move(pg_type);
+    root_reader_.Init(pg_type_);
+    array_size_approx_bytes_ = 0;
     return NANOARROW_OK;
   }
+
+  int64_t array_size_approx_bytes() const { return array_size_approx_bytes_; }
 
   ArrowErrorCode SetOutputSchema(ArrowSchema* schema, ArrowError* error) {
     if (std::string(schema_->format) != "+s") {
@@ -771,9 +1025,12 @@ class PostgresCopyStreamReader {
           ArrowArrayInitFromSchema(array_.get(), schema_.get(), error));
       NANOARROW_RETURN_NOT_OK(ArrowArrayStartAppending(array_.get()));
       NANOARROW_RETURN_NOT_OK(root_reader_.InitArray(array_.get()));
+      array_size_approx_bytes_ = 0;
     }
 
+    const uint8_t* start = data->data.as_uint8;
     NANOARROW_RETURN_NOT_OK(root_reader_.Read(data, -1, array_.get(), error));
+    array_size_approx_bytes_ += (data->data.as_uint8 - start);
     return NANOARROW_OK;
   }
 
@@ -791,10 +1048,14 @@ class PostgresCopyStreamReader {
     return NANOARROW_OK;
   }
 
+  const PostgresType& pg_type() const { return pg_type_; }
+
  private:
+  PostgresType pg_type_;
   PostgresCopyFieldTupleReader root_reader_;
   nanoarrow::UniqueSchema schema_;
   nanoarrow::UniqueArray array_;
+  int64_t array_size_approx_bytes_;
 };
 
 }  // namespace adbcpq

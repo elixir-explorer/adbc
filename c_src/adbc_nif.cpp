@@ -1260,13 +1260,9 @@ int elixir_to_arrow_type_struct(ErlNifEnv *env, ERL_NIF_TERM values, struct Arro
 
     ArrowSchemaInit(schema_out);
     NANOARROW_RETURN_NOT_OK(ArrowSchemaSetTypeStruct(schema_out, n_items));
-    NANOARROW_RETURN_NOT_OK(ArrowSchemaSetName(schema_out, ""));
-
     NANOARROW_RETURN_NOT_OK(ArrowArrayInitFromType(array_out, NANOARROW_TYPE_STRUCT));
     NANOARROW_RETURN_NOT_OK(ArrowArrayAllocateChildren(array_out, static_cast<int64_t>(n_items)));
-
     array_out->length = 1;
-    array_out->null_count = -1;
 
     ERL_NIF_TERM head, tail;
     tail = values;
@@ -1342,10 +1338,9 @@ int elixir_to_arrow_type_struct(ErlNifEnv *env, ERL_NIF_TERM values, struct Arro
             snprintf(error_out->message, sizeof(error_out->message), "type not supported yet.");
             return 1;
         }
-        NANOARROW_RETURN_NOT_OK(ArrowArrayFinishBuildingDefault(child_i, error_out));
         processed++;
     }
-
+    NANOARROW_RETURN_NOT_OK(ArrowArrayFinishBuildingDefault(array_out, error_out));
     return !(processed == n_items);
 }
 

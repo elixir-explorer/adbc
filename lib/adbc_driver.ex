@@ -125,7 +125,7 @@ defmodule Adbc.Driver do
   end
 
   def download(driver_name, opts) when is_list(opts) do
-    known = Enum.map_join(@official_drivers, ", ", &inspect/1)
+    known = Enum.map_join(@driver_names, ", ", &inspect/1)
     {:error, "unknown driver #{inspect(driver_name)}, expected one of #{known}"}
   end
 
@@ -186,7 +186,7 @@ defmodule Adbc.Driver do
     {:ok, url}
   end
 
-  defp driver_wheel(_url, version, _triplet) when version != @version do
+  defp driver_wheel(_url, version, triplet) when version != @version do
     {:error,
      "when passing a custom version for a driver, you must also specify the :url to find the precompiled version for `#{triplet}`"}
   end
@@ -251,7 +251,7 @@ defmodule Adbc.Driver do
 
   def so_path(driver_name, opts \\ [])
 
-  def so_path(driver_name, opts) when driver_name in @official_drivers do
+  def so_path(driver_name, opts) when driver_name in @driver_names do
     version = opts[:version] || @version
 
     case current_triplet() do

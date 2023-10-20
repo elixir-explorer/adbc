@@ -118,7 +118,7 @@ defmodule Adbc.Driver do
 
     with {:ok, triplet} <- current_triplet(),
          :missing <- driver_status(driver_name, version, triplet),
-         {:ok, url} <- driver_wheel(url, version, triplet),
+         {:ok, url} <- driver_wheel(url, driver_name, version, triplet),
          {:ok, cache_path} <- cached_download(url, ignore_proxy, driver_name, version, triplet) do
       extract!(cache_path, driver_name, version, triplet)
     end
@@ -182,18 +182,18 @@ defmodule Adbc.Driver do
     end
   end
 
-  defp driver_wheel(url, _version, _triplet) when is_binary(url) do
+  defp driver_wheel(url, _driver_name, _version, _triplet) when is_binary(url) do
     {:ok, url}
   end
 
-  defp driver_wheel(_url, version, triplet) when version != @version do
+  defp driver_wheel(_url, _driver_name, version, triplet) when version != @version do
     {:error,
      "when passing a custom version for a driver, you must also specify the :url to find the precompiled version for `#{triplet}`"}
   end
 
-  defp driver_wheel(_url, _version, triplet) do
+  defp driver_wheel(_url, driver_name, _version, triplet) do
     case @driver_data do
-      %{^triplet => %{url: url}} -> {:ok, url}
+      %{^driver_name => %{^triplet => %{url: url}}} -> {:ok, url}
       %{} -> {:error, "official driver does not have a precompiled version for `#{triplet}`"}
     end
   end
@@ -275,7 +275,7 @@ defmodule Adbc.Driver do
   end
 
   def so_path(driver_name, _opts) do
-    known = Enum.map_join(@official_drivers, ", ", &inspect/1)
+    known = Enum.map_join(@driver_names, ", ", &inspect/1)
 
     {:error,
      "unknown driver #{inspect(driver_name)}, expected one of #{known} or a string representing the full path to a driver"}

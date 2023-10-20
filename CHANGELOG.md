@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## v0.2.1
+
+* Fix URLs for downloading drivers
+
 ## v0.2.0
 
 * Update to ADBC 0.7.0

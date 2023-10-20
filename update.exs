@@ -47,7 +47,7 @@ mapping =
 
     data_for = fn wheels, parts ->
       case Enum.split_with(wheels, fn %{"name" => name} -> Enum.all?(parts, &(name =~ &1)) end) do
-        {[%{"name" => name, "url" => url}], rest} -> {%{name: name, url: url}, rest}
+        {[%{"browser_download_url" => url}], rest} -> {%{url: url}, rest}
         {[], _rest} -> raise "no wheel matching #{inspect(parts)}\n\n#{inspect(wheels)}"
         {_, _rest} -> raise "many wheels matching #{inspect(parts)}\n\n#{inspect(wheels)}"
       end
@@ -91,7 +91,7 @@ case String.split(File.read!(file), "# == CONSTANTS ==") do
     # == CONSTANTS ==
     """
 
-    File.write!(file, Code.format_string!(pre <> mid <> post))
+    File.write!(file, Code.format_string!(pre <> mid <> post) <> "\n")
 
   _ ->
     raise "could not find # == CONSTANTS == chunks in #{file}"

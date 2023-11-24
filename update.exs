@@ -1,9 +1,10 @@
 # To support a new version of ADBC, you must:
 #
-# 1. Update the contents in 3rd_party with VERSION (only root files and c/)
-# 2. Invoke `elixir update.exs VERSION`
-# 3. ...
-# 4. Profit!
+# 1. Fetch the latest ADBC release: https://github.com/apache/arrow-adbc/releases/
+# 2. Update the contents in 3rd_party with VERSION (only root files and c/)
+# 3. Invoke `elixir update.exs VERSION`
+# 4. ...
+# 5. Profit!
 #
 Mix.install([{:req, "~> 0.4"}])
 
@@ -91,7 +92,7 @@ case String.split(File.read!(file), "# == CONSTANTS ==") do
     # == CONSTANTS ==
     """
 
-    File.write!(file, Code.format_string!(pre <> mid <> post) <> "\n")
+    File.write!(file, [Code.format_string!(pre <> mid <> post), "\n"])
 
   _ ->
     raise "could not find # == CONSTANTS == chunks in #{file}"

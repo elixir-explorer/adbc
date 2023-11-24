@@ -91,7 +91,7 @@ case String.split(File.read!(file), "# == CONSTANTS ==") do
     # == CONSTANTS ==
     """
 
-    File.write!(file, Code.format_string!(pre <> mid <> post) <> "\n")
+    File.write!(file, "#{Code.format_string!(pre <> mid <> post)}\n")
 
   _ ->
     raise "could not find # == CONSTANTS == chunks in #{file}"

@@ -945,6 +945,58 @@ void ConnectionTest::TestMetadataGetObjectsConstraints() {
   // TODO: can't be done portably (need to create tables with primary keys and such)
 }
 
+void ConstraintTest(const AdbcGetObjectsConstraint* constraint,
+                    const std::string& key_type,
+                    const std::vector<std::string>& columns) {
+  std::string_view constraint_type(constraint->constraint_type.data,
+                                   constraint->constraint_type.size_bytes);
+  int number_of_columns = columns.size();
+  ASSERT_EQ(constraint_type, key_type);
+  ASSERT_EQ(constraint->n_column_names, number_of_columns)
+      << "expected constraint " << key_type
+      << " of adbc_fkey_child_test to be applied to " << std::to_string(number_of_columns)
+      << " column(s), found: " << constraint->n_column_names;
+
+  int column_index;
+  for (column_index = 0; column_index < number_of_columns; column_index++) {
+    std::string_view constraint_column_name(
+        constraint->constraint_column_names[column_index].data,
+        constraint->constraint_column_names[column_index].size_bytes);
+    ASSERT_EQ(constraint_column_name, columns[column_index]);
+  }
+}
+
+void ForeignKeyColumnUsagesTest(const AdbcGetObjectsConstraint* constraint,
+                                const std::string& catalog, const std::string& db_schema,
+                                const int column_usage_index,
+                                const std::string& fk_table_name,
+                                const std::string& fk_column_name) {
+  // Test fk_catalog
+  std::string_view constraint_column_usage_fk_catalog(
+      constraint->constraint_column_usages[column_usage_index]->fk_catalog.data,
+      constraint->constraint_column_usages[column_usage_index]->fk_catalog.size_bytes);
+  ASSERT_THAT(constraint_column_usage_fk_catalog, catalog);
+
+  // Test fk_db_schema
+  std::string_view constraint_column_usage_fk_db_schema(
+      constraint->constraint_column_usages[column_usage_index]->fk_db_schema.data,
+      constraint->constraint_column_usages[column_usage_index]->fk_db_schema.size_bytes);
+  ASSERT_THAT(constraint_column_usage_fk_db_schema, db_schema);
+
+  // Test fk_table_name
+  std::string_view constraint_column_usage_fk_table(
+      constraint->constraint_column_usages[column_usage_index]->fk_table.data,
+      constraint->constraint_column_usages[column_usage_index]->fk_table.size_bytes);
+  ASSERT_EQ(constraint_column_usage_fk_table, fk_table_name);
+
+  // Test fk_column_name
+  std::string_view constraint_column_usage_fk_column_name(
+      constraint->constraint_column_usages[column_usage_index]->fk_column_name.data,
+      constraint->constraint_column_usages[column_usage_index]
+          ->fk_column_name.size_bytes);
+  ASSERT_EQ(constraint_column_usage_fk_column_name, fk_column_name);
+}
+
 void ConnectionTest::TestMetadataGetObjectsPrimaryKey() {
   ASSERT_THAT(AdbcConnectionNew(&connection, &error), IsOkStatus(&error));
   ASSERT_THAT(AdbcConnectionInit(&connection, &database, &error), IsOkStatus(&error));
@@ -953,6 +1005,7 @@ void ConnectionTest::TestMetadataGetObjectsPrimaryKey() {
     GTEST_SKIP();
   }
 
+  // Set up primary key ddl
   std::optional<std::string> maybe_ddl = quirks()->PrimaryKeyTableDdl("adbc_pkey_test");
   if (!maybe_ddl.has_value()) {
     GTEST_SKIP();
@@ -962,16 +1015,37 @@ void ConnectionTest::TestMetadataGetObjectsPrimaryKey() {
   ASSERT_THAT(quirks()->DropTable(&connection, "adbc_pkey_test", &error),
               IsOkStatus(&error));
 
+  // Set up composite primary key ddl
+  std::optional<std::string> maybe_composite_ddl =
+      quirks()->CompositePrimaryKeyTableDdl("adbc_composite_pkey_test");
+  if (!maybe_composite_ddl.has_value()) {
+    GTEST_SKIP();
+  }
+  std::string composite_ddl = std::move(*maybe_composite_ddl);
+
+  // Empty database
+  ASSERT_THAT(quirks()->DropTable(&connection, "adbc_pkey_test", &error),
+              IsOkStatus(&error));
+  ASSERT_THAT(quirks()->DropTable(&connection, "adbc_composite_pkey_test", &error),
+              IsOkStatus(&error));
+
+  // Populate database
   {
-    Handle<AdbcStatement> statement;
-    ASSERT_THAT(AdbcStatementNew(&connection, &statement.value, &error),
-                IsOkStatus(&error));
-    ASSERT_THAT(AdbcStatementSetSqlQuery(&statement.value, ddl.c_str(), &error),
-                IsOkStatus(&error));
-    int64_t rows_affected = 0;
-    ASSERT_THAT(
-        AdbcStatementExecuteQuery(&statement.value, nullptr, &rows_affected, &error),
-        IsOkStatus(&error));
+    Handle<AdbcStatement> statements[2];
+    std::string ddls[2] = {ddl, composite_ddl};
+    int64_t rows_affected;
+
+    for (int ddl_index = 0; ddl_index < 2; ddl_index++) {
+      rows_affected = 0;
+      ASSERT_THAT(AdbcStatementNew(&connection, &statements[ddl_index].value, &error),
+                  IsOkStatus(&error));
+      ASSERT_THAT(AdbcStatementSetSqlQuery(&statements[ddl_index].value,
+                                           ddls[ddl_index].c_str(), &error),
+                  IsOkStatus(&error));
+      ASSERT_THAT(AdbcStatementExecuteQuery(&statements[ddl_index].value, nullptr,
+                                            &rows_affected, &error),
+                  IsOkStatus(&error));
+    }
   }
 
   adbc_validation::StreamReader reader;
@@ -988,6 +1062,7 @@ void ConnectionTest::TestMetadataGetObjectsPrimaryKey() {
   ASSERT_NE(*get_objects_data, nullptr)
       << "could not initialize the AdbcGetObjectsData object";
 
+  // Test primary key
   struct AdbcGetObjectsTable* table =
       AdbcGetObjectsDataGetTableByName(*get_objects_data, quirks()->catalog().c_str(),
                                        quirks()->db_schema().c_str(), "adbc_pkey_test");
@@ -1004,18 +1079,186 @@ void ConnectionTest::TestMetadataGetObjectsPrimaryKey() {
       << table->n_table_constraints;
 
   struct AdbcGetObjectsConstraint* constraint = table->table_constraints[0];
+  ConstraintTest(constraint, "PRIMARY KEY", {"id"});
 
-  std::string_view constraint_type(constraint->constraint_type.data,
-                                   constraint->constraint_type.size_bytes);
-  ASSERT_EQ(constraint_type, "PRIMARY KEY");
-  ASSERT_EQ(constraint->n_column_names, 1)
-      << "expected constraint adbc_pkey_test_pkey to be applied to 1 column, found: "
-      << constraint->n_column_names;
+  // Test composite primary key
+  struct AdbcGetObjectsTable* composite_table = AdbcGetObjectsDataGetTableByName(
+      *get_objects_data, quirks()->catalog().c_str(), quirks()->db_schema().c_str(),
+      "adbc_composite_pkey_test");
+  ASSERT_NE(composite_table, nullptr) << "could not find adbc_composite_pkey_test table";
 
-  std::string_view constraint_column_name(
-      constraint->constraint_column_names[0].data,
-      constraint->constraint_column_names[0].size_bytes);
-  ASSERT_EQ(constraint_column_name, "id");
+  // The composite primary key table has two columns: id_primary_col1, id_primary_col2
+  ASSERT_EQ(composite_table->n_table_columns, 2);
+
+  struct AdbcGetObjectsConstraint* composite_constraint =
+      composite_table->table_constraints[0];
+  const char* parent_2_column_names[2] = {"id_primary_col1", "id_primary_col2"};
+  struct AdbcGetObjectsColumn* parent_2_column;
+  for (int column_name_index = 0; column_name_index < 2; column_name_index++) {
+    parent_2_column = AdbcGetObjectsDataGetColumnByName(
+        *get_objects_data, quirks()->catalog().c_str(), quirks()->db_schema().c_str(),
+        "adbc_composite_pkey_test", parent_2_column_names[column_name_index]);
+    ASSERT_NE(parent_2_column, nullptr)
+        << "could not find column " << parent_2_column_names[column_name_index]
+        << " on adbc_composite_pkey_test table";
+
+    std::string_view constraint_column_name(
+        composite_constraint->constraint_column_names[column_name_index].data,
+        composite_constraint->constraint_column_names[column_name_index].size_bytes);
+    ASSERT_EQ(constraint_column_name, parent_2_column_names[column_name_index]);
+  }
+
+  ConstraintTest(composite_constraint, "PRIMARY KEY",
+                 {"id_primary_col1", "id_primary_col2"});
+}
+
+void ConnectionTest::TestMetadataGetObjectsForeignKey() {
+  ASSERT_THAT(AdbcConnectionNew(&connection, &error), IsOkStatus(&error));
+  ASSERT_THAT(AdbcConnectionInit(&connection, &database, &error), IsOkStatus(&error));
+
+  if (!quirks()->supports_get_objects()) {
+    GTEST_SKIP();
+  }
+
+  // Load DDLs
+  std::optional<std::string> maybe_parent_1_ddl =
+      quirks()->PrimaryKeyTableDdl("adbc_fkey_parent_1_test");
+  if (!maybe_parent_1_ddl.has_value()) {
+    GTEST_SKIP();
+  }
+
+  std::string parent_1_ddl = std::move(*maybe_parent_1_ddl);
+
+  std::optional<std::string> maybe_parent_2_ddl =
+      quirks()->CompositePrimaryKeyTableDdl("adbc_fkey_parent_2_test");
+  if (!maybe_parent_2_ddl.has_value()) {
+    GTEST_SKIP();
+  }
+  std::string parent_2_ddl = std::move(*maybe_parent_2_ddl);
+
+  std::optional<std::string> maybe_child_ddl = quirks()->ForeignKeyChildTableDdl(
+      "adbc_fkey_child_test", "adbc_fkey_parent_1_test", "adbc_fkey_parent_2_test");
+  if (!maybe_child_ddl.has_value()) {
+    GTEST_SKIP();
+  }
+  std::string child_ddl = std::move(*maybe_child_ddl);
+
+  // Empty database
+  // First drop the child table, since the parent tables depends on it
+  ASSERT_THAT(quirks()->DropTable(&connection, "adbc_fkey_child_test", &error),
+              IsOkStatus(&error));
+  ASSERT_THAT(quirks()->DropTable(&connection, "adbc_fkey_parent_1_test", &error),
+              IsOkStatus(&error));
+  ASSERT_THAT(quirks()->DropTable(&connection, "adbc_fkey_parent_2_test", &error),
+              IsOkStatus(&error));
+
+  // Populate database
+  {
+    Handle<AdbcStatement> statements[3];
+    std::string ddls[3] = {parent_1_ddl, parent_2_ddl, child_ddl};
+    int64_t rows_affected;
+
+    for (int ddl_index = 0; ddl_index < 3; ddl_index++) {
+      rows_affected = 0;
+      ASSERT_THAT(AdbcStatementNew(&connection, &statements[ddl_index].value, &error),
+                  IsOkStatus(&error));
+      ASSERT_THAT(AdbcStatementSetSqlQuery(&statements[ddl_index].value,
+                                           ddls[ddl_index].c_str(), &error),
+                  IsOkStatus(&error));
+      ASSERT_THAT(AdbcStatementExecuteQuery(&statements[ddl_index].value, nullptr,
+                                            &rows_affected, &error),
+                  IsOkStatus(&error));
+    }
+  }
+
+  adbc_validation::StreamReader reader;
+  ASSERT_THAT(
+      AdbcConnectionGetObjects(&connection, ADBC_OBJECT_DEPTH_ALL, nullptr, nullptr,
+                               nullptr, nullptr, nullptr, &reader.stream.value, &error),
+      IsOkStatus(&error));
+  ASSERT_NO_FATAL_FAILURE(reader.GetSchema());
+  ASSERT_NO_FATAL_FAILURE(reader.Next());
+  ASSERT_NE(nullptr, reader.array->release);
+  ASSERT_GT(reader.array->length, 0);
+
+  auto get_objects_data = adbc_validation::GetObjectsReader{&reader.array_view.value};
+  ASSERT_NE(*get_objects_data, nullptr)
+      << "could not initialize the AdbcGetObjectsData object";
+
+  // Test child table
+  struct AdbcGetObjectsTable* child_table = AdbcGetObjectsDataGetTableByName(
+      *get_objects_data, quirks()->catalog().c_str(), quirks()->db_schema().c_str(),
+      "adbc_fkey_child_test");
+  ASSERT_NE(child_table, nullptr) << "could not find adbc_fkey_child_test table";
+
+  // The child table has three columns: id_child_col1, id_child_col2, id_child_col3
+  ASSERT_EQ(child_table->n_table_columns, 3);
+
+  const char* child_column_names[3] = {"id_child_col1", "id_child_col2", "id_child_col3"};
+  struct AdbcGetObjectsColumn* child_column;
+  for (int column_index = 0; column_index < 2; column_index++) {
+    child_column = AdbcGetObjectsDataGetColumnByName(
+        *get_objects_data, quirks()->catalog().c_str(), quirks()->db_schema().c_str(),
+        "adbc_fkey_child_test", child_column_names[column_index]);
+    ASSERT_NE(child_column, nullptr)
+        << "could not find column " << child_column_names[column_index]
+        << " on adbc_fkey_child_test table";
+  }
+
+  // There are three constraints: PRIMARY KEY, FOREIGN KEY, FOREIGN KEY
+  // affecting one, one, and two columns, respetively
+  ASSERT_EQ(child_table->n_table_constraints, 3)
+      << "expected 3 constraint on adbc_fkey_child_test table, found: "
+      << child_table->n_table_constraints;
+
+  struct ConstraintFlags {
+    bool adbc_fkey_child_test_pkey = false;
+    bool adbc_fkey_child_test_id_child_col3_fkey = false;
+    bool adbc_fkey_child_test_id_child_col1_id_child_col2_fkey = false;
+  };
+  ConstraintFlags TestedConstraints;
+
+  for (int constraint_index = 0; constraint_index < 3; constraint_index++) {
+    struct AdbcGetObjectsConstraint* child_constraint =
+        child_table->table_constraints[constraint_index];
+    int numbern_of_column_usages = child_constraint->n_column_usages;
+
+    // The number of column usages identifies the constraint
+    switch (numbern_of_column_usages) {
+      case 0: {
+        // adbc_fkey_child_test_pkey
+        ConstraintTest(child_constraint, "PRIMARY KEY", {"id_child_col1"});
+
+        TestedConstraints.adbc_fkey_child_test_pkey = true;
+      } break;
+      case 1: {
+        // adbc_fkey_child_test_id_child_col3_fkey
+        ConstraintTest(child_constraint, "FOREIGN KEY", {"id_child_col3"});
+        ForeignKeyColumnUsagesTest(child_constraint, quirks()->catalog(),
+                                   quirks()->db_schema(), 0, "adbc_fkey_parent_1_test",
+                                   "id");
+
+        TestedConstraints.adbc_fkey_child_test_id_child_col3_fkey = true;
+      } break;
+      case 2: {
+        // adbc_fkey_child_test_id_child_col1_id_child_col2_fkey
+        ConstraintTest(child_constraint, "FOREIGN KEY",
+                       {"id_child_col1", "id_child_col2"});
+        ForeignKeyColumnUsagesTest(child_constraint, quirks()->catalog(),
+                                   quirks()->db_schema(), 0, "adbc_fkey_parent_2_test",
+                                   "id_primary_col1");
+        ForeignKeyColumnUsagesTest(child_constraint, quirks()->catalog(),
+                                   quirks()->db_schema(), 1, "adbc_fkey_parent_2_test",
+                                   "id_primary_col2");
+
+        TestedConstraints.adbc_fkey_child_test_id_child_col1_id_child_col2_fkey = true;
+      } break;
+    }
+  }
+
+  ASSERT_TRUE(TestedConstraints.adbc_fkey_child_test_pkey);
+  ASSERT_TRUE(TestedConstraints.adbc_fkey_child_test_id_child_col3_fkey);
+  ASSERT_TRUE(TestedConstraints.adbc_fkey_child_test_id_child_col1_id_child_col2_fkey);
 }
 
 void ConnectionTest::TestMetadataGetObjectsCancel() {
@@ -1123,7 +1366,8 @@ void StatementTest::TestRelease() {
 
 template <typename CType>
 void StatementTest::TestSqlIngestType(ArrowType type,
-                                      const std::vector<std::optional<CType>>& values) {
+                                      const std::vector<std::optional<CType>>& values,
+                                      bool dictionary_encode) {
   if (!quirks()->supports_bulk_ingest(ADBC_INGEST_OPTION_MODE_CREATE)) {
     GTEST_SKIP();
   }
@@ -1137,6 +1381,38 @@ void StatementTest::TestSqlIngestType(ArrowType type,
   ASSERT_THAT(MakeSchema(&schema.value, {{"col", type}}), IsOkErrno());
   ASSERT_THAT(MakeBatch<CType>(&schema.value, &array.value, &na_error, values),
               IsOkErrno());
+
+  if (dictionary_encode) {
+    // Create a dictionary-encoded version of the target schema
+    Handle<struct ArrowSchema> dict_schema;
+    ASSERT_THAT(ArrowSchemaInitFromType(&dict_schema.value, NANOARROW_TYPE_INT32),
+                IsOkErrno());
+    ASSERT_THAT(ArrowSchemaSetName(&dict_schema.value, schema.value.children[0]->name),
+                IsOkErrno());
+    ASSERT_THAT(ArrowSchemaSetName(schema.value.children[0], nullptr), IsOkErrno());
+
+    // Swap it into the target schema
+    ASSERT_THAT(ArrowSchemaAllocateDictionary(&dict_schema.value), IsOkErrno());
+    ArrowSchemaMove(schema.value.children[0], dict_schema.value.dictionary);
+    ArrowSchemaMove(&dict_schema.value, schema.value.children[0]);
+
+    // Create a dictionary-encoded array with easy 0...n indices so that the
+    // matched values will be the same.
+    Handle<struct ArrowArray> dict_array;
+    ASSERT_THAT(ArrowArrayInitFromType(&dict_array.value, NANOARROW_TYPE_INT32),
+                IsOkErrno());
+    ASSERT_THAT(ArrowArrayStartAppending(&dict_array.value), IsOkErrno());
+    for (size_t i = 0; i < values.size(); i++) {
+      ASSERT_THAT(ArrowArrayAppendInt(&dict_array.value, static_cast<int64_t>(i)),
+                  IsOkErrno());
+    }
+    ASSERT_THAT(ArrowArrayFinishBuildingDefault(&dict_array.value, nullptr), IsOkErrno());
+
+    // Swap it into the target batch
+    ASSERT_THAT(ArrowArrayAllocateDictionary(&dict_array.value), IsOkErrno());
+    ArrowArrayMove(array.value.children[0], dict_array.value.dictionary);
+    ArrowArrayMove(&dict_array.value, array.value.children[0]);
+  }
 
   ASSERT_THAT(AdbcStatementNew(&connection, &statement, &error), IsOkStatus(&error));
   ASSERT_THAT(AdbcStatementSetOption(&statement, ADBC_INGEST_OPTION_TARGET_TABLE,
@@ -1205,7 +1481,11 @@ void StatementTest::TestSqlIngestNumericType(ArrowType type) {
     values.push_back(std::numeric_limits<CType>::max());
   }
 
-  return TestSqlIngestType(type, values);
+  return TestSqlIngestType(type, values, false);
+}
+
+void StatementTest::TestSqlIngestBool() {
+  ASSERT_NO_FATAL_FAILURE(TestSqlIngestNumericType<bool>(NANOARROW_TYPE_BOOL));
 }
 
 void StatementTest::TestSqlIngestUInt8() {
@@ -1250,17 +1530,23 @@ void StatementTest::TestSqlIngestFloat64() {
 
 void StatementTest::TestSqlIngestString() {
   ASSERT_NO_FATAL_FAILURE(TestSqlIngestType<std::string>(
-      NANOARROW_TYPE_STRING, {std::nullopt, "", "", "1234", "例"}));
+      NANOARROW_TYPE_STRING, {std::nullopt, "", "", "1234", "例"}, false));
 }
 
 void StatementTest::TestSqlIngestLargeString() {
   ASSERT_NO_FATAL_FAILURE(TestSqlIngestType<std::string>(
-      NANOARROW_TYPE_LARGE_STRING, {std::nullopt, "", "", "1234", "例"}));
+      NANOARROW_TYPE_LARGE_STRING, {std::nullopt, "", "", "1234", "例"}, false));
 }
 
 void StatementTest::TestSqlIngestBinary() {
-  ASSERT_NO_FATAL_FAILURE(TestSqlIngestType<std::string>(
-      NANOARROW_TYPE_BINARY, {std::nullopt, "", "\x00\x01\x02\x04", "\xFE\xFF"}));
+  ASSERT_NO_FATAL_FAILURE(TestSqlIngestType<std::vector<std::byte>>(
+      NANOARROW_TYPE_BINARY,
+      {std::nullopt, std::vector<std::byte>{},
+       std::vector<std::byte>{std::byte{0x00}, std::byte{0x01}},
+       std::vector<std::byte>{std::byte{0x01}, std::byte{0x02}, std::byte{0x03},
+                              std::byte{0x04}},
+       std::vector<std::byte>{std::byte{0xfe}, std::byte{0xff}}},
+      false));
 }
 
 void StatementTest::TestSqlIngestDate32() {
@@ -1480,6 +1766,12 @@ void StatementTest::TestSqlIngestInterval() {
     ASSERT_EQ(nullptr, reader.array->release);
   }
   ASSERT_THAT(AdbcStatementRelease(&statement, &error), IsOkStatus(&error));
+}
+
+void StatementTest::TestSqlIngestStringDictionary() {
+  ASSERT_NO_FATAL_FAILURE(TestSqlIngestType<std::string>(
+      NANOARROW_TYPE_STRING, {std::nullopt, "", "", "1234", "例"},
+      /*dictionary_encode*/ true));
 }
 
 void StatementTest::TestSqlIngestTableEscaping() {
@@ -1857,7 +2149,7 @@ void StatementTest::TestSqlIngestErrors() {
                                          {"coltwo", NANOARROW_TYPE_INT64}}),
               IsOkErrno());
   ASSERT_THAT(
-      (MakeBatch<int64_t, int64_t>(&schema.value, &array.value, &na_error, {}, {})),
+      (MakeBatch<int64_t, int64_t>(&schema.value, &array.value, &na_error, {-42}, {-42})),
       IsOkErrno(&na_error));
 
   ASSERT_THAT(AdbcStatementBind(&statement, &array.value, &schema.value, &error),
@@ -2511,6 +2803,115 @@ void StatementTest::TestSqlIngestTemporaryExclusive() {
   }
 }
 
+void StatementTest::TestSqlIngestPrimaryKey() {
+  std::string name = "pkeytest";
+  auto ddl = quirks()->PrimaryKeyIngestTableDdl(name);
+  if (!ddl) {
+    GTEST_SKIP();
+  }
+  ASSERT_THAT(quirks()->DropTable(&connection, name, &error), IsOkStatus(&error));
+
+  // Create table
+  {
+    Handle<struct AdbcStatement> statement;
+    StreamReader reader;
+    ASSERT_THAT(AdbcStatementNew(&connection, &statement.value, &error),
+                IsOkStatus(&error));
+    ASSERT_THAT(AdbcStatementSetSqlQuery(&statement.value, ddl->c_str(), &error),
+                IsOkStatus(&error));
+    ASSERT_THAT(AdbcStatementExecuteQuery(&statement.value, nullptr, nullptr, &error),
+                IsOkStatus(&error));
+    ASSERT_THAT(AdbcStatementRelease(&statement.value, &error), IsOkStatus(&error));
+  }
+
+  // Ingest without the primary key
+  {
+    Handle<struct ArrowSchema> schema;
+    Handle<struct ArrowArray> array;
+    struct ArrowError na_error;
+    ASSERT_THAT(MakeSchema(&schema.value, {{"value", NANOARROW_TYPE_INT64}}),
+                IsOkErrno());
+    ASSERT_THAT((MakeBatch<int64_t>(&schema.value, &array.value, &na_error,
+                                    {42, -42, std::nullopt})),
+                IsOkErrno());
+
+    Handle<struct AdbcStatement> statement;
+    ASSERT_THAT(AdbcStatementNew(&connection, &statement.value, &error),
+                IsOkStatus(&error));
+    ASSERT_THAT(AdbcStatementSetOption(&statement.value, ADBC_INGEST_OPTION_TARGET_TABLE,
+                                       name.c_str(), &error),
+                IsOkStatus(&error));
+    ASSERT_THAT(AdbcStatementSetOption(&statement.value, ADBC_INGEST_OPTION_MODE,
+                                       ADBC_INGEST_OPTION_MODE_APPEND, &error),
+                IsOkStatus(&error));
+    ASSERT_THAT(AdbcStatementBind(&statement.value, &array.value, &schema.value, &error),
+                IsOkStatus(&error));
+    ASSERT_THAT(AdbcStatementExecuteQuery(&statement.value, nullptr, nullptr, &error),
+                IsOkStatus(&error));
+    ASSERT_THAT(AdbcStatementRelease(&statement.value, &error), IsOkStatus(&error));
+  }
+
+  // Ingest with the primary key
+  {
+    Handle<struct ArrowSchema> schema;
+    Handle<struct ArrowArray> array;
+    struct ArrowError na_error;
+    ASSERT_THAT(MakeSchema(&schema.value,
+                           {
+                               {"id", NANOARROW_TYPE_INT64},
+                               {"value", NANOARROW_TYPE_INT64},
+                           }),
+                IsOkErrno());
+    ASSERT_THAT((MakeBatch<int64_t, int64_t>(&schema.value, &array.value, &na_error,
+                                             {4, 5, 6}, {1, 0, -1})),
+                IsOkErrno());
+
+    Handle<struct AdbcStatement> statement;
+    ASSERT_THAT(AdbcStatementNew(&connection, &statement.value, &error),
+                IsOkStatus(&error));
+    ASSERT_THAT(AdbcStatementSetOption(&statement.value, ADBC_INGEST_OPTION_TARGET_TABLE,
+                                       name.c_str(), &error),
+                IsOkStatus(&error));
+    ASSERT_THAT(AdbcStatementSetOption(&statement.value, ADBC_INGEST_OPTION_MODE,
+                                       ADBC_INGEST_OPTION_MODE_APPEND, &error),
+                IsOkStatus(&error));
+    ASSERT_THAT(AdbcStatementBind(&statement.value, &array.value, &schema.value, &error),
+                IsOkStatus(&error));
+    ASSERT_THAT(AdbcStatementExecuteQuery(&statement.value, nullptr, nullptr, &error),
+                IsOkStatus(&error));
+    ASSERT_THAT(AdbcStatementRelease(&statement.value, &error), IsOkStatus(&error));
+  }
+
+  // Get the data
+  {
+    Handle<struct AdbcStatement> statement;
+    StreamReader reader;
+    ASSERT_THAT(AdbcStatementNew(&connection, &statement.value, &error),
+                IsOkStatus(&error));
+    ASSERT_THAT(AdbcStatementSetSqlQuery(
+                    &statement.value, "SELECT * FROM pkeytest ORDER BY id ASC", &error),
+                IsOkStatus(&error));
+    ASSERT_THAT(AdbcStatementExecuteQuery(&statement.value, &reader.stream.value, nullptr,
+                                          &error),
+                IsOkStatus(&error));
+
+    ASSERT_NO_FATAL_FAILURE(reader.GetSchema());
+    ASSERT_EQ(2, reader.schema->n_children);
+    ASSERT_NO_FATAL_FAILURE(reader.Next());
+    ASSERT_NE(nullptr, reader.array->release);
+    ASSERT_EQ(6, reader.array->length);
+    ASSERT_EQ(2, reader.array->n_children);
+
+    // Different databases start numbering at 0 or 1 for the primary key
+    // column, so can't compare it
+    // TODO(https://github.com/apache/arrow-adbc/issues/938): if the test
+    // helpers converted data to plain C++ values we could do a more
+    // sophisticated assertion
+    ASSERT_NO_FATAL_FAILURE(CompareArray<int64_t>(reader.array_view->children[1],
+                                                  {42, -42, std::nullopt, 1, 0, -1}));
+  }
+}
+
 void StatementTest::TestSqlPartitionedInts() {
   ASSERT_THAT(AdbcStatementNew(&connection, &statement, &error), IsOkStatus(&error));
   ASSERT_THAT(AdbcStatementSetSqlQuery(&statement, "SELECT 42", &error),
@@ -3073,6 +3474,55 @@ void StatementTest::TestSqlQueryStrings() {
   ASSERT_THAT(AdbcStatementRelease(&statement, &error), IsOkStatus(&error));
 }
 
+void StatementTest::TestSqlQueryInsertRollback() {
+  if (!quirks()->supports_transactions()) {
+    GTEST_SKIP();
+  }
+
+  ASSERT_THAT(quirks()->DropTable(&connection, "rollbacktest", &error),
+              IsOkStatus(&error));
+
+  ASSERT_THAT(AdbcConnectionSetOption(&connection, ADBC_CONNECTION_OPTION_AUTOCOMMIT,
+                                      ADBC_OPTION_VALUE_DISABLED, &error),
+              IsOkStatus(&error));
+  ASSERT_THAT(AdbcStatementNew(&connection, &statement, &error), IsOkStatus(&error));
+
+  ASSERT_THAT(
+      AdbcStatementSetSqlQuery(&statement, "CREATE TABLE rollbacktest (a INT)", &error),
+      IsOkStatus(&error));
+  ASSERT_THAT(AdbcStatementExecuteQuery(&statement, nullptr, nullptr, &error),
+              IsOkStatus(&error));
+
+  ASSERT_THAT(AdbcConnectionCommit(&connection, &error), IsOkStatus(&error));
+
+  ASSERT_THAT(AdbcStatementSetSqlQuery(&statement,
+                                       "INSERT INTO rollbacktest (a) VALUES (1)", &error),
+              IsOkStatus(&error));
+  ASSERT_THAT(AdbcStatementExecuteQuery(&statement, nullptr, nullptr, &error),
+              IsOkStatus(&error));
+
+  ASSERT_THAT(AdbcConnectionRollback(&connection, &error), IsOkStatus(&error));
+
+  adbc_validation::StreamReader reader;
+  ASSERT_THAT(AdbcStatementSetSqlQuery(&statement, "SELECT * FROM rollbacktest", &error),
+              IsOkStatus(&error));
+  ASSERT_THAT(AdbcStatementExecuteQuery(&statement, &reader.stream.value,
+                                        &reader.rows_affected, &error),
+              IsOkStatus(&error));
+
+  ASSERT_NO_FATAL_FAILURE(reader.GetSchema());
+
+  int64_t total_rows = 0;
+  while (true) {
+    ASSERT_NO_FATAL_FAILURE(reader.Next());
+    if (!reader.array->release) break;
+
+    total_rows += reader.array->length;
+  }
+
+  ASSERT_EQ(0, total_rows);
+}
+
 void StatementTest::TestSqlQueryCancel() {
   if (!quirks()->supports_cancel()) {
     GTEST_SKIP();
@@ -3113,6 +3563,81 @@ void StatementTest::TestSqlQueryErrors() {
   }
   ASSERT_NE(ADBC_STATUS_OK, code);
 }
+
+void StatementTest::TestSqlQueryTrailingSemicolons() {
+  ASSERT_THAT(AdbcStatementNew(&connection, &statement, &error), IsOkStatus(&error));
+  ASSERT_THAT(AdbcStatementSetSqlQuery(&statement, "SELECT current_date;;;", &error),
+              IsOkStatus(&error));
+
+  {
+    StreamReader reader;
+    ASSERT_THAT(AdbcStatementExecuteQuery(&statement, &reader.stream.value,
+                                          &reader.rows_affected, &error),
+                IsOkStatus(&error));
+  }
+
+  ASSERT_THAT(AdbcStatementRelease(&statement, &error), IsOkStatus(&error));
+}
+
+void StatementTest::TestSqlQueryRowsAffectedDelete() {
+  ASSERT_THAT(quirks()->DropTable(&connection, "delete_test", &error),
+              IsOkStatus(&error));
+  ASSERT_THAT(AdbcStatementNew(&connection, &statement, &error), IsOkStatus(&error));
+
+  ASSERT_THAT(AdbcStatementSetSqlQuery(&statement,
+                                       "CREATE TABLE delete_test (foo INT)", &error),
+              IsOkStatus(&error));
+  ASSERT_THAT(AdbcStatementExecuteQuery(&statement, nullptr, nullptr, &error),
+              IsOkStatus(&error));
+
+  ASSERT_THAT(AdbcStatementSetSqlQuery(&statement,
+              "INSERT INTO delete_test (foo) VALUES (1), (2), (3), (4), (5)", &error),
+              IsOkStatus(&error));
+  ASSERT_THAT(AdbcStatementExecuteQuery(&statement, nullptr, nullptr, &error),
+              IsOkStatus(&error));
+
+  ASSERT_THAT(AdbcStatementSetSqlQuery(&statement,
+                                       "DELETE FROM delete_test WHERE foo >= 3", &error),
+              IsOkStatus(&error));
+
+  int64_t rows_affected = 0;
+  ASSERT_THAT(AdbcStatementExecuteQuery(&statement, nullptr, &rows_affected, &error),
+              IsOkStatus(&error));
+  ASSERT_THAT(rows_affected,
+              ::testing::AnyOf(::testing::Eq(3), ::testing::Eq(-1)));
+}
+
+void StatementTest::TestSqlQueryRowsAffectedDeleteStream() {
+  ASSERT_THAT(quirks()->DropTable(&connection, "delete_test", &error),
+              IsOkStatus(&error));
+  ASSERT_THAT(AdbcStatementNew(&connection, &statement, &error), IsOkStatus(&error));
+
+  ASSERT_THAT(AdbcStatementSetSqlQuery(&statement,
+                                       "CREATE TABLE delete_test (foo INT)", &error),
+              IsOkStatus(&error));
+  ASSERT_THAT(AdbcStatementExecuteQuery(&statement, nullptr, nullptr, &error),
+              IsOkStatus(&error));
+
+  ASSERT_THAT(AdbcStatementSetSqlQuery(&statement,
+              "INSERT INTO delete_test (foo) VALUES (1), (2), (3), (4), (5)", &error),
+              IsOkStatus(&error));
+  ASSERT_THAT(AdbcStatementExecuteQuery(&statement, nullptr, nullptr, &error),
+              IsOkStatus(&error));
+
+  ASSERT_THAT(AdbcStatementSetSqlQuery(&statement,
+                                       "DELETE FROM delete_test WHERE foo >= 3", &error),
+              IsOkStatus(&error));
+
+  adbc_validation::StreamReader reader;
+  ASSERT_THAT(AdbcStatementExecuteQuery(&statement, &reader.stream.value,
+                                        &reader.rows_affected, &error),
+              IsOkStatus(&error));
+  ASSERT_THAT(reader.rows_affected,
+              ::testing::AnyOf(::testing::Eq(5), ::testing::Eq(-1)));
+}
+
+
+
 
 void StatementTest::TestTransactions() {
   if (!quirks()->supports_transactions() || quirks()->ddl_implicit_commit_txn()) {

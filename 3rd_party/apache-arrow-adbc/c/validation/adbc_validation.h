@@ -86,6 +86,45 @@ class DriverQuirks {
     return std::nullopt;
   }
 
+  /// \brief Get the statement to create a table with a primary key, or
+  ///   nullopt if not supported.  This is used to test ingestion into a table
+  ///   with an auto-incrementing primary key (which should not require the
+  ///   data to contain the primary key).
+  ///
+  /// The table should have two columns:
+  /// - "id" which should be an auto-incrementing primary key compatible with int64
+  /// - "value" with Arrow type int64
+  virtual std::optional<std::string> PrimaryKeyIngestTableDdl(
+      std::string_view name) const {
+    return std::nullopt;
+  }
+
+  /// \brief Get the statement to create a table with a composite primary key,
+  /// or nullopt if not supported.
+  ///
+  /// The table should have two columns:
+  /// - "id_primary_col1" of Arrow type int64 (together forming a composite primary key)
+  /// - "id_primary_col2" of Arrow type int64 (together forming a composite primary key)
+  virtual std::optional<std::string> CompositePrimaryKeyTableDdl(
+      std::string_view name) const {
+    return std::nullopt;
+  }
+
+  /// \brief Get the statement to create a child table with foreign keys,
+  /// or nullopt if not supported.
+  ///
+  /// The child table should have three columns:
+  /// - "id_child_col1" of Arrow type int64 (primary key, foreign key) referencing "id" in
+  /// the parent 1 primary key table
+  /// - "id_child_col2" of Arrow type int64 (composite foreign key) together with:
+  /// - "id_child_col3" of Arrow type int64 (composite foreign key) referencing
+  /// "(id_primary_col1, id_primary_col2)" in the parent 2 primary key table
+  virtual std::optional<std::string> ForeignKeyChildTableDdl(
+      std::string_view child_name, std::string_view parent_name_1,
+      std::string_view parent_name_2) const {
+    return std::nullopt;
+  }
+
   /// \brief Return the SQL to reference the bind parameter of the given index
   virtual std::string BindParameter(int index) const { return "?"; }
 
@@ -215,6 +254,7 @@ class ConnectionTest {
   void TestMetadataGetObjectsColumns();
   void TestMetadataGetObjectsConstraints();
   void TestMetadataGetObjectsPrimaryKey();
+  void TestMetadataGetObjectsForeignKey();
   void TestMetadataGetObjectsCancel();
 
   void TestMetadataGetStatisticNames();
@@ -255,6 +295,7 @@ class ConnectionTest {
     TestMetadataGetObjectsConstraints();                                                \
   }                                                                                     \
   TEST_F(FIXTURE, MetadataGetObjectsPrimaryKey) { TestMetadataGetObjectsPrimaryKey(); } \
+  TEST_F(FIXTURE, MetadataGetObjectsForeignKey) { TestMetadataGetObjectsForeignKey(); } \
   TEST_F(FIXTURE, MetadataGetObjectsCancel) { TestMetadataGetObjectsCancel(); }         \
   TEST_F(FIXTURE, MetadataGetStatisticNames) { TestMetadataGetStatisticNames(); }
 
@@ -270,6 +311,8 @@ class StatementTest {
   void TestRelease();
 
   // ---- Type-specific tests --------------------
+
+  void TestSqlIngestBool();
 
   // Integers
   void TestSqlIngestInt8();
@@ -297,6 +340,9 @@ class StatementTest {
   void TestSqlIngestTimestampTz();
   void TestSqlIngestInterval();
 
+  // Dictionary-encoded
+  void TestSqlIngestStringDictionary();
+
   // ---- End Type-specific tests ----------------
 
   void TestSqlIngestTableEscaping();
@@ -314,6 +360,7 @@ class StatementTest {
   void TestSqlIngestTemporaryAppend();
   void TestSqlIngestTemporaryReplace();
   void TestSqlIngestTemporaryExclusive();
+  void TestSqlIngestPrimaryKey();
 
   void TestSqlPartitionedInts();
 
@@ -330,8 +377,13 @@ class StatementTest {
   void TestSqlQueryFloats();
   void TestSqlQueryStrings();
 
+  void TestSqlQueryInsertRollback();
+
   void TestSqlQueryCancel();
   void TestSqlQueryErrors();
+  void TestSqlQueryTrailingSemicolons();
+  void TestSqlQueryRowsAffectedDelete();
+  void TestSqlQueryRowsAffectedDeleteStream();
 
   void TestSqlSchemaInts();
   void TestSqlSchemaFloats();
@@ -352,7 +404,8 @@ class StatementTest {
   struct AdbcStatement statement;
 
   template <typename CType>
-  void TestSqlIngestType(ArrowType type, const std::vector<std::optional<CType>>& values);
+  void TestSqlIngestType(ArrowType type, const std::vector<std::optional<CType>>& values,
+                         bool dictionary_encode);
 
   template <typename CType>
   void TestSqlIngestNumericType(ArrowType type);
@@ -370,6 +423,7 @@ class StatementTest {
                 ADBCV_STRINGIFY(FIXTURE) " must inherit from StatementTest");           \
   TEST_F(FIXTURE, NewInit) { TestNewInit(); }                                           \
   TEST_F(FIXTURE, Release) { TestRelease(); }                                           \
+  TEST_F(FIXTURE, SqlIngestBool) { TestSqlIngestBool(); }                               \
   TEST_F(FIXTURE, SqlIngestInt8) { TestSqlIngestInt8(); }                               \
   TEST_F(FIXTURE, SqlIngestInt16) { TestSqlIngestInt16(); }                             \
   TEST_F(FIXTURE, SqlIngestInt32) { TestSqlIngestInt32(); }                             \
@@ -388,6 +442,7 @@ class StatementTest {
   TEST_F(FIXTURE, SqlIngestTimestamp) { TestSqlIngestTimestamp(); }                     \
   TEST_F(FIXTURE, SqlIngestTimestampTz) { TestSqlIngestTimestampTz(); }                 \
   TEST_F(FIXTURE, SqlIngestInterval) { TestSqlIngestInterval(); }                       \
+  TEST_F(FIXTURE, SqlIngestStringDictionary) { TestSqlIngestStringDictionary(); }       \
   TEST_F(FIXTURE, SqlIngestTableEscaping) { TestSqlIngestTableEscaping(); }             \
   TEST_F(FIXTURE, SqlIngestColumnEscaping) { TestSqlIngestColumnEscaping(); }           \
   TEST_F(FIXTURE, SqlIngestAppend) { TestSqlIngestAppend(); }                           \
@@ -403,6 +458,7 @@ class StatementTest {
   TEST_F(FIXTURE, SqlIngestTemporaryAppend) { TestSqlIngestTemporaryAppend(); }         \
   TEST_F(FIXTURE, SqlIngestTemporaryReplace) { TestSqlIngestTemporaryReplace(); }       \
   TEST_F(FIXTURE, SqlIngestTemporaryExclusive) { TestSqlIngestTemporaryExclusive(); }   \
+  TEST_F(FIXTURE, SqlIngestPrimaryKey) { TestSqlIngestPrimaryKey(); }   \
   TEST_F(FIXTURE, SqlPartitionedInts) { TestSqlPartitionedInts(); }                     \
   TEST_F(FIXTURE, SqlPrepareGetParameterSchema) { TestSqlPrepareGetParameterSchema(); } \
   TEST_F(FIXTURE, SqlPrepareSelectNoParams) { TestSqlPrepareSelectNoParams(); }         \
@@ -417,8 +473,14 @@ class StatementTest {
   TEST_F(FIXTURE, SqlQueryInts) { TestSqlQueryInts(); }                                 \
   TEST_F(FIXTURE, SqlQueryFloats) { TestSqlQueryFloats(); }                             \
   TEST_F(FIXTURE, SqlQueryStrings) { TestSqlQueryStrings(); }                           \
+  TEST_F(FIXTURE, SqlQueryInsertRollback) { TestSqlQueryInsertRollback(); }             \
   TEST_F(FIXTURE, SqlQueryCancel) { TestSqlQueryCancel(); }                             \
   TEST_F(FIXTURE, SqlQueryErrors) { TestSqlQueryErrors(); }                             \
+  TEST_F(FIXTURE, SqlQueryTrailingSemicolons) { TestSqlQueryTrailingSemicolons(); }     \
+  TEST_F(FIXTURE, SqlQueryRowsAffectedDelete) { TestSqlQueryRowsAffectedDelete(); }     \
+  TEST_F(FIXTURE, SqlQueryRowsAffectedDeleteStream) {                                   \
+    TestSqlQueryRowsAffectedDeleteStream();                                             \
+  }                                                                                     \
   TEST_F(FIXTURE, SqlSchemaInts) { TestSqlSchemaInts(); }                               \
   TEST_F(FIXTURE, SqlSchemaFloats) { TestSqlSchemaFloats(); }                           \
   TEST_F(FIXTURE, SqlSchemaStrings) { TestSqlSchemaStrings(); }                         \

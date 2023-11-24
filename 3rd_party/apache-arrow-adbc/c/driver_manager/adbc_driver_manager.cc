@@ -21,6 +21,7 @@
 #include <algorithm>
 #include <array>
 #include <cctype>
+#include <cerrno>
 #include <cstring>
 #include <string>
 #include <unordered_map>
@@ -149,7 +150,7 @@ struct ManagedLibrary {
 
     void* handle = dlopen(library, RTLD_NOW | RTLD_LOCAL);
     if (!handle) {
-      error_message = "dlopen() failed: ";
+      error_message = "[DriverManager] dlopen() failed: ";
       error_message += dlerror();
 
       // If applicable, append the shared library prefix/extension and
@@ -179,6 +180,7 @@ struct ManagedLibrary {
     if (handle) {
       this->handle = handle;
     } else {
+      SetError(error, error_message);
       return ADBC_STATUS_INTERNAL;
     }
 #endif  // defined(_WIN32)
@@ -452,6 +454,11 @@ AdbcStatusCode ConnectionSetOptionDouble(struct AdbcConnection* connection,
 
 AdbcStatusCode StatementBind(struct AdbcStatement*, struct ArrowArray*,
                              struct ArrowSchema*, struct AdbcError* error) {
+  return ADBC_STATUS_NOT_IMPLEMENTED;
+}
+
+AdbcStatusCode StatementBindStream(struct AdbcStatement*, struct ArrowArrayStream*,
+                                   struct AdbcError* error) {
   return ADBC_STATUS_NOT_IMPLEMENTED;
 }
 
@@ -1664,6 +1671,7 @@ AdbcStatusCode AdbcLoadDriverFromInitFunc(AdbcDriverInitFunc init_func, int vers
     CHECK_REQUIRED(driver, StatementNew);
     CHECK_REQUIRED(driver, StatementRelease);
     FILL_DEFAULT(driver, StatementBind);
+    FILL_DEFAULT(driver, StatementBindStream);
     FILL_DEFAULT(driver, StatementGetParameterSchema);
     FILL_DEFAULT(driver, StatementPrepare);
     FILL_DEFAULT(driver, StatementSetOption);

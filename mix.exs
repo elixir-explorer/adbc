@@ -71,8 +71,7 @@ defmodule Adbc.MixProject do
   defp package() do
     [
       name: "adbc",
-      files:
-        ~w(3rd_party/apache-arrow-adbc c_src lib mix.exs README* LICENSE* Makefile checksum.exs),
+      files: ~w(3rd_party/apache-arrow-adbc c_src lib mix.exs README* LICENSE* Makefile),
       licenses: ["Apache-2.0"],
       links: %{"GitHub" => @github_url}
     ]

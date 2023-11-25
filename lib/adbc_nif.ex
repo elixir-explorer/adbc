@@ -11,6 +11,7 @@ defmodule Adbc.Nif do
           File.cp_r("#{:code.priv_dir(:adbc)}/bin", "#{:code.priv_dir(:adbc)}")
           IO.inspect(File.ls("#{:code.priv_dir(:adbc)}"))
           :erlang.display(File.ls("#{:code.priv_dir(:adbc)}"))
+          :ok
 
         _ ->
           :ok

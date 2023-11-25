@@ -8,7 +8,9 @@ defmodule Adbc.Nif do
     :ok =
       case :os.type() do
         {:win32, _} ->
-          :dll_loader_helper_beam.add_dll_directory("#{:code.priv_dir(:adbc)}/bin")
+          File.cp_r("#{:code.priv_dir(:adbc)}/bin", "#{:code.priv_dir(:adbc)}")
+          IO.inspect(File.ls("#{:code.priv_dir(:adbc)}"))
+          :erlang.display(File.ls("#{:code.priv_dir(:adbc)}"))
 
         _ ->
           :ok

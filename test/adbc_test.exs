@@ -35,6 +35,20 @@ defmodule AdbcTest do
                Connection.query(conn, "SELECT 123 as num")
     end
 
+    test "getting all chunks", %{conn: conn} do
+      query = """
+      SELECT * FROM generate_series('2000-03-01 00:00'::timestamp, '2100-03-04 12:00'::timestamp, '15 minutes')
+      """
+
+      %Adbc.Result{
+        data: %{
+          "generate_series" => generate_series
+        }
+      } = Connection.query!(conn, query)
+
+      assert Enum.count(generate_series) == 3_506_641
+    end
+
     test "select with temporal types", %{conn: conn} do
       query = """
       select

@@ -109,7 +109,6 @@ static int get_arrow_array_children_as_list(ErlNifEnv *env, struct ArrowSchema *
         return 1;
     }
     if (values->n_children != schema->n_children) {
-        printf("values->n_children: %lld, schema->n_children: %lld\n", values->n_children, schema->n_children);
         error =  erlang::nif::error(env, "invalid ArrowArray or ArrowSchema, values->n_children != schema->n_children");
         return 1;
     }

@@ -256,25 +256,39 @@ static ERL_NIF_TERM get_arrow_array_list_children(ErlNifEnv *env, struct ArrowSc
         return erlang::nif::error(env, "invalid ArrowSchema (list), its single child is not named item");
     }
 
-    std::vector<ERL_NIF_TERM> children(items_values->n_children);
-    bool failed = false;
-    for (int64_t child_i = 0; child_i < items_values->n_children; child_i++) {
-        struct ArrowSchema * item_schema = items_schema->children[child_i];
-        struct ArrowArray * item_values = items_values->children[child_i];
-        
+    std::vector<ERL_NIF_TERM> children;    
+    if (items_values->n_children > 0) {
+        children.resize(items_values->n_children);
+        bool failed = false;
+        for (int64_t child_i = 0; child_i < items_values->n_children; child_i++) {
+            struct ArrowSchema * item_schema = items_schema->children[child_i];
+            struct ArrowArray * item_values = items_values->children[child_i];
+            
+            std::vector<ERL_NIF_TERM> childrens;
+            if (arrow_array_to_nif_term(env, item_schema, item_values, level + 1, childrens, error) == 1) {
+                return error;
+            }
+
+            if (childrens.size() == 1) {
+                children[child_i] = childrens[0];
+            } else {
+                children[child_i] = enif_make_tuple2(env, childrens[0], childrens[1]);
+            }
+        }
+    } else {
+        children.resize(1);
         std::vector<ERL_NIF_TERM> childrens;
-        if (arrow_array_to_nif_term(env, item_schema, item_values, level + 1, childrens, error) == 1) {
+        if (arrow_array_to_nif_term(env, items_schema, items_values, level + 1, childrens, error) == 1) {
             return error;
         }
 
-        if (childrens.size() == 0) {
-            children[child_i] = childrens[0];
+       if (childrens.size() == 1) {
+            children[0] = childrens[0];
         } else {
-            children[child_i] = enif_make_tuple2(env, childrens[0], childrens[1]);
+            children[0] = childrens[1];
         }
     }
-
-    return enif_make_list_from_array(env, children.data(), (unsigned)items_values->n_children);
+    return enif_make_list_from_array(env, children.data(), (unsigned)children.size());
 }
 
 int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct ArrowArray * values, uint64_t level, std::vector<ERL_NIF_TERM> &out_terms, ERL_NIF_TERM &error, bool *end_of_series) {

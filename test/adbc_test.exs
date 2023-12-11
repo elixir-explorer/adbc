@@ -35,6 +35,11 @@ defmodule AdbcTest do
                Connection.query(conn, "SELECT 123 as num")
     end
 
+    test "list responses", %{conn: conn} do
+      assert {:ok, %Adbc.Result{data: %{"num" => [[1, 2, 3]]}}} =
+               Connection.query(conn, "SELECT ARRAY[1, 2, 3] as num")
+    end
+
     test "getting all chunks", %{conn: conn} do
       query = """
       SELECT * FROM generate_series('2000-03-01 00:00'::timestamp, '2100-03-04 12:00'::timestamp, '15 minutes')

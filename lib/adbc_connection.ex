@@ -286,13 +286,12 @@ defmodule Adbc.Connection do
 
   defp stream_results(reference, acc, num_rows) do
     case Adbc.Nif.adbc_arrow_array_stream_next(reference) do
-      {:ok, results, done} ->
+      {:ok, results, _done} ->
         acc = Map.merge(acc, Map.new(results), fn _k, v1, v2 -> v1 ++ v2 end)
+        stream_results(reference, acc, num_rows)
 
-        case done do
-          0 -> stream_results(reference, acc, num_rows)
-          1 -> {:ok, %Adbc.Result{data: acc, num_rows: num_rows}}
-        end
+      :end_of_series ->
+        {:ok, %Adbc.Result{data: acc, num_rows: num_rows}}
 
       {:error, reason} ->
         {:error, error_to_exception(reason)}

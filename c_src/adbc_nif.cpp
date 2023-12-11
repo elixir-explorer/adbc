@@ -282,7 +282,7 @@ static ERL_NIF_TERM get_arrow_array_list_children(ErlNifEnv *env, struct ArrowSc
             return error;
         }
 
-       if (childrens.size() == 1) {
+        if (childrens.size() == 1) {
             children[0] = childrens[0];
         } else {
             children[0] = childrens[1];

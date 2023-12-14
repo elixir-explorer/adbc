@@ -67,20 +67,28 @@ defmodule Adbc.Connection do
   @doc """
   Runs the given `query` with `params`.
   """
-  @spec query(t(), binary, [term]) :: {:ok, result_set} | {:error, Exception.t()}
-  def query(conn, query, params \\ []) when is_binary(query) and is_list(params) do
+  @spec query(t(), binary | reference, [term]) :: {:ok, result_set} | {:error, Exception.t()}
+  def query(conn, query, params \\ []) when (is_binary(query) or is_reference(query)) and is_list(params) do
     stream_lock(conn, {:query, query, params}, &stream_results/2)
   end
 
   @doc """
   Same as `query/3` but raises an exception on error.
   """
-  @spec query!(t(), binary, [term]) :: result_set
-  def query!(conn, query, params \\ []) when is_binary(query) and is_list(params) do
+  @spec query!(t(), binary | reference, [term]) :: result_set
+  def query!(conn, query, params \\ []) when (is_binary(query) or is_reference(query)) and is_list(params) do
     case query(conn, query, params) do
       {:ok, result} -> result
       {:error, reason} -> raise reason
     end
+  end
+
+  @doc """
+  Prepares the given `query`.
+  """
+  @spec prepare(t(), binary) :: {:ok, reference} | {:error, Exception.t()}
+  def prepare(conn, query) when is_binary(query) do
+    stream_lock(conn, {:prepare, query}, fn ref, _ -> {:ok, ref} end)
   end
 
   @doc """
@@ -92,7 +100,7 @@ defmodule Adbc.Connection do
   native code that consumes the ArrowStream accordingly.
   """
   def query_pointer(conn, query, params \\ [], fun)
-      when is_binary(query) and is_list(params) and is_function(fun) do
+      when (is_binary(query) or is_reference(query)) and is_list(params) and is_function(fun) do
     stream_lock(conn, {:query, query, params}, fn stream_ref, rows_affected ->
       {:ok, fun.(Adbc.Nif.adbc_arrow_array_stream_get_pointer(stream_ref), rows_affected)}
     end)
@@ -267,6 +275,13 @@ defmodule Adbc.Connection do
 
   defp stream_lock(conn, command, fun) do
     case GenServer.call(conn, {:stream_lock, command}, :infinity) do
+      {:ok, conn, unlock_ref, statement_ref} ->
+        try do
+          statement_ref
+        after
+          GenServer.cast(conn, {:unlock, unlock_ref})
+        end
+
       {:ok, conn, unlock_ref, stream_ref, rows_affected} ->
         try do
           fun.(stream_ref, normalize_rows(rows_affected))
@@ -351,6 +366,11 @@ defmodule Adbc.Connection do
         {pid, _} = from
 
         case handle_command(command, state.conn) do
+          {:ok, statement_ref} when is_reference(statement_ref) ->
+            unlock_ref = Process.monitor(pid)
+            GenServer.reply(from, {:ok, self(), unlock_ref, statement_ref})
+            %{state | lock: unlock_ref, queue: queue}
+
           {:ok, stream_ref, rows_affected} when is_reference(stream_ref) ->
             unlock_ref = Process.monitor(pid)
             GenServer.reply(from, {:ok, self(), unlock_ref, stream_ref, rows_affected})
@@ -365,17 +385,36 @@ defmodule Adbc.Connection do
 
   defp maybe_dequeue(state), do: state
 
-  defp handle_command({:query, query, params}, conn) do
-    with {:ok, stmt} <- Adbc.Nif.adbc_statement_new(conn),
-         :ok <- Adbc.Nif.adbc_statement_set_sql_query(stmt, query),
+  defp handle_command({:query, query, params}, conn) when is_binary(query) do
+    with stmt <- create_statement(conn, query),
          :ok <- maybe_bind(stmt, params) do
       Adbc.Nif.adbc_statement_execute_query(stmt)
+    end
+  end
+
+  defp handle_command({:query, stmt, params}, _conn) when is_reference(stmt) do
+    with :ok <- maybe_bind(stmt, params) do
+      Adbc.Nif.adbc_statement_execute_query(stmt)
+    end
+  end
+
+  defp handle_command({:prepare, query}, conn) do
+    with stmt <- create_statement(conn, query),
+         :ok <- Adbc.Nif.adbc_statement_prepare(stmt) do
+      {:ok, stmt, -1}
     end
   end
 
   defp handle_command({name, args}, conn) do
     with {:ok, stream_ref} <- apply(Adbc.Nif, name, [conn | args]) do
       {:ok, stream_ref, -1}
+    end
+  end
+
+  defp create_statement(conn, query) do
+    with {:ok, stmt} <- Adbc.Nif.adbc_statement_new(conn),
+         :ok <- Adbc.Nif.adbc_statement_set_sql_query(stmt, query) do
+      stmt
     end
   end
 

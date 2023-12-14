@@ -187,6 +187,13 @@ defmodule Adbc.Connection.Test do
       assert {:error, %Adbc.Error{} = error} = Connection.query(conn, "NOT VALID SQL")
       assert Exception.message(error) =~ "[SQLite] Failed to prepare query"
     end
+
+    test "select with prepared query", %{db: db} do
+      conn = start_supervised!({Connection, database: db})
+      assert {:ok, ref} = Connection.prepare(conn, "SELECT 123 + ? as num")
+      assert {:ok, %Adbc.Result{data: %{"num" => [579]}}} =
+               Connection.query(conn, ref, [456])
+    end
   end
 
   describe "query!" do
@@ -213,6 +220,21 @@ defmodule Adbc.Connection.Test do
       assert_raise Adbc.Error,
                    ~s([SQLite] Failed to prepare query: near "NOT": syntax error\nQuery:NOT VALID SQL),
                    fn -> Connection.query!(conn, "NOT VALID SQL") end
+    end
+  end
+
+  describe "prepared queries" do
+    test "prepare", %{db: db} do
+      conn = start_supervised!({Connection, database: db})
+      assert {:ok, ref} = Connection.prepare(conn, "SELECT 123 + ? as num")
+      assert is_reference(ref)
+    end
+
+    test "release", %{db: db} do
+      conn = start_supervised!({Connection, database: db})
+      assert {:ok, ref} = Connection.prepare(conn, "SELECT 123 + ? as num")
+      assert :ok = Connection.release(conn, ref)
+      assert {:error, _} = Connection.query(conn, ref, [456])
     end
   end
 

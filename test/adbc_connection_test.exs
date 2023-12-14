@@ -248,6 +248,17 @@ defmodule Adbc.Connection.Test do
                    :from_pointer
                end)
     end
+
+    test "prepared query", %{db: db} do
+      conn = start_supervised!({Connection, database: db})
+
+      {:ok, ref} = Connection.prepare(conn, "SELECT 123 as num")
+      assert {:ok, :from_pointer} =
+               Connection.query_pointer(conn, ref, fn
+                 pointer, nil when is_integer(pointer) ->
+                   :from_pointer
+               end)
+    end
   end
 
   describe "lock" do

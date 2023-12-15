@@ -54,7 +54,7 @@ defmodule Adbc.Connection.Test do
              "int32_bitmask" => [],
              "int32_to_int32_list_map" => %{},
              "int64_value" => [],
-             "string_list" => [],
+             "string_list" => [[]],
              # ["SQLite", "3.39.2", "ADBC SQLite Driver", "(unknown)", "0.2.0-SNAPSHOT"]},
              "string_value" => ["SQLite", _, "ADBC SQLite Driver", _, _]
            }
@@ -75,7 +75,7 @@ defmodule Adbc.Connection.Test do
              "int32_bitmask" => [],
              "int32_to_int32_list_map" => %{},
              "int64_value" => [],
-             "string_list" => [],
+             "string_list" => [[]],
              "string_value" => ["SQLite"]
            }
          }
@@ -138,7 +138,7 @@ defmodule Adbc.Connection.Test do
                  [
                    {"constraint_name", []},
                    {"constraint_type", []},
-                   {"constraint_column_names", []},
+                   {"constraint_column_names", [[]]},
                    {"constraint_column_usage",
                     [
                       {"fk_catalog", []},

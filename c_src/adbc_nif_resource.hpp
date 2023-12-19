@@ -46,6 +46,7 @@ template <typename T> struct NifRes {
   using res_type = NifRes<T>;
 
   val_type val;
+  bool freed;
 
   // only used when T = struct 
   void * private_data = nullptr;
@@ -66,6 +67,7 @@ template <typename T> struct NifRes {
     }
     memset(&res->val, 0, sizeof(val_type));
     res->private_data = nullptr;
+    res->freed = false;
     return res;
   }
 
@@ -128,16 +130,26 @@ template <typename T> struct NifRes {
 
   template <typename R = T>
   static auto destruct_resource(ErlNifEnv *env, void *args) ->
-      typename std::enable_if<!release_guard<R>::value, void>::type {
-    if constexpr(std::is_same<struct AdbcStatement, T>::value) {
-      auto res = (NifRes<T> *)args;
-      if (res) {
-        struct AdbcError adbc_error{};
-        AdbcStatementRelease(&res->val, &adbc_error);
-      }
-    }
-  }
+      typename std::enable_if<!release_guard<R>::value, void>::type {}
 };
+
+static void destruct_adbc_database_resource(ErlNifEnv *env, void *args) {
+  auto res = (NifRes<struct AdbcDatabase> *)args;
+  if (res && !res->freed) {
+    struct AdbcError adbc_error{};
+    AdbcDatabaseRelease(&res->val, &adbc_error);
+    res->freed = true;
+  }
+}
+
+static void destruct_adbc_statement_resource(ErlNifEnv *env, void *args) {
+  auto res = (NifRes<struct AdbcStatement> *)args;
+  if (res && !res->freed) {
+    struct AdbcError adbc_error{};
+    AdbcStatementRelease(&res->val, &adbc_error);
+    res->freed = true;
+  }
+}
 
 // Used to construct a unique_ptr wrapping memory that is managed remotely.
 // The value in this memory *does* need to be destructed

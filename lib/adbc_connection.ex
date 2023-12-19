@@ -320,15 +320,21 @@ defmodule Adbc.Connection do
   end
 
   @impl true
-  def handle_cast({:unlock, ref}, %{lock: {ref, stream_ref}} = state) do
+  def handle_cast({:unlock, ref}, %{lock: {ref, stream_ref, stmt}} = state) do
     Adbc.Nif.adbc_arrow_array_stream_release(stream_ref)
+    if stmt != nil do
+      Adbc.Nif.adbc_statement_release(stmt)
+    end
     Process.demonitor(ref, [:flush])
     {:noreply, maybe_dequeue(%{state | lock: :none})}
   end
 
   @impl true
-  def handle_info({:DOWN, ref, _, _, _}, %{lock: {ref, stream_ref}} = state) do
+  def handle_info({:DOWN, ref, _, _, _}, %{lock: {ref, stream_ref, stmt}} = state) do
     Adbc.Nif.adbc_arrow_array_stream_release(stream_ref)
+    if stmt != nil do
+      Adbc.Nif.adbc_statement_release(stmt)
+    end
     {:noreply, maybe_dequeue(%{state | lock: :none})}
   end
 
@@ -359,13 +365,14 @@ defmodule Adbc.Connection do
         {pid, _} = from
 
         case handle_command(command, state.conn) do
-          {:ok, stream_ref, rows_affected} when is_reference(stream_ref) ->
+          {{:ok, stream_ref, rows_affected}, stmt} when is_reference(stream_ref) ->
             unlock_ref = Process.monitor(pid)
             GenServer.reply(from, {:ok, self(), unlock_ref, stream_ref, rows_affected})
-            %{state | lock: {unlock_ref, stream_ref}, queue: queue}
+            %{state | lock: {unlock_ref, stream_ref, stmt}, queue: queue}
 
-          {:error, error} ->
+          {{:error, error}, stmt} ->
             GenServer.reply(from, {:error, error})
+            if stmt != nil, do: Adbc.Nif.adbc_statement_release(stmt)
             maybe_dequeue(%{state | queue: queue})
         end
     end
@@ -377,13 +384,14 @@ defmodule Adbc.Connection do
     with {:ok, stmt} <- Adbc.Nif.adbc_statement_new(conn),
          :ok <- Adbc.Nif.adbc_statement_set_sql_query(stmt, query),
          :ok <- maybe_bind(stmt, params) do
-      Adbc.Nif.adbc_statement_execute_query(stmt)
+      r = Adbc.Nif.adbc_statement_execute_query(stmt)
+      {r, stmt}
     end
   end
 
   defp handle_command({name, args}, conn) do
     with {:ok, stream_ref} <- apply(Adbc.Nif, name, [conn | args]) do
-      {:ok, stream_ref, -1}
+      {{:ok, stream_ref, -1}, nil}
     end
   end
 

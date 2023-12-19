@@ -142,6 +142,15 @@ static void destruct_adbc_database_resource(ErlNifEnv *env, void *args) {
   }
 }
 
+static void destruct_adbc_connection_resource(ErlNifEnv *env, void *args) {
+  auto res = (NifRes<struct AdbcConnection> *)args;
+  if (res && !res->freed) {
+    struct AdbcError adbc_error{};
+    AdbcConnectionRelease(&res->val, &adbc_error);
+    res->freed = true;
+  }
+}
+
 static void destruct_adbc_statement_resource(ErlNifEnv *env, void *args) {
   auto res = (NifRes<struct AdbcStatement> *)args;
   if (res && !res->freed) {

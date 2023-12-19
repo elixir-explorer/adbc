@@ -1452,7 +1452,7 @@ static int on_load(ErlNifEnv *env, void **, ERL_NIF_TERM) {
 
     {
         using res_type = NifRes<struct AdbcConnection>;
-        rt = enif_open_resource_type(env, "Elixir.Adbc.Nif", "NifResAdbcConnection", res_type::destruct_resource, ERL_NIF_RT_CREATE, NULL);
+        rt = enif_open_resource_type(env, "Elixir.Adbc.Nif", "NifResAdbcConnection", destruct_adbc_connection_resource, ERL_NIF_RT_CREATE, NULL);
         if (!rt) return -1;
         res_type::type = rt;
     }

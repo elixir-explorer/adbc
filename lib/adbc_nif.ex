@@ -27,15 +27,11 @@ defmodule Adbc.Nif do
 
   def adbc_database_init(_self), do: :erlang.nif_error(:not_loaded)
 
-  def adbc_database_release(_self), do: :erlang.nif_error(:not_loaded)
-
   def adbc_connection_new, do: :erlang.nif_error(:not_loaded)
 
   def adbc_connection_set_option(_self, _key, _value), do: :erlang.nif_error(:not_loaded)
 
   def adbc_connection_init(_self, _database), do: :erlang.nif_error(:not_loaded)
-
-  def adbc_connection_release(_self), do: :erlang.nif_error(:not_loaded)
 
   def adbc_connection_get_info(_self, _info_codes), do: :erlang.nif_error(:not_loaded)
 
@@ -53,8 +49,6 @@ defmodule Adbc.Nif do
   def adbc_connection_get_table_types(_self), do: :erlang.nif_error(:not_loaded)
 
   def adbc_statement_new(_connection), do: :erlang.nif_error(:not_loaded)
-
-  def adbc_statement_release(_statement), do: :erlang.nif_error(:not_loaded)
 
   def adbc_statement_execute_query(_statement), do: :erlang.nif_error(:not_loaded)
 

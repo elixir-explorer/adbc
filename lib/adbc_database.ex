@@ -83,11 +83,6 @@ defmodule Adbc.Database do
     {:noreply, state}
   end
 
-  @impl true
-  def terminate(_, {_driver, db}) do
-    Adbc.Nif.adbc_database_release(db)
-  end
-
   defp init_driver(ref, driver) do
     case Adbc.Driver.so_path(driver) do
       {:ok, path} -> Adbc.Nif.adbc_database_set_option(ref, "driver", path)

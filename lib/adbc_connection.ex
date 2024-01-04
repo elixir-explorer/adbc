@@ -336,12 +336,6 @@ defmodule Adbc.Connection do
   def handle_info({:EXIT, _db, reason}, state), do: {:stop, reason, state}
   def handle_info(_msg, state), do: {:noreply, state}
 
-  @impl true
-  def terminate(_reason, state) do
-    Adbc.Nif.adbc_connection_release(state.conn)
-    :ok
-  end
-
   ## Queue helpers
 
   defp maybe_dequeue(%{lock: :none, queue: queue} = state) do

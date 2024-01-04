@@ -321,6 +321,9 @@ defmodule Adbc.Connection do
 
   @impl true
   def handle_cast({:unlock, ref}, %{lock: {ref, stream_ref}} = state) do
+    # We could let the GC be the one release it but,
+    # since a stream can be a large resource, we release
+    # it now and let the GC free the remaining resources.
     Adbc.Nif.adbc_arrow_array_stream_release(stream_ref)
     Process.demonitor(ref, [:flush])
     {:noreply, maybe_dequeue(%{state | lock: :none})}
@@ -335,12 +338,6 @@ defmodule Adbc.Connection do
   @impl true
   def handle_info({:EXIT, _db, reason}, state), do: {:stop, reason, state}
   def handle_info(_msg, state), do: {:noreply, state}
-
-  @impl true
-  def terminate(_reason, state) do
-    Adbc.Nif.adbc_connection_release(state.conn)
-    :ok
-  end
 
   ## Queue helpers
 

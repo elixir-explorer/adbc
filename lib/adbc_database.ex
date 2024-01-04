@@ -63,29 +63,43 @@ defmodule Adbc.Database do
   @impl true
   def init({driver, db}) do
     Process.flag(:trap_exit, true)
-    {:ok, {driver, db}}
+    {:ok, {driver, db, %{}}}
   end
 
   @impl true
-  def handle_call({:initialize_connection, conn_ref}, {pid, _}, {driver, db}) do
+  def handle_call({:initialize_connection, conn_ref}, {pid, _}, {driver, db, conns}) do
     case Adbc.Nif.adbc_connection_init(conn_ref, db) do
       :ok ->
         Process.link(pid)
-        {:reply, {:ok, driver}, {driver, db}}
+        conns = Map.put(conns, pid, true)
+        {:reply, {:ok, driver}, {driver, db, conns}}
 
       {:error, reason} ->
-        {:reply, {:error, reason}, {driver, db}}
+        {:reply, {:error, reason}, {driver, db, conns}}
     end
   end
 
   @impl true
+  def handle_info({:EXIT, pid, _reason}, {driver, db, conns}) do
+    {:noreply, {driver, db, Map.delete(conns, pid)}}
+  end
+
   def handle_info(_msg, state) do
     {:noreply, state}
   end
 
   @impl true
-  def terminate(_, {_driver, db}) do
-    Adbc.Nif.adbc_database_release(db)
+  def terminate(_reason, {_driver, _db, conns}) do
+    for {pid, _} <- conns do
+      ref = Process.monitor(pid)
+      Process.exit(pid, :kill)
+
+      receive do
+        {:DOWN, ^ref, _, _, _} -> :ok
+      end
+    end
+
+    :ok
   end
 
   defp init_driver(ref, driver) do

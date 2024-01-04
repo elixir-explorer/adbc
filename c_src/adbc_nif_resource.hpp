@@ -131,11 +131,29 @@ template <typename T> struct NifRes {
       typename std::enable_if<!release_guard<R>::value, void>::type {}
 };
 
+static void destruct_adbc_database_resource(ErlNifEnv *env, void *args) {
+  auto res = (NifRes<struct AdbcDatabase> *)args;
+  struct AdbcError adbc_error{};
+  AdbcDatabaseRelease(&res->val, &adbc_error);
+}
+
+static void destruct_adbc_connection_resource(ErlNifEnv *env, void *args) {
+  auto res = (NifRes<struct AdbcConnection> *)args;
+  struct AdbcError adbc_error{};
+  AdbcConnectionRelease(&res->val, &adbc_error);
+}
+
+static void destruct_adbc_statement_resource(ErlNifEnv *env, void *args) {
+  auto res = (NifRes<struct AdbcStatement> *)args;
+  struct AdbcError adbc_error{};
+  AdbcStatementRelease(&res->val, &adbc_error);
+}
+
 // Used to construct a unique_ptr wrapping memory that is managed remotely.
 // The value in this memory *does* need to be destructed
 // but *should not* be deallocated using `delete`.
 template <typename T> struct NoOpDeleter {
-  void operator()(T *val) {
+  auto operator()(T *val) {
     // Do destruct
     val->~T();
     // Do not delete; we do not own the memory

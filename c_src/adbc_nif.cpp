@@ -778,29 +778,6 @@ static ERL_NIF_TERM adbc_database_init(ErlNifEnv *env, int argc, const ERL_NIF_T
     return erlang::nif::ok(env);
 }
 
-static ERL_NIF_TERM adbc_database_release(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
-    using res_type = NifRes<struct AdbcDatabase>;
-
-    ERL_NIF_TERM ret{};
-    ERL_NIF_TERM error{};
-    res_type * database = nullptr;
-    if ((database = res_type::get_resource(env, argv[0], error)) == nullptr) {
-        return error;
-    }
-
-    struct AdbcError adbc_error{};
-    AdbcStatusCode code = AdbcDatabaseRelease(&database->val, &adbc_error);
-    if (code != ADBC_STATUS_OK) {
-        if (code == ADBC_STATUS_INVALID_STATE) {
-            return erlang::nif::error(env, "invalid state");
-        } else {
-            return nif_error_from_adbc_error(env, &adbc_error);
-        }
-    }
-
-    return erlang::nif::ok(env);
-}
-
 static ERL_NIF_TERM adbc_connection_new(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
     using res_type = NifRes<struct AdbcConnection>;
 
@@ -866,29 +843,6 @@ static ERL_NIF_TERM adbc_connection_init(ErlNifEnv *env, int argc, const ERL_NIF
     AdbcStatusCode code = AdbcConnectionInit(&connection->val, &db->val, &adbc_error);
     if (code != ADBC_STATUS_OK) {
         return nif_error_from_adbc_error(env, &adbc_error);
-    }
-
-    return erlang::nif::ok(env);
-}
-
-static ERL_NIF_TERM adbc_connection_release(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
-    using res_type = NifRes<struct AdbcConnection>;
-
-    ERL_NIF_TERM ret{};
-    ERL_NIF_TERM error{};
-    res_type * connection = nullptr;
-    if ((connection = res_type::get_resource(env, argv[0], error)) == nullptr) {
-        return error;
-    }
-
-    struct AdbcError adbc_error{};
-    AdbcStatusCode code = AdbcConnectionRelease(&connection->val, &adbc_error);
-    if (code != ADBC_STATUS_OK) {
-        if (code == ADBC_STATUS_INVALID_STATE) {
-            return erlang::nif::error(env, "invalid state");
-        } else {
-            return nif_error_from_adbc_error(env, &adbc_error);
-        }
     }
 
     return erlang::nif::ok(env);
@@ -1180,30 +1134,6 @@ static ERL_NIF_TERM adbc_statement_new(ErlNifEnv *env, int argc, const ERL_NIF_T
     return erlang::nif::ok(env, ret);
 }
 
-static ERL_NIF_TERM adbc_statement_release(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
-    using res_type = NifRes<struct AdbcStatement>;
-
-    ERL_NIF_TERM ret{};
-    ERL_NIF_TERM error{};
-
-    res_type * statement = nullptr;
-    if ((statement = res_type::get_resource(env, argv[0], error)) == nullptr) {
-        return error;
-    }
-
-    struct AdbcError adbc_error{};
-    AdbcStatusCode code = AdbcStatementRelease(&statement->val, &adbc_error);
-    if (code != ADBC_STATUS_OK) {
-        if (code == ADBC_STATUS_INVALID_STATE) {
-            return erlang::nif::error(env, "invalid state");
-        } else {
-            return nif_error_from_adbc_error(env, &adbc_error);
-        }
-    }
-
-    return erlang::nif::ok(env);
-}
-
 static ERL_NIF_TERM adbc_statement_execute_query(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
     using res_type = NifRes<struct AdbcStatement>;
     using array_stream_type = NifRes<struct ArrowArrayStream>;
@@ -1445,21 +1375,21 @@ static int on_load(ErlNifEnv *env, void **, ERL_NIF_TERM) {
 
     {
         using res_type = NifRes<struct AdbcDatabase>;
-        rt = enif_open_resource_type(env, "Elixir.Adbc.Nif", "NifResAdbcDatabase", res_type::destruct_resource, ERL_NIF_RT_CREATE, NULL);
+        rt = enif_open_resource_type(env, "Elixir.Adbc.Nif", "NifResAdbcDatabase", destruct_adbc_database_resource, ERL_NIF_RT_CREATE, NULL);
         if (!rt) return -1;
         res_type::type = rt;
     }
 
     {
         using res_type = NifRes<struct AdbcConnection>;
-        rt = enif_open_resource_type(env, "Elixir.Adbc.Nif", "NifResAdbcConnection", res_type::destruct_resource, ERL_NIF_RT_CREATE, NULL);
+        rt = enif_open_resource_type(env, "Elixir.Adbc.Nif", "NifResAdbcConnection", destruct_adbc_connection_resource, ERL_NIF_RT_CREATE, NULL);
         if (!rt) return -1;
         res_type::type = rt;
     }
 
     {
         using res_type = NifRes<struct AdbcStatement>;
-        rt = enif_open_resource_type(env, "Elixir.Adbc.Nif", "NifResAdbcStatement", res_type::destruct_resource, ERL_NIF_RT_CREATE, NULL);
+        rt = enif_open_resource_type(env, "Elixir.Adbc.Nif", "NifResAdbcStatement", destruct_adbc_statement_resource, ERL_NIF_RT_CREATE, NULL);
         if (!rt) return -1;
         res_type::type = rt;
     }
@@ -1493,18 +1423,15 @@ static ErlNifFunc nif_functions[] = {
     {"adbc_database_new", 0, adbc_database_new, 0},
     {"adbc_database_set_option", 3, adbc_database_set_option, 0},
     {"adbc_database_init", 1, adbc_database_init, 0},
-    {"adbc_database_release", 1, adbc_database_release, 0},
 
     {"adbc_connection_new", 0, adbc_connection_new, 0},
     {"adbc_connection_set_option", 3, adbc_connection_set_option, 0},
     {"adbc_connection_init", 2, adbc_connection_init, 0},
-    {"adbc_connection_release", 1, adbc_connection_release, 0},
     {"adbc_connection_get_info", 2, adbc_connection_get_info, 0},
     {"adbc_connection_get_objects", 7, adbc_connection_get_objects, 0},
     {"adbc_connection_get_table_types", 1, adbc_connection_get_table_types, 0},
 
     {"adbc_statement_new", 1, adbc_statement_new, 0},
-    {"adbc_statement_release", 1, adbc_statement_release, 0},
     {"adbc_statement_execute_query", 1, adbc_statement_execute_query, 0},
     {"adbc_statement_prepare", 1, adbc_statement_prepare, 0},
     {"adbc_statement_set_sql_query", 2, adbc_statement_set_sql_query, 0},

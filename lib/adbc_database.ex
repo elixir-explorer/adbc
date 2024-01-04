@@ -99,7 +99,6 @@ defmodule Adbc.Database do
       end
     end
 
-    :erlang.garbage_collect()
     :ok
   end
 

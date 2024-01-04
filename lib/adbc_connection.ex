@@ -321,6 +321,9 @@ defmodule Adbc.Connection do
 
   @impl true
   def handle_cast({:unlock, ref}, %{lock: {ref, stream_ref}} = state) do
+    # We could let the GC be the one collecting it but,
+    # given this could be a large resource, we want to
+    # release it as soon as possible.
     Adbc.Nif.adbc_arrow_array_stream_release(stream_ref)
     Process.demonitor(ref, [:flush])
     {:noreply, maybe_dequeue(%{state | lock: :none})}

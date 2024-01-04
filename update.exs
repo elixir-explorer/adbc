@@ -1,8 +1,8 @@
 # To support a new version of ADBC, you must:
 #
-# 1. Fetch the latest ADBC release: https://github.com/apache/arrow-adbc/releases/
+# 1. Fetch the latest ADBC release source: https://github.com/apache/arrow-adbc/releases/
 # 2. Update the contents in 3rd_party with VERSION (only root files and c/)
-# 3. Invoke `elixir update.exs VERSION`
+# 3. Invoke `elixir update.exs VERSION [TAG]`
 # 4. ...
 # 5. Profit!
 #
@@ -11,10 +11,11 @@ Mix.install([{:req, "~> 0.4"}])
 drivers = ~w(sqlite postgresql flightsql snowflake)a
 file = "lib/adbc_driver.ex"
 
-version =
+{version, tag} =
   case System.argv() do
-    [version] -> version
-    _ -> raise "expected VERSION as argument"
+    [version] -> {version, "apache-arrow-adbc-#{version}"}
+    [version, tag] -> {version, tag}
+    _ -> raise "expected VERSION [TAG] as argument"
   end
 
 opts =
@@ -24,11 +25,7 @@ opts =
     []
   end
 
-release =
-  Req.get!(
-    "https://api.github.com/repos/apache/arrow-adbc/releases/tags/apache-arrow-adbc-#{version}",
-    opts
-  )
+release = Req.get!("https://api.github.com/repos/apache/arrow-adbc/releases/tags/#{tag}", opts)
 
 if release.status != 200 do
   raise "unknown GitHub release for version #{version}\n\n#{inspect(release)}"

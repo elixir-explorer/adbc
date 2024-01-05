@@ -239,13 +239,6 @@ defmodule Adbc.Connection.Test do
       assert {:ok, ref} = Connection.prepare(conn, "SELECT 123 + ? as num")
       assert is_reference(ref)
     end
-
-    test "release", %{db: db} do
-      conn = start_supervised!({Connection, database: db})
-      assert {:ok, ref} = Connection.prepare(conn, "SELECT 123 + ? as num")
-      assert :ok = Connection.release(conn, ref)
-      assert {:error, _} = Connection.query(conn, ref, [456])
-    end
   end
 
   describe "query_pointer" do

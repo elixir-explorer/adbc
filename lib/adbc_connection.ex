@@ -88,7 +88,10 @@ defmodule Adbc.Connection do
   """
   @spec prepare(t(), binary) :: {:ok, reference} | {:error, Exception.t()}
   def prepare(conn, query) when is_binary(query) do
-    stream_lock(conn, {:prepare, query}, fn ref, _ -> {:ok, ref} end)
+    with stmt <- create_statement(conn, query),
+         :ok <- Adbc.Nif.adbc_statement_prepare(stmt) do
+      {:ok, stmt}
+    end
   end
 
   @doc """
@@ -275,13 +278,6 @@ defmodule Adbc.Connection do
 
   defp stream_lock(conn, command, fun) do
     case GenServer.call(conn, {:stream_lock, command}, :infinity) do
-      {:ok, conn, unlock_ref, statement_ref} ->
-        try do
-          statement_ref
-        after
-          GenServer.cast(conn, {:unlock, unlock_ref})
-        end
-
       {:ok, conn, unlock_ref, stream_ref, rows_affected} ->
         try do
           fun.(stream_ref, normalize_rows(rows_affected))
@@ -366,11 +362,6 @@ defmodule Adbc.Connection do
         {pid, _} = from
 
         case handle_command(command, state.conn) do
-          {:ok, statement_ref} when is_reference(statement_ref) ->
-            unlock_ref = Process.monitor(pid)
-            GenServer.reply(from, {:ok, self(), unlock_ref, statement_ref})
-            %{state | lock: unlock_ref, queue: queue}
-
           {:ok, stream_ref, rows_affected} when is_reference(stream_ref) ->
             unlock_ref = Process.monitor(pid)
             GenServer.reply(from, {:ok, self(), unlock_ref, stream_ref, rows_affected})
@@ -395,13 +386,6 @@ defmodule Adbc.Connection do
   defp handle_command({:query, stmt, params}, _conn) when is_reference(stmt) do
     with :ok <- maybe_bind(stmt, params) do
       Adbc.Nif.adbc_statement_execute_query(stmt)
-    end
-  end
-
-  defp handle_command({:prepare, query}, conn) do
-    with stmt <- create_statement(conn, query),
-         :ok <- Adbc.Nif.adbc_statement_prepare(stmt) do
-      {:ok, stmt, -1}
     end
   end
 

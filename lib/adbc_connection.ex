@@ -91,6 +91,9 @@ defmodule Adbc.Connection do
     with stmt <- create_statement(conn, query),
          :ok <- Adbc.Nif.adbc_statement_prepare(stmt) do
       {:ok, stmt}
+    else
+      {:error, reason} ->
+        {:error, error_to_exception(reason)}
     end
   end
 

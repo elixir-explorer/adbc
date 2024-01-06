@@ -395,7 +395,16 @@ defmodule Adbc.Connection do
     end
   end
 
-  defp create_statement(conn, query) do
+  defp create_statement(conn, query) when is_pid(conn) do
+    %{conn: conn} = :sys.get_state(conn)
+
+    with {:ok, stmt} <- Adbc.Nif.adbc_statement_new(conn),
+         :ok <- Adbc.Nif.adbc_statement_set_sql_query(stmt, query) do
+      stmt
+    end
+  end
+
+  defp create_statement(conn, query) when is_reference(conn) do
     with {:ok, stmt} <- Adbc.Nif.adbc_statement_new(conn),
          :ok <- Adbc.Nif.adbc_statement_set_sql_query(stmt, query) do
       stmt

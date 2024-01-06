@@ -845,6 +845,8 @@ static ERL_NIF_TERM adbc_connection_init(ErlNifEnv *env, int argc, const ERL_NIF
         return nif_error_from_adbc_error(env, &adbc_error);
     }
 
+    connection->private_data = &db->val;
+    enif_keep_resource(&db->val);
     return erlang::nif::ok(env);
 }
 
@@ -1130,6 +1132,8 @@ static ERL_NIF_TERM adbc_statement_new(ErlNifEnv *env, int argc, const ERL_NIF_T
         return nif_error_from_adbc_error(env, &adbc_error);
     }
 
+    connection->private_data = &connection->val;
+    enif_keep_resource(&connection->val);
     ERL_NIF_TERM ret = statement->make_resource(env);
     return erlang::nif::ok(env, ret);
 }

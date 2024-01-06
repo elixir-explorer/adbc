@@ -304,7 +304,6 @@ defmodule Adbc.Connection do
   def init({db, conn}) do
     case GenServer.call(db, {:initialize_connection, conn}, :infinity) do
       {:ok, driver} ->
-        Process.flag(:trap_exit, true)
         Process.put(:adbc_driver, driver)
         {:ok, %{conn: conn, lock: :none, queue: :queue.new()}}
 
@@ -334,10 +333,6 @@ defmodule Adbc.Connection do
     Adbc.Nif.adbc_arrow_array_stream_release(stream_ref)
     {:noreply, maybe_dequeue(%{state | lock: :none})}
   end
-
-  @impl true
-  def handle_info({:EXIT, _db, reason}, state), do: {:stop, reason, state}
-  def handle_info(_msg, state), do: {:noreply, state}
 
   ## Queue helpers
 

@@ -140,12 +140,14 @@ static void destruct_adbc_database_resource(ErlNifEnv *env, void *args) {
 static void destruct_adbc_connection_resource(ErlNifEnv *env, void *args) {
   auto res = (NifRes<struct AdbcConnection> *)args;
   struct AdbcError adbc_error{};
+  if(res->private_data != nullptr) enif_release_resource(&res->private_data);
   AdbcConnectionRelease(&res->val, &adbc_error);
 }
 
 static void destruct_adbc_statement_resource(ErlNifEnv *env, void *args) {
   auto res = (NifRes<struct AdbcStatement> *)args;
   struct AdbcError adbc_error{};
+  if(res->private_data != nullptr) enif_release_resource(&res->private_data);
   AdbcStatementRelease(&res->val, &adbc_error);
 }
 

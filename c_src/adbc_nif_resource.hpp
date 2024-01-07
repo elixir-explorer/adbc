@@ -10,8 +10,6 @@
 // Only for debugging:
 #include <cstdio>
 
-template <typename T> struct NoOpDeleter;
-
 template <typename...> using void_t = void;
 
 // Check for the existence of member variable 'release' using SFINAE
@@ -55,11 +53,8 @@ template <typename T> struct NifRes {
   /// Creates a new NifRes<T> using `enif_alloc_resource`, returning it as an
   /// owned pointer. When this owned pointer leaves the scope,
   /// `enif_release_resource` is automatically called.
-  static auto allocate_resource(ErlNifEnv *env, ERL_NIF_TERM &error)
-      -> std::unique_ptr<NifRes<T>, NoOpDeleter<res_type>> {
-    std::unique_ptr<NifRes<T>, NoOpDeleter<res_type>> res{
-        static_cast<res_type *>(
-            enif_alloc_resource(res_type::type, sizeof(res_type)))};
+  static auto allocate_resource(ErlNifEnv *env, ERL_NIF_TERM &error) -> res_type * {
+    auto res =  static_cast<res_type *>(enif_alloc_resource(res_type::type, sizeof(res_type)));
     if (res == nullptr) {
       error = erlang::nif::error(env, "cannot allocate Nif resource\n");
       return res;
@@ -93,42 +88,12 @@ template <typename T> struct NifRes {
     return enif_make_resource(env, this);
   }
 
-  /// Creates another reference to the same underlying NifRes to be used in C++.
-  /// (Increments the reference count on the C++ side).
-  auto clone_ref() const -> std::unique_ptr<NifRes<T>, NoOpDeleter<res_type>> {
-    enif_keep_resource(this);
-    return std::unique_ptr<NifRes<T>>{this};
-  }
-
   // Called whenever a _single_ reference to the resource goes out of scope.
   // Decrements the reference count on the C++ side.
-  ~NifRes() { enif_release_resource(this); }
-
-  // Callback which is called by the Erlang GC when the _last_ reference to the
-  // NifRes goes out of scope. If there is special cleanup that should happen
-  // for a particular child-class, create a template specialization for it.
-  template <typename R = T>
-  static auto destruct_resource(ErlNifEnv *env, void *args) ->
-      typename std::enable_if<release_guard<R>::value, void>::type {
-    auto res = (NifRes<T> *)args;
-    if (res) {
-      if (res->val.release) {
-        res->val.release(&res->val);
-      }
-
-      if (res->private_data) {
-        auto schema = (struct ArrowSchema*)res->private_data;
-        if (schema->release) {
-          schema->release(schema);
-        }
-        enif_free(schema);
-      }
-    }
+  ~NifRes() {
+    enif_release_resource(this);
+    val->~T();
   }
-
-  template <typename R = T>
-  static auto destruct_resource(ErlNifEnv *env, void *args) ->
-      typename std::enable_if<!release_guard<R>::value, void>::type {}
 };
 
 static void destruct_adbc_database_resource(ErlNifEnv *env, void *args) {
@@ -151,15 +116,23 @@ static void destruct_adbc_statement_resource(ErlNifEnv *env, void *args) {
   AdbcStatementRelease(&res->val, &adbc_error);
 }
 
-// Used to construct a unique_ptr wrapping memory that is managed remotely.
-// The value in this memory *does* need to be destructed
-// but *should not* be deallocated using `delete`.
-template <typename T> struct NoOpDeleter {
-  auto operator()(T *val) {
-    // Do destruct
-    val->~T();
-    // Do not delete; we do not own the memory
+static void destruct_adbc_error(ErlNifEnv *env, void *args) {
+  auto res = (NifRes<struct AdbcError> *)args;
+  if (res->val.release) {
+    res->val.release(&res->val);
   }
-};
+}
+
+static void destruct_adbc_arrow_array_stream(ErlNifEnv *env, void *args) {
+  auto res = (NifRes<struct AdbcStatement> *)args;
+  if (res->private_data) {
+    auto schema = (struct ArrowSchema*)res->private_data;
+    if (schema->release) {
+      schema->release(schema);
+    }
+    enif_free(schema);
+    res->private_data = nullptr;
+  }
+}
 
 #endif /* ADBC_NIF_RESOURCE_HPP */

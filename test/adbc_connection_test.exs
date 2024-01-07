@@ -187,6 +187,23 @@ defmodule Adbc.Connection.Test do
       assert {:error, %Adbc.Error{} = error} = Connection.query(conn, "NOT VALID SQL")
       assert Exception.message(error) =~ "[SQLite] Failed to prepare query"
     end
+
+    test "select with prepared query", %{db: db} do
+      conn = start_supervised!({Connection, database: db})
+      assert {:ok, ref} = Connection.prepare(conn, "SELECT 123 + ? as num")
+      assert {:ok, %Adbc.Result{data: %{"num" => [579]}}} =
+               Connection.query(conn, ref, [456])
+    end
+
+    test "select with multiple prepared queries", %{db: db} do
+      conn = start_supervised!({Connection, database: db})
+      assert {:ok, ref_a} = Connection.prepare(conn, "SELECT 123 + ? as num")
+      assert {:ok, ref_b} = Connection.prepare(conn, "SELECT 1000 + ? as num")
+      assert {:ok, %Adbc.Result{data: %{"num" => [579]}}} =
+               Connection.query(conn, ref_a, [456])
+      assert {:ok, %Adbc.Result{data: %{"num" => [1456]}}} =
+               Connection.query(conn, ref_b, [456])
+    end
   end
 
   describe "query!" do
@@ -216,12 +233,31 @@ defmodule Adbc.Connection.Test do
     end
   end
 
+  describe "prepared queries" do
+    test "prepare", %{db: db} do
+      conn = start_supervised!({Connection, database: db})
+      assert {:ok, ref} = Connection.prepare(conn, "SELECT 123 + ? as num")
+      assert is_reference(ref)
+    end
+  end
+
   describe "query_pointer" do
     test "select", %{db: db} do
       conn = start_supervised!({Connection, database: db})
 
       assert {:ok, :from_pointer} =
                Connection.query_pointer(conn, "SELECT 123 as num", fn
+                 pointer, nil when is_integer(pointer) ->
+                   :from_pointer
+               end)
+    end
+
+    test "prepared query", %{db: db} do
+      conn = start_supervised!({Connection, database: db})
+
+      {:ok, ref} = Connection.prepare(conn, "SELECT 123 + ? as num")
+      assert {:ok, :from_pointer} =
+               Connection.query_pointer(conn, ref, [456], fn
                  pointer, nil when is_integer(pointer) ->
                    :from_pointer
                end)
@@ -270,6 +306,7 @@ defmodule Adbc.Connection.Test do
     test "commands that error do not lock", %{db: db} do
       conn = start_supervised!({Connection, database: db})
       {:error, %Adbc.Error{}} = Connection.query(conn, "NOT VALID SQL")
+      {:error, %Adbc.Error{}} = Connection.prepare(conn, "NOT VALID SQL")
       run_anything(conn)
     end
 

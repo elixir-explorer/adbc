@@ -67,19 +67,33 @@ defmodule Adbc.Connection do
   @doc """
   Runs the given `query` with `params`.
   """
-  @spec query(t(), binary, [term]) :: {:ok, result_set} | {:error, Exception.t()}
-  def query(conn, query, params \\ []) when is_binary(query) and is_list(params) do
+  @spec query(t(), binary | reference, [term]) :: {:ok, result_set} | {:error, Exception.t()}
+  def query(conn, query, params \\ []) when (is_binary(query) or is_reference(query)) and is_list(params) do
     stream_lock(conn, {:query, query, params}, &stream_results/2)
   end
 
   @doc """
   Same as `query/3` but raises an exception on error.
   """
-  @spec query!(t(), binary, [term]) :: result_set
-  def query!(conn, query, params \\ []) when is_binary(query) and is_list(params) do
+  @spec query!(t(), binary | reference, [term]) :: result_set
+  def query!(conn, query, params \\ []) when (is_binary(query) or is_reference(query)) and is_list(params) do
     case query(conn, query, params) do
       {:ok, result} -> result
       {:error, reason} -> raise reason
+    end
+  end
+
+  @doc """
+  Prepares the given `query`.
+  """
+  @spec prepare(t(), binary) :: {:ok, reference} | {:error, Exception.t()}
+  def prepare(conn, query) when is_binary(query) do
+    with stmt <- create_statement(conn, query),
+         :ok <- Adbc.Nif.adbc_statement_prepare(stmt) do
+      {:ok, stmt}
+    else
+      {:error, reason} ->
+        {:error, error_to_exception(reason)}
     end
   end
 
@@ -92,7 +106,7 @@ defmodule Adbc.Connection do
   native code that consumes the ArrowStream accordingly.
   """
   def query_pointer(conn, query, params \\ [], fun)
-      when is_binary(query) and is_list(params) and is_function(fun) do
+      when (is_binary(query) or is_reference(query)) and is_list(params) and is_function(fun) do
     stream_lock(conn, {:query, query, params}, fn stream_ref, rows_affected ->
       {:ok, fun.(Adbc.Nif.adbc_arrow_array_stream_get_pointer(stream_ref), rows_affected)}
     end)
@@ -365,10 +379,15 @@ defmodule Adbc.Connection do
 
   defp maybe_dequeue(state), do: state
 
-  defp handle_command({:query, query, params}, conn) do
-    with {:ok, stmt} <- Adbc.Nif.adbc_statement_new(conn),
-         :ok <- Adbc.Nif.adbc_statement_set_sql_query(stmt, query),
+  defp handle_command({:query, query, params}, conn) when is_binary(query) do
+    with stmt <- create_statement(conn, query),
          :ok <- maybe_bind(stmt, params) do
+      Adbc.Nif.adbc_statement_execute_query(stmt)
+    end
+  end
+
+  defp handle_command({:query, stmt, params}, _conn) when is_reference(stmt) do
+    with :ok <- maybe_bind(stmt, params) do
       Adbc.Nif.adbc_statement_execute_query(stmt)
     end
   end
@@ -376,6 +395,18 @@ defmodule Adbc.Connection do
   defp handle_command({name, args}, conn) do
     with {:ok, stream_ref} <- apply(Adbc.Nif, name, [conn | args]) do
       {:ok, stream_ref, -1}
+    end
+  end
+
+  defp create_statement(conn, query) when is_pid(conn) do
+    %{conn: conn} = :sys.get_state(conn)
+    create_statement(conn, query)
+  end
+
+  defp create_statement(conn, query) when is_reference(conn) do
+    with {:ok, stmt} <- Adbc.Nif.adbc_statement_new(conn),
+         :ok <- Adbc.Nif.adbc_statement_set_sql_query(stmt, query) do
+      stmt
     end
   end
 

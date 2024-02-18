@@ -2,7 +2,7 @@
 #
 # 1. Fetch the latest ADBC release source: https://github.com/apache/arrow-adbc/releases/
 # 2. Update the contents in 3rd_party with VERSION (only root files and c/)
-# 3. Invoke `elixir update.exs VERSION [TAG]`
+# 3. Invoke `elixir update.exs VERSION [TAG]` (such as `elixir update.exs 0.10.0 apache-arrow-adbc-0.10.0-rc1`)
 # 4. ...
 # 5. Profit!
 #
@@ -35,6 +35,7 @@ assets = release.body["assets"]
 
 mapping =
   for driver <- drivers, into: %{} do
+    IO.puts("Generating #{driver}")
     prefix = "adbc_driver_#{driver}-#{version}"
     suffix = ".whl"
 

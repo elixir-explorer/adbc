@@ -18,7 +18,7 @@ defmodule Adbc.MixProject do
       make_precompiler: {:nif, CCPrecompiler},
       make_precompiler_url: "#{@github_url}/releases/download/v#{@version}/@{artefact_filename}",
       make_precompiler_filename: "adbc_nif",
-      make_precompiler_nif_versions: [versions: ["2.16", "2.17"]],
+      make_precompiler_nif_versions: [versions: ["2.16"]],
       cc_precompiler: [
         cleanup: "clean",
         compilers: %{
@@ -49,7 +49,7 @@ defmodule Adbc.MixProject do
     [
       # compilation
       {:cc_precompiler, "~> 0.1.8 or ~> 0.2", runtime: false},
-      {:elixir_make, "~> 0.7.0", runtime: false},
+      {:elixir_make, "~> 0.8", runtime: false},
 
       # runtime
       {:dll_loader_helper_beam, "~> 1.0"},
@@ -72,7 +72,7 @@ defmodule Adbc.MixProject do
     [
       name: "adbc",
       files:
-        ~w(3rd_party/apache-arrow-adbc c_src lib mix.exs README* LICENSE* Makefile checksum.exs),
+        ~w(3rd_party/apache-arrow-adbc c_src lib mix.exs README* LICENSE* Makefile Makefile.win checksum.exs),
       licenses: ["Apache-2.0"],
       links: %{"GitHub" => @github_url}
     ]

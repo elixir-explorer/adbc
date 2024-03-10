@@ -15,12 +15,13 @@ jobs:
       MIX_ENV: prod
     strategy:
       matrix:
-        otp_version: [25, 26]
+        otp_version: [25]
     
     name: Linux GNU - OTP ${{ matrix.otp_version }}
 
     steps:
-      - uses: actions/checkout@v3
+      - name: Checkout
+        uses: actions/checkout@v4
 
       - uses: erlef/setup-beam@v1
         with:
@@ -40,7 +41,7 @@ jobs:
           mix deps.get
           mix elixir_make.precompile
 
-      - uses: softprops/action-gh-release@v1
+      - uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/')
         with:
           files: |
@@ -50,15 +51,16 @@ jobs:
     runs-on: macos-11
     env:
       MIX_ENV: prod
-      elixir_version: "1.15.2"
+      elixir_version: "1.16.2"
     strategy:
       matrix:
-        otp_version: ["25.3.2.3", "26.0.2"]
+        otp_version: ["25.3.2.8"]
 
     name: macOS - OTP ${{ matrix.otp_version }}
 
     steps:
-      - uses: actions/checkout@v3
+      - name: Checkout
+        uses: actions/checkout@v4
 
       - name: Install erlang and elixir
         run: |
@@ -82,7 +84,7 @@ jobs:
           mix deps.get
           mix elixir_make.precompile
 
-      - uses: softprops/action-gh-release@v1
+      - uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/')
         with:
           files: |
@@ -94,12 +96,13 @@ jobs:
       MIX_ENV: prod
     strategy:
       matrix:
-        otp_version: [25, 26]
+        otp_version: [25]
     
     name: Windows - OTP ${{ matrix.otp_version }}
 
     steps:
-      - uses: actions/checkout@v3
+      - name: Checkout
+        uses: actions/checkout@v4
 
       - uses: erlef/setup-beam@v1
         with:
@@ -118,7 +121,7 @@ jobs:
           mix deps.get
           mix elixir_make.precompile
 
-      - uses: softprops/action-gh-release@v1
+      - uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/')
         with:
           files: |

@@ -54,9 +54,10 @@ jobs:
       elixir_version: "1.16.2"
     strategy:
       matrix:
-        otp_version: ["25.3.2.8"]
+        job:
+          - { otp_version: "25.3.2.8", elixir: "1.16.2" }
 
-    name: macOS - OTP ${{ matrix.otp_version }}
+    name: macOS - OTP ${{ matrix.job.otp_version }}
 
     steps:
       - name: Checkout
@@ -64,21 +65,32 @@ jobs:
 
       - name: Install erlang and elixir
         run: |
-          brew install autoconf coreutils curl git openssl asdf
-          asdf plugin add erlang https://github.com/asdf-vm/asdf-erlang.git
-          asdf plugin-add elixir https://github.com/asdf-vm/asdf-elixir.git
-          export KERL_CONFIGURE_OPTIONS="--disable-debug --without-javac"
-          asdf install erlang ${{ matrix.otp_version }}
-          asdf install elixir ${{ env.elixir_version }}
-          asdf global erlang ${{ matrix.otp_version }}
-          asdf global elixir ${{ env.elixir_version }}
-          source $(brew --prefix asdf)/libexec/asdf.sh
+          export ROOT_DIR=$(pwd)
+
+          mkdir -p ./cache/otp
+          curl -fSL https://github.com/cocoa-xu/otp-build/releases/download/v${{ matrix.job.otp_version }}/otp-x86_64-apple-darwin.tar.gz -o ./cache/otp/otp-v${{ matrix.job.otp_version }}-x86_64-apple-darwin.tar.gz
+          cd ./cache/otp
+          tar -xzf otp-v${{ matrix.job.otp_version }}-x86_64-apple-darwin.tar.gz
+          cd ${ROOT_DIR}
+
+          export PATH=$(pwd)/cache/otp/usr/local/bin:$(pwd)/./cache/elixir/elixir-${{ matrix.job.elixir }}/bin:${PATH}
+          export ERL_ROOTDIR=$(pwd)/cache/otp/usr/local/lib/erlang
+
+          mkdir -p ./cache/elixir
+          curl -fSL https://github.com/elixir-lang/elixir/archive/refs/tags/v${{ matrix.job.elixir }}.tar.gz -o ./cache/elixir/elixir-${{ matrix.job.elixir }}.tar.gz
+          cd ./cache/elixir
+          tar -xzf elixir-${{ matrix.job.elixir }}.tar.gz
+          cd elixir-${{ matrix.job.elixir }}
+          make compile
+          make -j$(sysctl -n hw.ncpu) install
+
           mix local.hex --force
           mix local.rebar --force
 
       - name: Precompile
         run: |
-          source $(brew --prefix asdf)/libexec/asdf.sh
+          export PATH=$(pwd)/cache/otp/usr/local/bin:$(pwd)/./cache/elixir/elixir-${{ matrix.job.elixir }}/bin:${PATH}
+          export ERL_ROOTDIR=$(pwd)/cache/otp/usr/local/lib/erlang
           export ELIXIR_MAKE_CACHE_DIR=$(pwd)/cache
           mkdir -p "${ELIXIR_MAKE_CACHE_DIR}"
           mix deps.get

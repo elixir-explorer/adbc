@@ -113,21 +113,22 @@ defmodule Adbc.Connection do
 
   The result is an Arrow dataset with the following schema:
 
-  Field Name                  | Field Type
-  ----------------------------|------------------------
-  info_name                   | uint32 not null
-  info_value                  | INFO_SCHEMA
+
+  | Field Name                 |  Field Type    | Null Contstraint  |
+  | -------------------------- | ---------------|------------------ |
+  | `info_name`                |  `uint32`      | not null          |
+  | `info_value`               |  `INFO_SCHEMA` |                   |
 
   `INFO_SCHEMA` is a dense union with members:
 
-  Field Name (Type Code)      | Field Type
-  ----------------------------|------------------------
-  string_value (0)            | utf8
-  bool_value (1)              | bool
-  int64_value (2)             | int64
-  int32_bitmask (3)           | int32
-  string_list (4)             | list<utf8>
-  int32_to_int32_list_map (5) | map<int32, list<int32>>
+  | Field Name       | Type Code |  Field Type                   |
+  | -----------------| --------- | ----------------------------- |
+  | `string_value`              | 0 |  `utf8`                    |
+  | `bool_value`                | 1 |  `bool`                    |
+  | `int64_value`               | 2 |  `int64`                   |
+  | `int32_bitmask`             | 3 |  `int32`                   |
+  | `string_list`               | 4 |  `list<utf8>`              |
+  | `int32_to_int32_list_map`   | 5 |  `map<int32, list<int32>>` |
 
   Each metadatum is identified by an integer code. The recognized
   codes are defined as constants. Codes [0, 10_000) are reserved
@@ -145,65 +146,65 @@ defmodule Adbc.Connection do
 
   The result is an Arrow dataset with the following schema:
 
-  | Field Name               | Field Type              |
-  |--------------------------|-------------------------|
-  | catalog_name             | utf8                    |
-  | catalog_db_schemas       | list<DB_SCHEMA_SCHEMA>  |
+  | Field Name               | Field Type                |
+  |--------------------------|---------------------------|
+  | `catalog_name`           | `utf8`                    |
+  | `catalog_db_schemas`     | `list<DB_SCHEMA_SCHEMA>`  |
 
   `DB_SCHEMA_SCHEMA` is a Struct with fields:
 
-  | Field Name               | Field Type              |
-  |--------------------------|-------------------------|
-  | db_schema_name           | utf8                    |
-  | db_schema_tables         | list<TABLE_SCHEMA>      |
+  | Field Name             | Field Type              |
+  |------------------------|-------------------------|
+  | `db_schema_name`       | `utf8`                  |
+  | `db_schema_tables`     | `list<TABLE_SCHEMA>`    |
 
   `TABLE_SCHEMA` is a Struct with fields:
 
-  | Field Name               | Field Type              |
-  |--------------------------|-------------------------|
-  | table_name               | utf8 not null           |
-  | table_type               | utf8 not null           |
-  | table_columns            | list<COLUMN_SCHEMA>     |
-  | table_constraints        | list<CONSTRAINT_SCHEMA> |
+  | Field Name           | Field Type                | Null Contstraint   |
+  |----------------------|---------------------------|--------------------|
+  | `table_name`         | `utf8`                    | not null           |
+  | `table_type`         | `utf8`                    | not null           |
+  | `table_columns`      | `list<COLUMN_SCHEMA>`     |                    |
+  | `table_constraints`  | `list<CONSTRAINT_SCHEMA>` |                    |
 
   `COLUMN_SCHEMA` is a Struct with fields:
 
-  | Field Name               | Field Type              | Comments |
-  |--------------------------|-------------------------|----------|
-  | column_name              | utf8 not null           |          |
-  | ordinal_position         | int32                   | (1)      |
-  | remarks                  | utf8                    | (2)      |
-  | xdbc_data_type           | int16                   | (3)      |
-  | xdbc_type_name           | utf8                    | (3)      |
-  | xdbc_column_size         | int32                   | (3)      |
-  | xdbc_decimal_digits      | int16                   | (3)      |
-  | xdbc_num_prec_radix      | int16                   | (3)      |
-  | xdbc_nullable            | int16                   | (3)      |
-  | xdbc_column_def          | utf8                    | (3)      |
-  | xdbc_sql_data_type       | int16                   | (3)      |
-  | xdbc_datetime_sub        | int16                   | (3)      |
-  | xdbc_char_octet_length   | int32                   | (3)      |
-  | xdbc_is_nullable         | utf8                    | (3)      |
-  | xdbc_scope_catalog       | utf8                    | (3)      |
-  | xdbc_scope_schema        | utf8                    | (3)      |
-  | xdbc_scope_table         | utf8                    | (3)      |
-  | xdbc_is_autoincrement    | bool                    | (3)      |
-  | xdbc_is_generatedcolumn  | bool                    | (3)      |
+  | Field Name               | Field Type  | Null Contstraint | Comments |
+  |--------------------------|-------------|-----------       |----------|
+  | `column_name`              | `utf8`    | not null         |          |
+  | `ordinal_position`         | `int32`   |                  | (1)      |
+  | `remarks`                  | `utf8`    |                  | (2)      |
+  | `xdbc_data_type`           | `int16`   |                  | (3)      |
+  | `xdbc_type_name`           | `utf8`    |                  | (3)      |
+  | `xdbc_column_size`         | `int32`   |                  | (3)      |
+  | `xdbc_decimal_digits`      | `int16`   |                  | (3)      |
+  | `xdbc_num_prec_radix`      | `int16`   |                  | (3)      |
+  | `xdbc_nullable`            | `int16`   |                  | (3)      |
+  | `xdbc_column_def`          | `utf8`    |                  | (3)      |
+  | `xdbc_sql_data_type`       | `int16`   |                  | (3)      |
+  | `xdbc_datetime_sub`        | `int16`   |                  | (3)      |
+  | `xdbc_char_octet_length`   | `int32`   |                  | (3)      |
+  | `xdbc_is_nullable`         | `utf8`    |                  | (3)      |
+  | `xdbc_scope_catalog`       | `utf8`    |                  | (3)      |
+  | `xdbc_scope_schema`        | `utf8`    |                  | (3)      |
+  | `xdbc_scope_table`         | `utf8`    |                  | (3)      |
+  | `xdbc_is_autoincrement`    | `bool`    |                  | (3)      |
+  | `xdbc_is_generatedcolumn`  | `bool`    |                  | (3)      |
 
   1. The column's ordinal position in the table (starting from 1).
   2. Database-specific description of the column.
   3. Optional value. Should be null if not supported by the driver.
-     xdbc_ values are meant to provide JDBC/ODBC-compatible metadata
+     `xdbc_` values are meant to provide JDBC/ODBC-compatible metadata
      in an agnostic manner.
 
   `CONSTRAINT_SCHEMA` is a Struct with fields:
 
-  | Field Name               | Field Type              | Comments |
-  |--------------------------|-------------------------|----------|
-  | constraint_name          | utf8                    |          |
-  | constraint_type          | utf8 not null           | (1)      |
-  | constraint_column_names  | list<utf8> not null     | (2)      |
-  | constraint_column_usage  | list<USAGE_SCHEMA>      | (3)      |
+  | Field Name                | Field Type         | Null Contstraint | Comments |
+  |---------------------------|--------------------|------------------|----------|
+  | `constraint_name`         | `utf8`               |                  |          |
+  | `constraint_type`         | `utf8`               | not null         | (1)      |
+  | `constraint_column_names` | `list<utf8>`         | not null         | (2)      |
+  | `constraint_column_usage` | `list<USAGE_SCHEMA>` |                  | (3)      |
 
   1. One of 'CHECK', 'FOREIGN KEY', 'PRIMARY KEY', or 'UNIQUE'.
   2. The columns on the current table that are constrained, in order.
@@ -211,12 +212,12 @@ defmodule Adbc.Connection do
 
   `USAGE_SCHEMA` is a Struct with fields:
 
-  | Field Name               | Field Type              |
-  |--------------------------|-------------------------|
-  | fk_catalog               | utf8                    |
-  | fk_db_schema             | utf8                    |
-  | fk_table                 | utf8 not null           |
-  | fk_column_name           | utf8 not null           |
+  | Field Name               | Field Type  | Null Contstraint |
+  |--------------------------|-------------|------------------|
+  | `fk_catalog`             | `utf8`        |                  |
+  | `fk_db_schema`           | `utf8`        |                  |
+  | `fk_table`               | `utf8`        | not null         |
+  | `fk_column_name`         | `utf8`        | not null         |
   """
   @spec get_objects(
           t(),
@@ -265,9 +266,10 @@ defmodule Adbc.Connection do
 
   The result is an Arrow dataset with the following schema:
 
-  Field Name     | Field Type
-  ---------------|--------------
-  table_type     | utf8 not null
+  | Field Name     | Field Type    | Null Contstraint |
+  |----------------|---------------|------------------|
+  | `table_type`   | `utf8`        | not null         |
+
   """
   @spec get_table_types(t) ::
           {:ok, result_set} | {:error, Exception.t()}

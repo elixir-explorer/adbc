@@ -300,6 +300,8 @@ defmodule Adbc.Driver do
     library_name =
       case :os.type() do
         {:unix, :darwin} -> "libduckdb.dylib"
+        {:win32, _} -> "duckdb.dll"
+        _ -> "libduckdb.so"
       end
 
     adbc_so_priv_dir() |> Path.join(library_name)

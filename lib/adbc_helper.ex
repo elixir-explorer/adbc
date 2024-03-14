@@ -59,22 +59,30 @@ defmodule Adbc.Helper do
 
   defp cacerts_options do
     cond do
-      path = System.get_env("ADBC_CACERT") ->
-        [cacertfile: path]
+      certs = otp_cacerts() ->
+        [cacerts: certs]
 
       Application.spec(:castore, :vsn) ->
         [cacertfile: Application.app_dir(:castore, "priv/cacerts.pem")]
 
-      Application.spec(:certifi, :vsn) ->
-        [cacertfile: Application.app_dir(:certifi, "priv/cacerts.pem")]
-
-      certs = otp_cacerts() ->
-        [cacerts: certs]
-
-      path = cacerts_from_os() ->
-        [cacertfile: path]
-
       true ->
+        IO.warn("""
+        No certificate trust store was found.
+
+        A certificate trust store is required in
+        order to download locales for your configuration.
+        Since elixir_make could not detect a system
+        installed certificate trust store one of the
+        following actions may be taken:
+
+        1. Use OTP 25+ on an OS that has built-in certificate
+           trust store.
+
+        2. Install the hex package `castore`. It will
+           be automatically detected after recompilation.
+
+        """)
+
         []
     end
   end
@@ -89,34 +97,5 @@ defmodule Adbc.Helper do
           nil
       end
     end
-  end
-
-  # https_opts and related code are taken from
-  # https://github.com/elixir-cldr/cldr_utils/blob/v2.19.1/lib/cldr/http/http.ex
-  @certificate_locations [
-    # Debian/Ubuntu/Gentoo etc.
-    "/etc/ssl/certs/ca-certificates.crt",
-
-    # Fedora/RHEL 6
-    "/etc/pki/tls/certs/ca-bundle.crt",
-
-    # OpenSUSE
-    "/etc/ssl/ca-bundle.pem",
-
-    # OpenELEC
-    "/etc/pki/tls/cacert.pem",
-
-    # CentOS/RHEL 7
-    "/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem",
-
-    # Open SSL on MacOS
-    "/usr/local/etc/openssl/cert.pem",
-
-    # MacOS & Alpine Linux
-    "/etc/ssl/cert.pem"
-  ]
-
-  defp cacerts_from_os do
-    Enum.find(@certificate_locations, &File.exists?/1)
   end
 end

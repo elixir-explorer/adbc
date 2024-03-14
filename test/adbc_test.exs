@@ -11,7 +11,7 @@ defmodule AdbcTest do
     end
 
     test "returns errors" do
-      assert {:error, "unknown driver :unknown, expected one of :sqlite, :postgresql, " <> _} =
+      assert {:error, "unknown driver :unknown, expected one of :flightsql, :postgresql, " <> _} =
                Adbc.download_driver(:unknown)
     end
   end

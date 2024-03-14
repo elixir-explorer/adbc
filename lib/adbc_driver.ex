@@ -131,8 +131,12 @@ defmodule Adbc.Driver do
 
   defp find_driver(driver_name) do
     case @driver_versions do
-      %{^driver_name => version} -> {:ok, version}
-      %{} -> {:missing, Enum.map_join(@driver_versions, ", ", fn {key, _} -> inspect(key) end)}
+      %{^driver_name => version} ->
+        {:ok, version}
+
+      %{} ->
+        {:missing,
+         @driver_versions |> Map.keys() |> Enum.sort() |> Enum.map_join(", ", &inspect/1)}
     end
   end
 

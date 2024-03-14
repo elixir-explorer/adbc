@@ -11,7 +11,8 @@ defmodule Adbc.Driver do
     sqlite: "0.11.0",
     postgresql: "0.11.0",
     flightsql: "0.11.0",
-    snowflake: "0.11.0"
+    snowflake: "0.11.0",
+    duckdb: "0.10.0"
   }
   @generated_driver_data %{
     sqlite: %{
@@ -100,6 +101,28 @@ defmodule Adbc.Driver do
       "x86_64-windows-msvc" => %{
         url:
           "https://github.com/apache/arrow-adbc/releases/download/apache-arrow-adbc-0.11.0-rc0/adbc_driver_snowflake-0.11.0-py3-none-win_amd64.whl"
+      }
+    },
+    duckdb: %{
+      "aarch64-apple-darwin" => %{
+        url:
+          "https://github.com/duckdb/duckdb/releases/download/v0.10.0/libduckdb-osx-universal.zip"
+      },
+      "aarch64-linux-gnu" => %{
+        url:
+          "https://github.com/duckdb/duckdb/releases/download/v0.10.0/libduckdb-linux-amd64.zip"
+      },
+      "x86_64-apple-darwin" => %{
+        url:
+          "https://github.com/duckdb/duckdb/releases/download/v0.10.0/libduckdb-osx-universal.zip"
+      },
+      "x86_64-linux-gnu" => %{
+        url:
+          "https://github.com/duckdb/duckdb/releases/download/v0.10.0/libduckdb-linux-aarch64.zip"
+      },
+      "x86_64-windows-msvc" => %{
+        url:
+          "https://github.com/duckdb/duckdb/releases/download/v0.10.0/libduckdb-windows-amd64.zip"
       }
     }
   }
@@ -243,7 +266,7 @@ defmodule Adbc.Driver do
     {:ok, zip_files} = :zip.table(cache_path)
 
     for {:zip_file, filename, _, _, _, _} <- zip_files,
-        Path.extname(filename) == ".so" do
+        Path.extname(filename) in [".so", ".dylib"] do
       {:ok, {filename, file_data}} = :zip.zip_get(filename, zip_handle)
 
       filename =

@@ -46,6 +46,7 @@ jobs:
         with:
           files: |
             cache/adbc*.tar.gz
+            cache/adbc*.sha256
 
   macos:
     runs-on: macos-11
@@ -101,6 +102,7 @@ jobs:
         with:
           files: |
             cache/adbc*.tar.gz
+            cache/adbc*.sha256
 
   windows:
     runs-on: windows-latest
@@ -138,3 +140,4 @@ jobs:
         with:
           files: |
             cache/adbc*.tar.gz
+            cache/adbc*.sha256

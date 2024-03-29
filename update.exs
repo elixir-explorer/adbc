@@ -74,7 +74,7 @@ mapping =
     {driver, data}
   end
 
-case String.split(File.read!(file), "# == CONSTANTS ==") do
+case String.split(File.read!(file), "# == GENERATED CONSTANTS ==") do
   [pre, _mid, post] ->
     time =
       NaiveDateTime.utc_now() |> NaiveDateTime.truncate(:second) |> NaiveDateTime.to_iso8601()
@@ -94,5 +94,5 @@ case String.split(File.read!(file), "# == CONSTANTS ==") do
     File.write!(file, [Code.format_string!(pre <> mid <> post), "\n"])
 
   _ ->
-    raise "could not find # == CONSTANTS == chunks in #{file}"
+    raise "could not find # == GENERATED CONSTANTS == chunks in #{file}"
 end

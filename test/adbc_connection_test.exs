@@ -36,7 +36,7 @@ defmodule Adbc.Connection.Test do
 
       assert {:error, %Adbc.Error{} = error} = Connection.start_link(database: db, who_knows: 123)
 
-      assert Exception.message(error) == "[SQLite] Unknown connection option who_knows=123"
+      assert Exception.message(error) == "[SQLite] Unknown connection option who_knows='123'"
     end
   end
 
@@ -231,7 +231,7 @@ defmodule Adbc.Connection.Test do
       conn = start_supervised!({Connection, database: db})
 
       assert_raise Adbc.Error,
-                   ~s([SQLite] Failed to prepare query: near "NOT": syntax error\nQuery:NOT VALID SQL),
+                   ~s([SQLite] Failed to prepare query: near "NOT": syntax error\nquery: NOT VALID SQL),
                    fn -> Connection.query!(conn, "NOT VALID SQL") end
     end
   end

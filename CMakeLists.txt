@@ -27,7 +27,7 @@ endif()
 message(STATUS "Using ERTS_INCLUDE_DIR: ${ERTS_INCLUDE_DIR}")
 
 if(UNIX AND APPLE)
-    set(CMAKE_SHARED_LINKER_FLAGS "-flat_namespace -undefined suppress -undefined dynamic_lookup")
+    set(CMAKE_SHARED_LINKER_FLAGS "-flat_namespace -undefined dynamic_lookup")
 endif()
 
 set(CMAKE_CXX_STANDARD 17)
@@ -78,7 +78,7 @@ if(UNIX AND NOT APPLE)
     set_target_properties(adbc_nif PROPERTIES INSTALL_RPATH "\$ORIGIN/lib")
 elseif(UNIX AND APPLE)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wno-reorder-ctor")
-    set(CMAKE_SHARED_LINKER_FLAGS "-flat_namespace -undefined suppress -undefined dynamic_lookup")
+    set(CMAKE_SHARED_LINKER_FLAGS "-flat_namespace -undefined dynamic_lookup")
     set_target_properties(adbc_nif PROPERTIES INSTALL_RPATH "@loader_path/lib")
 endif()
 

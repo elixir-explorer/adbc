@@ -1,5 +1,17 @@
 # CHANGELOG
 
+## v0.2.4-rc0
+
+* Update to ADBC 0.11.0-rc0
+* Fix tables in inline docs of `Adbc.Connection` (@lkarthee in #57)
+* Default to erlang certificate store (@lkarthee in #57)
+
+## v0.2.3
+
+* Update to ADBC 0.10.0
+* Using NIF version 2.16 for all precompilation targets (@cocoa-xu in #54)
+* Add API for prepared queries (@dlindenkreuz in #51)
+
 ## v0.2.2
 
 * Update to ADBC 0.8.0

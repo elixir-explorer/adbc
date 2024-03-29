@@ -84,7 +84,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Cache OTP
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         id: cache-otp
         with:
           path: ./cache/otp
@@ -100,7 +100,7 @@ jobs:
 
       - name: Cache Elixir
         id: cache-elixir
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: ./cache/elixir
           key: ${{ runner.os }}-elixir-${{ env.ELIXIR_VERSION }}

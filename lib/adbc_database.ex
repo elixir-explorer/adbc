@@ -47,6 +47,7 @@ defmodule Adbc.Database do
     end
 
     {process_options, opts} = Keyword.pop(opts, :process_options, [])
+    opts = Keyword.merge(driver_default_options(driver), opts)
 
     with {:ok, ref} <- Adbc.Nif.adbc_database_new(),
          :ok <- init_driver(ref, driver),
@@ -57,6 +58,9 @@ defmodule Adbc.Database do
       {:error, reason} -> {:error, error_to_exception(reason)}
     end
   end
+
+  defp driver_default_options(:duckdb), do: [entrypoint: "duckdb_adbc_init"]
+  defp driver_default_options(_), do: []
 
   ## Callbacks
 

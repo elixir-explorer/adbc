@@ -1,8 +1,9 @@
 # CHANGELOG
 
-## v0.2.4-rc0
+## v0.3.0
 
 * Update to ADBC 0.11.0-rc0
+* Builtin support for DuckDB
 * Fix tables in inline docs of `Adbc.Connection` (@lkarthee in #57)
 * Default to erlang certificate store (@lkarthee in #57)
 

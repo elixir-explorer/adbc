@@ -7,9 +7,9 @@ on:
       - main
       - dev
     paths-ignore:
-      - '**/*.md'
-      - 'LICENSE*'
-      - '.github/workflows/precompile.yml'
+      - "**/*.md"
+      - "LICENSE*"
+      - ".github/workflows/precompile.yml"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -44,10 +44,6 @@ jobs:
         run: |
           mix deps.get
           mix test
-
-      - name: Test custom driver
-        run: |
-          mix test --only duckdb
 
   windows:
     if: "!contains(github.event.pull_request.labels.*.name, 'skip ci')"

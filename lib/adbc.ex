@@ -52,6 +52,14 @@ defmodule Adbc do
   give the full path to a driver in the `:driver` option to load other
   existing drivers.
 
+  ### DuckDB
+
+  The DuckDB driver provides access to in-memory DuckDB databases.
+
+  #### Examples
+
+      {Adbc.Database, driver: :duckdb}
+
   ### PostgreSQL
 
   The PostgreSQL driver provides access to any database that supports

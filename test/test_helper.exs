@@ -1,4 +1,5 @@
 Adbc.download_driver!(:sqlite)
+Adbc.download_driver!(:duckdb)
 
 exclude =
   if System.find_executable("psql") do
@@ -7,7 +8,5 @@ exclude =
   else
     [:postgresql]
   end
-
-exclude = exclude ++ [:duckdb]
 
 ExUnit.start(exclude: exclude)

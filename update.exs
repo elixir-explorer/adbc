@@ -2,20 +2,25 @@
 #
 # 1. Fetch the latest ADBC release source: https://github.com/apache/arrow-adbc/releases/
 # 2. Update the contents in 3rd_party with VERSION (only root files and c/)
-# 3. Invoke `elixir update.exs VERSION [TAG]` (such as `elixir update.exs 0.10.0 apache-arrow-adbc-0.10.0-rc1`)
+# 3. Invoke `elixir update.exs VERSION DUCKDB_VERSION [TAG]` (such as `elixir update.exs 0.10.0 duckdb-v0.10.1 apache-arrow-adbc-0.10.0-rc1`)
 # 4. ...
 # 5. Profit!
 #
 Mix.install([{:req, "~> 0.4"}])
 
-drivers = ~w(sqlite postgresql flightsql snowflake)a
+arrow_adbc_drivers = ~w(sqlite postgresql flightsql snowflake)a
 file = "lib/adbc_driver.ex"
 
-{version, tag} =
+{version, duckdb_version, tag} =
   case System.argv() do
-    [version] -> {version, "apache-arrow-adbc-#{version}"}
-    [version, tag] -> {version, tag}
-    _ -> raise "expected VERSION [TAG] as argument"
+    [version, "duckdb-v" <> duckdb_version] ->
+      {version, duckdb_version, "apache-arrow-adbc-#{version}"}
+
+    [version, "duckdb-v" <> duckdb_version, tag] ->
+      {version, duckdb_version, tag}
+
+    _ ->
+      raise "expected VERSION DUCKDB_VERSION [TAG] as argument"
   end
 
 opts =
@@ -34,7 +39,7 @@ end
 assets = release.body["assets"]
 
 mapping =
-  for driver <- drivers, into: %{} do
+  for driver <- arrow_adbc_drivers, into: %{} do
     IO.puts("Generating #{driver}")
     prefix = "adbc_driver_#{driver}-#{version}"
     suffix = ".whl"
@@ -74,12 +79,61 @@ mapping =
     {driver, data}
   end
 
+release =
+  Req.get!("https://api.github.com/repos/duckdb/duckdb/releases/tags/v#{duckdb_version}", opts)
+
+if release.status != 200 do
+  raise "unknown GitHub release for DuckDB version v#{duckdb_version}\n\n#{inspect(release)}"
+end
+
+assets = release.body["assets"]
+IO.puts("Generating duckdb")
+prefix = "libduckdb"
+suffix = ".zip"
+
+zip_files =
+  Enum.filter(assets, fn %{"name" => name} ->
+    String.starts_with?(name, prefix) and String.ends_with?(name, suffix) and
+      !String.contains?(name, "src")
+  end)
+
+data_for = fn zip_files, parts ->
+  case Enum.split_with(zip_files, fn %{"name" => name} -> Enum.all?(parts, &(name =~ &1)) end) do
+    {[%{"browser_download_url" => url}], rest} -> {%{url: url}, rest}
+    {[], _rest} -> raise "no zip files matching #{inspect(parts)}\n\n#{inspect(zip_files)}"
+    {_, _rest} -> raise "many zip files matching #{inspect(parts)}\n\n#{inspect(zip_files)}"
+  end
+end
+
+{aarch64_apple_darwin, zip_files} = data_for.(zip_files, ["osx", "universal"])
+{x86_64_apple_darwin, zip_files} = {aarch64_apple_darwin, zip_files}
+{aarch64_linux_gnu, zip_files} = data_for.(zip_files, ["linux", "aarch64"])
+{x86_64_linux_gnu, zip_files} = data_for.(zip_files, ["linux", "amd64"])
+{x86_64_windows_msvc, zip_files} = data_for.(zip_files, ["windows", "amd64"])
+
+if zip_files != [] do
+  IO.puts("The following zip files for duckdb are not being used:\n\n#{inspect(zip_files)}")
+end
+
+duckdb_data =
+  %{
+    "aarch64-apple-darwin" => aarch64_apple_darwin,
+    "x86_64-apple-darwin" => x86_64_apple_darwin,
+    "aarch64-linux-gnu" => aarch64_linux_gnu,
+    "x86_64-linux-gnu" => x86_64_linux_gnu,
+    "x86_64-windows-msvc" => x86_64_windows_msvc
+  }
+
+mapping = Map.put(mapping, :duckdb, duckdb_data)
+
 case String.split(File.read!(file), "# == GENERATED CONSTANTS ==") do
   [pre, _mid, post] ->
     time =
       NaiveDateTime.utc_now() |> NaiveDateTime.truncate(:second) |> NaiveDateTime.to_iso8601()
 
-    driver_versions = Map.new(drivers, &{&1, version})
+    driver_versions =
+      Map.new(arrow_adbc_drivers, &{&1, version})
+      |> Map.put(:duckdb, duckdb_version)
 
     mid = """
     # == GENERATED CONSTANTS ==

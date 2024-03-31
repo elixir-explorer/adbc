@@ -266,17 +266,10 @@ defmodule Adbc.Driver do
     {:ok, zip_files} = :zip.table(cache_path)
 
     for {:zip_file, filename, _, _, _, _} <- zip_files,
-        Path.extname(filename) in [".so", ".dylib"] do
-      {:ok, {filename, file_data}} = :zip.zip_get(filename, zip_handle)
+        Path.extname(filename) in [".so", ".dylib", ".dll"] do
+      {:ok, {_filename, file_data}} = :zip.zip_get(filename, zip_handle)
 
-      filename =
-        String.replace_leading(
-          to_string(filename),
-          "adbc_driver_#{driver_name}/",
-          "#{triplet}-#{version}-"
-        )
-
-      filepath = Path.join(adbc_so_priv_dir, filename)
+      filepath = adbc_driver_so(driver_name, version, triplet)
       File.write!(filepath, file_data)
     end
 

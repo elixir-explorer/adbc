@@ -6,7 +6,7 @@ defmodule Update do
 
   # To update ADBC drivers, bump the tag and version accordingly
   @adbc_version "0.11.0"
-  @adbc_tag "apache-arrow-adbc-0.11.0-rc0"
+  @adbc_tag "apache-arrow-adbc-0.11.0"
   @adbc_drivers ~w(sqlite postgresql flightsql snowflake)a
 
   def versions do

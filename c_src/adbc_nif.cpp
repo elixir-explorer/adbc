@@ -307,9 +307,9 @@ int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct 
     ERL_NIF_TERM current_term{}, children_term{};
     std::vector<ERL_NIF_TERM> children;
 
-    bool has_validity_bitmap = values->null_count != 0 && values->null_count != -1;
+    bool has_validity_bitmap = values->null_count != -1;
     const uint8_t * bitmap_buffer = nullptr;
-    if (has_validity_bitmap && values->n_buffers >= 2) {
+    if (values->n_buffers >= 2) {
         bitmap_buffer = (const uint8_t *)values->buffers[0];
     }
     const int32_t * offsets_buffer = nullptr;

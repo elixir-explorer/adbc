@@ -8,13 +8,6 @@
 #include <nanoarrow/nanoarrow.h>
 #include "adbc_nif_resource.hpp"
 
-#ifdef __GNUC__
-#pragma GCC diagnostic ignored "-Wunused-parameter"
-#pragma GCC diagnostic ignored "-Wmissing-field-initializers"
-#pragma GCC diagnostic ignored "-Wunused-variable"
-#pragma GCC diagnostic ignored "-Wunused-function"
-#endif
-
 template<> ErlNifResourceType * NifRes<struct AdbcDatabase>::type = nullptr;
 template<> ErlNifResourceType * NifRes<struct AdbcConnection>::type = nullptr;
 template<> ErlNifResourceType * NifRes<struct AdbcStatement>::type = nullptr;
@@ -123,7 +116,6 @@ static ERL_NIF_TERM get_arrow_array_sparse_union_children(ErlNifEnv *env, struct
 static ERL_NIF_TERM get_arrow_array_sparse_union_children(ErlNifEnv *env, struct ArrowSchema * schema, struct ArrowArray * values, int64_t offset, int64_t count, uint64_t level);
 
 int get_arrow_array_children_as_list(ErlNifEnv *env, struct ArrowSchema * schema, struct ArrowArray * values, int64_t offset, int64_t count, uint64_t level, std::vector<ERL_NIF_TERM> &children, ERL_NIF_TERM &error) {
-    ERL_NIF_TERM children_term{};
     if (schema->n_children > 0 && schema->children == nullptr) {
         error = erlang::nif::error(env, "invalid ArrowSchema, schema->children == nullptr, however, schema->n_children > 0");
         return 1;
@@ -403,7 +395,6 @@ ERL_NIF_TERM get_arrow_array_list_children(ErlNifEnv *env, struct ArrowSchema * 
             return erlang::nif::error(env, "invalid offset for ArrowArray (list), (offset + count) > items_values->n_children");
         }
         children.resize(count);
-        bool failed = false;
         for (int64_t child_i = offset; child_i < offset + count; child_i++) {
             if (bitmap_buffer && values->null_count > 0) {
                 uint8_t vbyte = bitmap_buffer[child_i / 8];
@@ -462,8 +453,6 @@ int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct 
     ERL_NIF_TERM current_term{}, children_term{};
     std::vector<ERL_NIF_TERM> children;
 
-    const uint8_t * bitmap_buffer = nullptr;
-    const int32_t * offsets_buffer = nullptr;
     constexpr int64_t bitmap_buffer_index = 0;
     int64_t data_buffer_index = 1;
     int64_t offset_buffer_index = 2;
@@ -1040,7 +1029,6 @@ static ERL_NIF_TERM adbc_database_new(ErlNifEnv *env, int argc, const ERL_NIF_TE
 static ERL_NIF_TERM adbc_database_set_option(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
     using res_type = NifRes<struct AdbcDatabase>;
 
-    ERL_NIF_TERM ret{};
     ERL_NIF_TERM error{};
     res_type * database = nullptr;
     if ((database = res_type::get_resource(env, argv[0], error)) == nullptr) {
@@ -1067,7 +1055,6 @@ static ERL_NIF_TERM adbc_database_set_option(ErlNifEnv *env, int argc, const ERL
 static ERL_NIF_TERM adbc_database_init(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
     using res_type = NifRes<struct AdbcDatabase>;
 
-    ERL_NIF_TERM ret{};
     ERL_NIF_TERM error{};
     res_type * database = nullptr;
     if ((database = res_type::get_resource(env, argv[0], error)) == nullptr) {
@@ -1105,7 +1092,6 @@ static ERL_NIF_TERM adbc_connection_new(ErlNifEnv *env, int argc, const ERL_NIF_
 static ERL_NIF_TERM adbc_connection_set_option(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
     using res_type = NifRes<struct AdbcConnection>;
 
-    ERL_NIF_TERM ret{};
     ERL_NIF_TERM error{};
     res_type * connection = res_type::get_resource(env, argv[0], error);
     if (connection == nullptr) {
@@ -1133,7 +1119,6 @@ static ERL_NIF_TERM adbc_connection_init(ErlNifEnv *env, int argc, const ERL_NIF
     using res_type = NifRes<struct AdbcConnection>;
     using db_type = NifRes<struct AdbcDatabase>;
 
-    ERL_NIF_TERM ret{};
     ERL_NIF_TERM error{};
     res_type * connection = nullptr;
     db_type * db = nullptr;
@@ -1477,7 +1462,6 @@ static ERL_NIF_TERM adbc_statement_execute_query(ErlNifEnv *env, int argc, const
 static ERL_NIF_TERM adbc_statement_prepare(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
     using res_type = NifRes<struct AdbcStatement>;
 
-    ERL_NIF_TERM ret{};
     ERL_NIF_TERM error{};
 
     res_type * statement = nullptr;
@@ -1497,7 +1481,6 @@ static ERL_NIF_TERM adbc_statement_prepare(ErlNifEnv *env, int argc, const ERL_N
 static ERL_NIF_TERM adbc_statement_set_sql_query(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
     using res_type = NifRes<struct AdbcStatement>;
 
-    ERL_NIF_TERM ret{};
     ERL_NIF_TERM error{};
 
     res_type * statement = nullptr;
@@ -1658,7 +1641,6 @@ static ERL_NIF_TERM adbc_statement_bind_stream(ErlNifEnv *env, int argc, const E
     using res_type = NifRes<struct AdbcStatement>;
     using array_stream_type = NifRes<struct ArrowArrayStream>;
 
-    ERL_NIF_TERM ret{};
     ERL_NIF_TERM error{};
 
     res_type * statement = nullptr;
@@ -1753,7 +1735,3 @@ static ErlNifFunc nif_functions[] = {
 };
 
 ERL_NIF_INIT(Elixir.Adbc.Nif, nif_functions, on_load, on_reload, on_upgrade, NULL);
-
-#if defined(__GNUC__)
-#pragma GCC visibility push(default)
-#endif

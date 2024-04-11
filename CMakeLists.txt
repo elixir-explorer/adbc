@@ -27,7 +27,7 @@ endif()
 message(STATUS "Using ERTS_INCLUDE_DIR: ${ERTS_INCLUDE_DIR}")
 
 if(UNIX AND APPLE)
-    set(CMAKE_SHARED_LINKER_FLAGS "-flat_namespace -undefined dynamic_lookup")
+    set(CMAKE_SHARED_LINKER_FLAGS "-undefined dynamic_lookup")
 endif()
 
 set(CMAKE_CXX_STANDARD 17)

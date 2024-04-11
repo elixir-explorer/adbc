@@ -49,15 +49,13 @@ defmodule Adbc.Connection.Test do
          num_rows: nil,
          data: %{
            "info_name" => [0, 1, 100, 101, 102],
-           "info_value" => %{
-             "bool_value" => [],
-             "int32_bitmask" => [],
-             "int32_to_int32_list_map" => %{},
-             "int64_value" => [],
-             "string_list" => [[]],
-             # ["SQLite", "3.39.2", "ADBC SQLite Driver", "(unknown)", "0.2.0-SNAPSHOT"]},
-             "string_value" => ["SQLite", _, "ADBC SQLite Driver", _, _]
-           }
+           "info_value" => [
+             %{"string_value" => ["SQLite"]},
+             %{"string_value" => ["3.43.2"]},
+             %{"string_value" => ["ADBC SQLite Driver"]},
+             %{"string_value" => ["(unknown)"]},
+             %{"string_value" => ["0.4.0"]}
+           ]
          }
        }} = Connection.get_info(conn)
     end
@@ -65,21 +63,14 @@ defmodule Adbc.Connection.Test do
     test "get some info from a connection", %{db: db} do
       conn = start_supervised!({Connection, database: db})
 
-      {:ok,
-       %Adbc.Result{
-         num_rows: nil,
-         data: %{
-           "info_name" => [0],
-           "info_value" => %{
-             "bool_value" => [],
-             "int32_bitmask" => [],
-             "int32_to_int32_list_map" => %{},
-             "int64_value" => [],
-             "string_list" => [[]],
-             "string_value" => ["SQLite"]
-           }
-         }
-       }} = Connection.get_info(conn, [0])
+      assert {:ok,
+              %Adbc.Result{
+                num_rows: nil,
+                data: %{
+                  "info_name" => [0],
+                  "info_value" => [%{"string_value" => ["SQLite"]}]
+                }
+              }} == Connection.get_info(conn, [0])
     end
   end
 

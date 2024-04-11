@@ -42,8 +42,6 @@ defmodule AdbcTest do
     end
 
     test "list responses with null", %{conn: conn} do
-      dbg(Connection.query(conn, "SELECT ARRAY[1, 2, 3, null, 5] as num"))
-
       assert {:ok, %Adbc.Result{data: %{"num" => [[1, 2, 3, nil, 5]]}}} =
                Connection.query(conn, "SELECT ARRAY[1, 2, 3, null, 5] as num")
     end

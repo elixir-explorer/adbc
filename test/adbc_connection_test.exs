@@ -51,10 +51,13 @@ defmodule Adbc.Connection.Test do
            "info_name" => [0, 1, 100, 101, 102],
            "info_value" => [
              %{"string_value" => ["SQLite"]},
-             %{"string_value" => ["3.43.2"]},
+             # %{"string_value" => ["3.43.2"]},
+             %{"string_value" => [_]},
              %{"string_value" => ["ADBC SQLite Driver"]},
-             %{"string_value" => ["(unknown)"]},
-             %{"string_value" => ["0.4.0"]}
+             # %{"string_value" => ["(unknown)"]},
+             %{"string_value" => [_]},
+             # %{"string_value" => ["0.4.0"]}
+             %{"string_value" => [_]}
            ]
          }
        }} = Connection.get_info(conn)

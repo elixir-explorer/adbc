@@ -93,6 +93,15 @@ defmodule Adbc.Connection do
     end)
   end
 
+  defp init_statement_options(ref, opts) do
+    Enum.reduce_while(opts, :ok, fn {key, value}, :ok ->
+      case Adbc.Nif.adbc_statement_set_option(ref, to_string(key), to_string(value)) do
+        :ok -> {:cont, :ok}
+        {:error, _} = error -> {:halt, error}
+      end
+    end)
+  end
+
   @doc """
   Runs the given `query` with `params`.
   """
@@ -109,6 +118,30 @@ defmodule Adbc.Connection do
   def query!(conn, query, params \\ [])
       when (is_binary(query) or is_reference(query)) and is_list(params) do
     case query(conn, query, params) do
+      {:ok, result} -> result
+      {:error, reason} -> raise reason
+    end
+  end
+
+  @doc """
+  Runs the given `query` with `params`.
+  """
+  @spec query_with_options(t(), binary | reference, [term], Keyword.t()) ::
+          {:ok, result_set} | {:error, Exception.t()}
+  def query_with_options(conn, query, params \\ [], statement_options)
+      when (is_binary(query) or is_reference(query)) and is_list(params) and
+             is_list(statement_options) do
+    stream(conn, {:query, query, params, statement_options}, &stream_results/2)
+  end
+
+  @doc """
+  Same as `query_with_options/4` but raises an exception on error.
+  """
+  @spec query_with_options!(t(), binary | reference, [term], Keyword.t()) :: result_set
+  def query_with_options!(conn, query, params \\ [], statement_options)
+      when (is_binary(query) or is_reference(query)) and is_list(params) and
+             is_list(statement_options) do
+    case query_with_options(conn, query, params, statement_options) do
       {:ok, result} -> result
       {:error, reason} -> raise reason
     end
@@ -439,18 +472,32 @@ defmodule Adbc.Connection do
     end
   end
 
+  defp handle_stream({:query, query_or_prepared, params, statement_options}, conn) do
+    with {:ok, stmt} <- ensure_statement(conn, query_or_prepared, statement_options),
+         :ok <- maybe_bind(stmt, params) do
+      Adbc.Nif.adbc_statement_execute_query(stmt)
+    end
+  end
+
   defp handle_stream({name, args}, conn) do
     with {:ok, stream_ref} <- apply(Adbc.Nif, name, [conn | args]) do
       {:ok, stream_ref, -1}
     end
   end
 
-  defp ensure_statement(conn, query) when is_binary(query), do: create_statement(conn, query)
-  defp ensure_statement(_conn, prepared) when is_reference(prepared), do: {:ok, prepared}
+  defp ensure_statement(conn, query, statement_options \\ [])
 
-  defp create_statement(conn, query) do
+  defp ensure_statement(conn, query, statement_options)
+       when is_binary(query) and is_list(statement_options),
+       do: create_statement(conn, query, statement_options)
+
+  defp ensure_statement(_conn, prepared, _statement_options) when is_reference(prepared),
+    do: {:ok, prepared}
+
+  defp create_statement(conn, query, statement_options \\ []) when is_list(statement_options) do
     with {:ok, stmt} <- Adbc.Nif.adbc_statement_new(conn),
-         :ok <- Adbc.Nif.adbc_statement_set_sql_query(stmt, query) do
+         :ok <- Adbc.Nif.adbc_statement_set_sql_query(stmt, query),
+         :ok <- init_statement_options(stmt, statement_options) do
       {:ok, stmt}
     end
   end

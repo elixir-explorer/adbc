@@ -1504,6 +1504,32 @@ static ERL_NIF_TERM adbc_statement_new(ErlNifEnv *env, int argc, const ERL_NIF_T
     return erlang::nif::ok(env, ret);
 }
 
+static ERL_NIF_TERM adbc_statement_set_option(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
+    using res_type = NifRes<struct AdbcStatement>;
+
+    ERL_NIF_TERM error{};
+    res_type * statement = res_type::get_resource(env, argv[0], error);
+    if (statement == nullptr) {
+        return error;
+    }
+
+    std::string key, value;
+    if (!erlang::nif::get(env, argv[1], key)) {
+        return enif_make_badarg(env);
+    }
+    if (!erlang::nif::get(env, argv[2], value)) {
+        return enif_make_badarg(env);
+    }
+
+    struct AdbcError adbc_error{};
+    AdbcStatusCode code = AdbcStatementSetOption(&statement->val, key.c_str(), value.c_str(), &adbc_error);
+    if (code != ADBC_STATUS_OK) {
+        return nif_error_from_adbc_error(env, &adbc_error);
+    }
+
+    return erlang::nif::ok(env);
+}
+
 static ERL_NIF_TERM adbc_statement_execute_query(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
     using res_type = NifRes<struct AdbcStatement>;
     using array_stream_type = NifRes<struct ArrowArrayStream>;
@@ -1801,6 +1827,7 @@ static ErlNifFunc nif_functions[] = {
     {"adbc_connection_get_table_types", 1, adbc_connection_get_table_types, 0},
 
     {"adbc_statement_new", 1, adbc_statement_new, 0},
+    {"adbc_statement_set_option", 3, adbc_statement_set_option, 0},
     {"adbc_statement_execute_query", 1, adbc_statement_execute_query, 0},
     {"adbc_statement_prepare", 1, adbc_statement_prepare, 0},
     {"adbc_statement_set_sql_query", 2, adbc_statement_set_sql_query, 0},

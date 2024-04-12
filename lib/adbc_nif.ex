@@ -52,7 +52,9 @@ defmodule Adbc.Nif do
 
   def adbc_connection_get_table_types(_self), do: :erlang.nif_error(:not_loaded)
 
-  def adbc_statement_new(_connection), do: :erlang.nif_error(:not_loaded)
+  def adbc_statement_new(_statement), do: :erlang.nif_error(:not_loaded)
+
+  def adbc_statement_set_option(_statement, _key, _value), do: :erlang.nif_error(:not_loaded)
 
   def adbc_statement_execute_query(_statement), do: :erlang.nif_error(:not_loaded)
 

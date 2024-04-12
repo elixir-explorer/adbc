@@ -1026,6 +1026,44 @@ static ERL_NIF_TERM adbc_database_new(ErlNifEnv *env, int argc, const ERL_NIF_TE
     return erlang::nif::ok(env, ret);
 }
 
+static ERL_NIF_TERM adbc_database_get_option(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
+    using res_type = NifRes<struct AdbcDatabase>;
+
+    ERL_NIF_TERM error{};
+    res_type * database = nullptr;
+    if ((database = res_type::get_resource(env, argv[0], error)) == nullptr) {
+        return error;
+    }
+
+    std::string key;
+    if (!erlang::nif::get(env, argv[1], key)) {
+        return enif_make_badarg(env);
+    }
+
+    struct AdbcError adbc_error{};
+    char value[64] = {'\0'};
+    size_t value_len = sizeof(value) / sizeof(value[0]);
+    AdbcStatusCode code = AdbcDatabaseGetOption(&database->val, key.c_str(), value, &value_len, &adbc_error);
+    if (code != ADBC_STATUS_OK) {
+        return nif_error_from_adbc_error(env, &adbc_error);
+    }
+    if (value_len != 0) {
+        char * out_value = (char *)enif_alloc(sizeof(char) * (value_len + 1));
+        memset(out_value, 0, value_len + 1);
+        value_len += 1;
+        code = AdbcDatabaseGetOption(&database->val, key.c_str(), out_value, &value_len, &adbc_error);
+        if (code != ADBC_STATUS_OK) {
+            return nif_error_from_adbc_error(env, &adbc_error);
+        }
+        if (out_value[value_len - 1] == '\0') {
+            value_len -= 1;
+        }
+        return erlang::nif::ok(env, erlang::nif::make_binary(env, out_value, value_len));
+    }
+
+    return erlang::nif::ok(env, erlang::nif::make_binary(env, ""));
+}
+
 static ERL_NIF_TERM adbc_database_set_option(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
     using res_type = NifRes<struct AdbcDatabase>;
 
@@ -1712,6 +1750,7 @@ static int on_upgrade(ErlNifEnv *, void **, void **, ERL_NIF_TERM) {
 
 static ErlNifFunc nif_functions[] = {
     {"adbc_database_new", 0, adbc_database_new, 0},
+    {"adbc_database_get_option", 2, adbc_database_get_option, 0},
     {"adbc_database_set_option", 3, adbc_database_set_option, 0},
     {"adbc_database_init", 1, adbc_database_init, 0},
 

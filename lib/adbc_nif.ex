@@ -23,6 +23,8 @@ defmodule Adbc.Nif do
 
   def adbc_database_new, do: :erlang.nif_error(:not_loaded)
 
+  def adbc_database_get_option(_self, _key), do: :erlang.nif_error(:not_loaded)
+
   def adbc_database_set_option(_self, _key, _value), do: :erlang.nif_error(:not_loaded)
 
   def adbc_database_init(_self), do: :erlang.nif_error(:not_loaded)

@@ -62,12 +62,30 @@ defmodule Adbc.Database do
   @doc """
   Get a string option of the database.
   """
-  def get_option(db, key) when is_pid(db) and is_binary(key) do
-    GenServer.call(db, {:get_option, key})
+  @spec get_option(pid(), atom() | String.t()) :: {:ok, String.t()} | {:error, String.t()}
+  def get_option(db, key) when is_pid(db) do
+    case GenServer.call(db, {:get_option, to_string(key)}) do
+      {:ok, value} ->
+        {:ok, value}
+
+      {:error, reason} ->
+        {:error, error_to_exception(reason)}
+    end
   end
 
-  def get_option(db, key) when is_pid(db) and is_atom(key) do
-    get_option(db, to_string(key))
+  @doc """
+  Set a string option of the database.
+  """
+  @spec set_option(pid(), atom() | String.t(), atom() | String.t() | number()) ::
+          :ok | {:error, String.t()}
+  def set_option(db, key, value) when is_pid(db) do
+    case GenServer.call(db, {:set_option, to_string(key), to_string(value)}) do
+      :ok ->
+        :ok
+
+      {:error, reason} ->
+        {:error, error_to_exception(reason)}
+    end
   end
 
   defp driver_default_options(:duckdb), do: [entrypoint: "duckdb_adbc_init"]
@@ -94,13 +112,11 @@ defmodule Adbc.Database do
   end
 
   def handle_call({:get_option, key}, _from, {driver, db}) do
-    case Adbc.Nif.adbc_database_get_option(db, key) do
-      {:ok, value} ->
-        {:reply, {:ok, value}, {driver, db}}
+    {:reply, Adbc.Nif.adbc_database_get_option(db, key), {driver, db}}
+  end
 
-      {:error, reason} ->
-        {:reply, {:error, reason}, {driver, db}}
-    end
+  def handle_call({:set_option, key, value}, _from, {driver, db}) do
+    {:reply, Adbc.Nif.adbc_database_set_option(db, key, value), {driver, db}}
   end
 
   @impl true

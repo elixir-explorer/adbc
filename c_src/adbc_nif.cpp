@@ -1127,6 +1127,44 @@ static ERL_NIF_TERM adbc_connection_new(ErlNifEnv *env, int argc, const ERL_NIF_
     return erlang::nif::ok(env, ret);
 }
 
+static ERL_NIF_TERM adbc_connection_get_option(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
+    using res_type = NifRes<struct AdbcConnection>;
+
+    ERL_NIF_TERM error{};
+    res_type * connection = res_type::get_resource(env, argv[0], error);
+    if (connection == nullptr) {
+        return error;
+    }
+
+    std::string key;
+    if (!erlang::nif::get(env, argv[1], key)) {
+        return enif_make_badarg(env);
+    }
+
+    struct AdbcError adbc_error{};
+    char value[64] = {'\0'};
+    size_t value_len = sizeof(value) / sizeof(value[0]);
+    AdbcStatusCode code = AdbcConnectionGetOption(&connection->val, key.c_str(), value, &value_len, &adbc_error);
+    if (code != ADBC_STATUS_OK) {
+        return nif_error_from_adbc_error(env, &adbc_error);
+    }
+    if (value_len != 0) {
+        char * out_value = (char *)enif_alloc(sizeof(char) * (value_len + 1));
+        memset(out_value, 0, value_len + 1);
+        value_len += 1;
+        code = AdbcConnectionGetOption(&connection->val, key.c_str(), out_value, &value_len, &adbc_error);
+        if (code != ADBC_STATUS_OK) {
+            return nif_error_from_adbc_error(env, &adbc_error);
+        }
+        if (out_value[value_len - 1] == '\0') {
+            value_len -= 1;
+        }
+        return erlang::nif::ok(env, erlang::nif::make_binary(env, out_value, value_len));
+    }
+
+    return erlang::nif::ok(env, erlang::nif::make_binary(env, ""));
+}
+
 static ERL_NIF_TERM adbc_connection_set_option(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
     using res_type = NifRes<struct AdbcConnection>;
 
@@ -1755,6 +1793,7 @@ static ErlNifFunc nif_functions[] = {
     {"adbc_database_init", 1, adbc_database_init, 0},
 
     {"adbc_connection_new", 0, adbc_connection_new, 0},
+    {"adbc_connection_get_option", 2, adbc_connection_get_option, 0},
     {"adbc_connection_set_option", 3, adbc_connection_set_option, 0},
     {"adbc_connection_init", 2, adbc_connection_init, 0},
     {"adbc_connection_get_info", 2, adbc_connection_get_info, 0},

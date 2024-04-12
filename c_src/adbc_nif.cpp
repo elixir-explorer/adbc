@@ -693,7 +693,7 @@ int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct 
             // only handle and return children if this is a struct
             is_struct = true;
 
-            if (schema->n_children == values->n_children) {
+            if (values->length > 0) {
                 if (count == -1) count = values->n_children;
                 if (get_arrow_array_children_as_list(env, schema, values, offset, count, level, children, error) == 1) {
                     return 1;

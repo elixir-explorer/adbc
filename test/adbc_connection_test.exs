@@ -36,7 +36,7 @@ defmodule Adbc.Connection.Test do
 
       assert {:error, %Adbc.Error{} = error} = Connection.start_link(database: db, who_knows: 123)
 
-      assert Exception.message(error) == "[SQLite] Unknown connection option who_knows='123'"
+      assert Exception.message(error) == "[SQLite] Unknown connection option who_knows=123"
     end
   end
 

@@ -30,7 +30,7 @@ defmodule Adbc.DatabaseTest do
       assert {:error, %Adbc.Error{} = error} =
                Database.start_link(driver: :sqlite, who_knows: 123)
 
-      assert Exception.message(error) == "[SQLite] Unknown database option who_knows='123'"
+      assert Exception.message(error) == "[SQLite] Unknown database option who_knows=123"
     end
   end
 end

@@ -95,11 +95,36 @@ defmodule Adbc.Connection do
 
   defp init_statement_options(ref, opts) do
     Enum.reduce_while(opts, :ok, fn {key, value}, :ok ->
-      case Adbc.Nif.adbc_statement_set_option(ref, to_string(key), to_string(value)) do
-        :ok -> {:cont, :ok}
-        {:error, _} = error -> {:halt, error}
-      end
+      init_statement_option(ref, key, value)
     end)
+  end
+
+  defp init_statement_option(ref, key, value) when is_binary(value) do
+    case Adbc.Nif.adbc_statement_set_option(ref, to_string(key), value) do
+      :ok -> {:cont, :ok}
+      {:error, _} = error -> {:halt, error}
+    end
+  end
+
+  defp init_statement_option(ref, key, {:bytes, value}) when is_binary(value) do
+    case Adbc.Nif.adbc_statement_set_option_bytes(ref, to_string(key), value) do
+      :ok -> {:cont, :ok}
+      {:error, _} = error -> {:halt, error}
+    end
+  end
+
+  defp init_statement_option(ref, key, value) when is_integer(value) do
+    case Adbc.Nif.adbc_statement_set_option_int(ref, to_string(key), value) do
+      :ok -> {:cont, :ok}
+      {:error, _} = error -> {:halt, error}
+    end
+  end
+
+  defp init_statement_option(ref, key, value) when is_float(value) do
+    case Adbc.Nif.adbc_statement_set_option_double(ref, to_string(key), value) do
+      :ok -> {:cont, :ok}
+      {:error, _} = error -> {:halt, error}
+    end
   end
 
   @doc """

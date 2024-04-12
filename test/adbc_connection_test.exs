@@ -230,6 +230,47 @@ defmodule Adbc.Connection.Test do
     end
   end
 
+  describe "query with statement options" do
+    test "without parameters", %{db: db} do
+      conn = start_supervised!({Connection, database: db})
+
+      assert %Adbc.Result{data: %{"num" => [123], "bool" => [1]}} ==
+               Connection.query_with_options!(conn, "SELECT 123 as num, true as bool",
+                 "adbc.sqlite.query.batch_rows": 1
+               )
+    end
+
+    test "with parameters", %{db: db} do
+      conn = start_supervised!({Connection, database: db})
+
+      assert %Adbc.Result{data: %{"num" => [579]}} ==
+               Connection.query_with_options!(conn, "SELECT 123 + ? as num", [456],
+                 "adbc.sqlite.query.batch_rows": 10
+               )
+    end
+
+    test "invalid statement option key", %{db: db} do
+      conn = start_supervised!({Connection, database: db})
+
+      assert {:error, %Adbc.Error{} = error} =
+               Connection.query_with_options(conn, "SELECT 123 as num", foo: 1)
+
+      assert Exception.message(error) == "[SQLite] Unknown statement option foo=1"
+    end
+
+    test "invalid statement option value", %{db: db} do
+      conn = start_supervised!({Connection, database: db})
+
+      assert {:error, %Adbc.Error{} = error} =
+               Connection.query_with_options(conn, "SELECT 123 as num, true as bool",
+                 "adbc.sqlite.query.batch_rows": 0
+               )
+
+      assert Exception.message(error) ==
+               "[SQLite] Invalid statement option value adbc.sqlite.query.batch_rows=0 (value is non-positive or out of range of int)"
+    end
+  end
+
   describe "prepared queries" do
     test "prepare", %{db: db} do
       conn = start_supervised!({Connection, database: db})

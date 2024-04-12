@@ -56,6 +56,14 @@ defmodule Adbc.Nif do
 
   def adbc_statement_set_option(_statement, _key, _value), do: :erlang.nif_error(:not_loaded)
 
+  def adbc_statement_set_option_bytes(_statement, _key, _value),
+    do: :erlang.nif_error(:not_loaded)
+
+  def adbc_statement_set_option_int(_statement, _key, _value), do: :erlang.nif_error(:not_loaded)
+
+  def adbc_statement_set_option_double(_statement, _key, _value),
+    do: :erlang.nif_error(:not_loaded)
+
   def adbc_statement_execute_query(_statement), do: :erlang.nif_error(:not_loaded)
 
   def adbc_statement_prepare(_statement), do: :erlang.nif_error(:not_loaded)

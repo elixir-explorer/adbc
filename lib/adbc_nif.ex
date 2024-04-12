@@ -25,7 +25,19 @@ defmodule Adbc.Nif do
 
   def adbc_database_get_option(_self, _key), do: :erlang.nif_error(:not_loaded)
 
+  def adbc_database_get_option_bytes(_self, _key), do: :erlang.nif_error(:not_loaded)
+
+  def adbc_database_get_option_int(_self, _key), do: :erlang.nif_error(:not_loaded)
+
+  def adbc_database_get_option_double(_self, _key), do: :erlang.nif_error(:not_loaded)
+
   def adbc_database_set_option(_self, _key, _value), do: :erlang.nif_error(:not_loaded)
+
+  def adbc_database_set_option_bytes(_self, _key, _value), do: :erlang.nif_error(:not_loaded)
+
+  def adbc_database_set_option_int(_self, _key, _value), do: :erlang.nif_error(:not_loaded)
+
+  def adbc_database_set_option_double(_self, _key, _value), do: :erlang.nif_error(:not_loaded)
 
   def adbc_database_init(_self), do: :erlang.nif_error(:not_loaded)
 
@@ -33,7 +45,19 @@ defmodule Adbc.Nif do
 
   def adbc_connection_get_option(_self, _key), do: :erlang.nif_error(:not_loaded)
 
+  def adbc_connection_get_option_bytes(_self, _key), do: :erlang.nif_error(:not_loaded)
+
+  def adbc_connection_get_option_int(_self, _key), do: :erlang.nif_error(:not_loaded)
+
+  def adbc_connection_get_option_double(_self, _key), do: :erlang.nif_error(:not_loaded)
+
   def adbc_connection_set_option(_self, _key, _value), do: :erlang.nif_error(:not_loaded)
+
+  def adbc_connection_set_option_bytes(_self, _key, _value), do: :erlang.nif_error(:not_loaded)
+
+  def adbc_connection_set_option_int(_self, _key, _value), do: :erlang.nif_error(:not_loaded)
+
+  def adbc_connection_set_option_double(_self, _key, _value), do: :erlang.nif_error(:not_loaded)
 
   def adbc_connection_init(_self, _database), do: :erlang.nif_error(:not_loaded)
 
@@ -53,6 +77,14 @@ defmodule Adbc.Nif do
   def adbc_connection_get_table_types(_self), do: :erlang.nif_error(:not_loaded)
 
   def adbc_statement_new(_statement), do: :erlang.nif_error(:not_loaded)
+
+  def adbc_statement_get_option(_statement, _key), do: :erlang.nif_error(:not_loaded)
+
+  def adbc_statement_get_option_bytes(_statement, _key), do: :erlang.nif_error(:not_loaded)
+
+  def adbc_statement_get_option_int(_statement, _key), do: :erlang.nif_error(:not_loaded)
+
+  def adbc_statement_get_option_double(_statement, _key), do: :erlang.nif_error(:not_loaded)
 
   def adbc_statement_set_option(_statement, _key, _value), do: :erlang.nif_error(:not_loaded)
 

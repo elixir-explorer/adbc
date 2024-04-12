@@ -56,7 +56,7 @@ defmodule Adbc.Connection do
   end
 
   @doc """
-  Get a string option of the connection.
+  Get a string type option of the connection.
   """
   @spec get_option(pid(), atom() | String.t()) :: {:ok, String.t()} | {:error, String.t()}
   def get_option(conn, key) when is_pid(conn) do
@@ -70,12 +70,54 @@ defmodule Adbc.Connection do
   end
 
   @doc """
-  Get a string option of the connection.
+  Get a bytes type option of the connection.
+  """
+  @spec get_option_bytes(pid(), atom() | String.t()) :: {:ok, binary()} | {:error, String.t()}
+  def get_option_bytes(conn, key) when is_pid(conn) do
+    case GenServer.call(conn, {:get_option, :bytes, to_string(key)}) do
+      {:ok, value} ->
+        {:ok, value}
+
+      {:error, reason} ->
+        {:error, error_to_exception(reason)}
+    end
+  end
+
+  @doc """
+  Get an int type option of the connection.
+  """
+  @spec get_option_int(pid(), atom() | String.t()) :: {:ok, integer()} | {:error, String.t()}
+  def get_option_int(conn, key) when is_pid(conn) do
+    case GenServer.call(conn, {:get_option, :int, to_string(key)}) do
+      {:ok, value} ->
+        {:ok, value}
+
+      {:error, reason} ->
+        {:error, error_to_exception(reason)}
+    end
+  end
+
+  @doc """
+  Get a double type option of the connection.
+  """
+  @spec get_option_double(pid(), atom() | String.t()) :: {:ok, float()} | {:error, String.t()}
+  def get_option_double(conn, key) when is_pid(conn) do
+    case GenServer.call(conn, {:get_option, :double, to_string(key)}) do
+      {:ok, value} ->
+        {:ok, value}
+
+      {:error, reason} ->
+        {:error, error_to_exception(reason)}
+    end
+  end
+
+  @doc """
+  Set a string option of the connection.
   """
   @spec set_option(pid(), atom() | String.t(), atom() | String.t() | number()) ::
           :ok | {:error, String.t()}
-  def set_option(conn, key, value) when is_pid(conn) and is_binary(key) do
-    case GenServer.call(conn, {:set_option, to_string(key), to_string(value)}) do
+  def set_option(conn, key, value) when is_pid(conn) do
+    case GenServer.call(conn, {:set_option, to_string(key), value}) do
       :ok ->
         :ok
 
@@ -86,7 +128,7 @@ defmodule Adbc.Connection do
 
   defp init_options(ref, opts) do
     Enum.reduce_while(opts, :ok, fn {key, value}, :ok ->
-      case Adbc.Nif.adbc_connection_set_option(ref, to_string(key), to_string(value)) do
+      case Adbc.Helper.set_option(:connection, ref, key, value) do
         :ok -> {:cont, :ok}
         {:error, _} = error -> {:halt, error}
       end
@@ -95,36 +137,11 @@ defmodule Adbc.Connection do
 
   defp init_statement_options(ref, opts) do
     Enum.reduce_while(opts, :ok, fn {key, value}, :ok ->
-      init_statement_option(ref, key, value)
+      case Adbc.Helper.set_option(:statement, ref, key, value) do
+        :ok -> {:cont, :ok}
+        {:error, _} = error -> {:halt, error}
+      end
     end)
-  end
-
-  defp init_statement_option(ref, key, value) when is_binary(value) do
-    case Adbc.Nif.adbc_statement_set_option(ref, to_string(key), value) do
-      :ok -> {:cont, :ok}
-      {:error, _} = error -> {:halt, error}
-    end
-  end
-
-  defp init_statement_option(ref, key, {:bytes, value}) when is_binary(value) do
-    case Adbc.Nif.adbc_statement_set_option_bytes(ref, to_string(key), value) do
-      :ok -> {:cont, :ok}
-      {:error, _} = error -> {:halt, error}
-    end
-  end
-
-  defp init_statement_option(ref, key, value) when is_integer(value) do
-    case Adbc.Nif.adbc_statement_set_option_int(ref, to_string(key), value) do
-      :ok -> {:cont, :ok}
-      {:error, _} = error -> {:halt, error}
-    end
-  end
-
-  defp init_statement_option(ref, key, value) when is_float(value) do
-    case Adbc.Nif.adbc_statement_set_option_double(ref, to_string(key), value) do
-      :ok -> {:cont, :ok}
-      {:error, _} = error -> {:halt, error}
-    end
   end
 
   @doc """
@@ -429,12 +446,12 @@ defmodule Adbc.Connection do
     {:noreply, maybe_dequeue(state)}
   end
 
-  def handle_call({:get_option, key}, _from, state = %{conn: conn}) do
-    {:reply, Adbc.Nif.adbc_connection_get_option(conn, key), state}
+  def handle_call({:get_option, option_type, key}, _from, state = %{conn: conn}) do
+    {:reply, Adbc.Helper.get_option(:connection, option_type, conn, key), state}
   end
 
   def handle_call({:set_option, key, value}, _from, state = %{conn: conn}) do
-    {:reply, Adbc.Nif.adbc_connection_set_option(conn, key, value), state}
+    {:reply, Adbc.Helper.set_option(:connection, conn, key, value), state}
   end
 
   @impl true

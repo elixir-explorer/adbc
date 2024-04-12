@@ -60,11 +60,53 @@ defmodule Adbc.Database do
   end
 
   @doc """
-  Get a string option of the database.
+  Get a string type option of the database.
   """
   @spec get_option(pid(), atom() | String.t()) :: {:ok, String.t()} | {:error, String.t()}
   def get_option(db, key) when is_pid(db) do
-    case GenServer.call(db, {:get_option, to_string(key)}) do
+    case GenServer.call(db, {:get_option, :string, to_string(key)}) do
+      {:ok, value} ->
+        {:ok, value}
+
+      {:error, reason} ->
+        {:error, error_to_exception(reason)}
+    end
+  end
+
+  @doc """
+  Get a bytes type option of the database.
+  """
+  @spec get_option_bytes(pid(), atom() | String.t()) :: {:ok, binary()} | {:error, String.t()}
+  def get_option_bytes(db, key) when is_pid(db) do
+    case GenServer.call(db, {:get_option, :bytes, to_string(key)}) do
+      {:ok, value} ->
+        {:ok, value}
+
+      {:error, reason} ->
+        {:error, error_to_exception(reason)}
+    end
+  end
+
+  @doc """
+  Get an int type option of the database.
+  """
+  @spec get_option_int(pid(), atom() | String.t()) :: {:ok, integer()} | {:error, String.t()}
+  def get_option_int(db, key) when is_pid(db) do
+    case GenServer.call(db, {:get_option, :int, to_string(key)}) do
+      {:ok, value} ->
+        {:ok, value}
+
+      {:error, reason} ->
+        {:error, error_to_exception(reason)}
+    end
+  end
+
+  @doc """
+  Get a double type option of the database.
+  """
+  @spec get_option_double(pid(), atom() | String.t()) :: {:ok, float()} | {:error, String.t()}
+  def get_option_double(db, key) when is_pid(db) do
+    case GenServer.call(db, {:get_option, :double, to_string(key)}) do
       {:ok, value} ->
         {:ok, value}
 
@@ -79,7 +121,7 @@ defmodule Adbc.Database do
   @spec set_option(pid(), atom() | String.t(), atom() | String.t() | number()) ::
           :ok | {:error, String.t()}
   def set_option(db, key, value) when is_pid(db) do
-    case GenServer.call(db, {:set_option, to_string(key), to_string(value)}) do
+    case GenServer.call(db, {:set_option, key, value}) do
       :ok ->
         :ok
 
@@ -111,12 +153,12 @@ defmodule Adbc.Database do
     end
   end
 
-  def handle_call({:get_option, key}, _from, {driver, db}) do
-    {:reply, Adbc.Nif.adbc_database_get_option(db, key), {driver, db}}
+  def handle_call({:get_option, option_type, key}, _from, {driver, db}) do
+    {:reply, Adbc.Helper.get_option(:database, option_type, db, key), {driver, db}}
   end
 
   def handle_call({:set_option, key, value}, _from, {driver, db}) do
-    {:reply, Adbc.Nif.adbc_database_set_option(db, key, value), {driver, db}}
+    {:reply, Adbc.Helper.set_option(:database, db, key, value), {driver, db}}
   end
 
   @impl true
@@ -124,14 +166,14 @@ defmodule Adbc.Database do
 
   defp init_driver(ref, driver) do
     case Adbc.Driver.so_path(driver) do
-      {:ok, path} -> Adbc.Nif.adbc_database_set_option(ref, "driver", path)
+      {:ok, path} -> Adbc.Helper.set_option(:database, ref, "driver", path)
       {:error, reason} -> {:error, reason}
     end
   end
 
   defp init_options(ref, opts) do
     Enum.reduce_while(opts, :ok, fn {key, value}, :ok ->
-      case Adbc.Nif.adbc_database_set_option(ref, to_string(key), to_string(value)) do
+      case Adbc.Helper.set_option(:database, ref, key, value) do
         :ok -> {:cont, :ok}
         {:error, _} = error -> {:halt, error}
       end

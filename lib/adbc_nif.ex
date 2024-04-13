@@ -23,41 +23,17 @@ defmodule Adbc.Nif do
 
   def adbc_database_new, do: :erlang.nif_error(:not_loaded)
 
-  def adbc_database_get_option(_self, _key), do: :erlang.nif_error(:not_loaded)
+  def adbc_database_get_option(_self, _type, _key), do: :erlang.nif_error(:not_loaded)
 
-  def adbc_database_get_option_bytes(_self, _key), do: :erlang.nif_error(:not_loaded)
-
-  def adbc_database_get_option_int(_self, _key), do: :erlang.nif_error(:not_loaded)
-
-  def adbc_database_get_option_double(_self, _key), do: :erlang.nif_error(:not_loaded)
-
-  def adbc_database_set_option(_self, _key, _value), do: :erlang.nif_error(:not_loaded)
-
-  def adbc_database_set_option_bytes(_self, _key, _value), do: :erlang.nif_error(:not_loaded)
-
-  def adbc_database_set_option_int(_self, _key, _value), do: :erlang.nif_error(:not_loaded)
-
-  def adbc_database_set_option_double(_self, _key, _value), do: :erlang.nif_error(:not_loaded)
+  def adbc_database_set_option(_self, _type, _key, _value), do: :erlang.nif_error(:not_loaded)
 
   def adbc_database_init(_self), do: :erlang.nif_error(:not_loaded)
 
   def adbc_connection_new, do: :erlang.nif_error(:not_loaded)
 
-  def adbc_connection_get_option(_self, _key), do: :erlang.nif_error(:not_loaded)
+  def adbc_connection_get_option(_self, _type, _key), do: :erlang.nif_error(:not_loaded)
 
-  def adbc_connection_get_option_bytes(_self, _key), do: :erlang.nif_error(:not_loaded)
-
-  def adbc_connection_get_option_int(_self, _key), do: :erlang.nif_error(:not_loaded)
-
-  def adbc_connection_get_option_double(_self, _key), do: :erlang.nif_error(:not_loaded)
-
-  def adbc_connection_set_option(_self, _key, _value), do: :erlang.nif_error(:not_loaded)
-
-  def adbc_connection_set_option_bytes(_self, _key, _value), do: :erlang.nif_error(:not_loaded)
-
-  def adbc_connection_set_option_int(_self, _key, _value), do: :erlang.nif_error(:not_loaded)
-
-  def adbc_connection_set_option_double(_self, _key, _value), do: :erlang.nif_error(:not_loaded)
+  def adbc_connection_set_option(_self, _type, _key, _value), do: :erlang.nif_error(:not_loaded)
 
   def adbc_connection_init(_self, _database), do: :erlang.nif_error(:not_loaded)
 
@@ -76,35 +52,21 @@ defmodule Adbc.Nif do
 
   def adbc_connection_get_table_types(_self), do: :erlang.nif_error(:not_loaded)
 
-  def adbc_statement_new(_statement), do: :erlang.nif_error(:not_loaded)
+  def adbc_statement_new(_self), do: :erlang.nif_error(:not_loaded)
 
-  def adbc_statement_get_option(_statement, _key), do: :erlang.nif_error(:not_loaded)
+  def adbc_statement_get_option(_self, _type, _key), do: :erlang.nif_error(:not_loaded)
 
-  def adbc_statement_get_option_bytes(_statement, _key), do: :erlang.nif_error(:not_loaded)
+  def adbc_statement_set_option(_self, _type, _key, _value), do: :erlang.nif_error(:not_loaded)
 
-  def adbc_statement_get_option_int(_statement, _key), do: :erlang.nif_error(:not_loaded)
+  def adbc_statement_execute_query(_self), do: :erlang.nif_error(:not_loaded)
 
-  def adbc_statement_get_option_double(_statement, _key), do: :erlang.nif_error(:not_loaded)
+  def adbc_statement_prepare(_self), do: :erlang.nif_error(:not_loaded)
 
-  def adbc_statement_set_option(_statement, _key, _value), do: :erlang.nif_error(:not_loaded)
+  def adbc_statement_set_sql_query(_self, _query), do: :erlang.nif_error(:not_loaded)
 
-  def adbc_statement_set_option_bytes(_statement, _key, _value),
-    do: :erlang.nif_error(:not_loaded)
+  def adbc_statement_bind(_self, _values), do: :erlang.nif_error(:not_loaded)
 
-  def adbc_statement_set_option_int(_statement, _key, _value), do: :erlang.nif_error(:not_loaded)
-
-  def adbc_statement_set_option_double(_statement, _key, _value),
-    do: :erlang.nif_error(:not_loaded)
-
-  def adbc_statement_execute_query(_statement), do: :erlang.nif_error(:not_loaded)
-
-  def adbc_statement_prepare(_statement), do: :erlang.nif_error(:not_loaded)
-
-  def adbc_statement_set_sql_query(_statement, _query), do: :erlang.nif_error(:not_loaded)
-
-  def adbc_statement_bind(_statement, _values), do: :erlang.nif_error(:not_loaded)
-
-  def adbc_statement_bind_stream(_statement, _stream), do: :erlang.nif_error(:not_loaded)
+  def adbc_statement_bind_stream(_self, _stream), do: :erlang.nif_error(:not_loaded)
 
   def adbc_arrow_array_stream_get_pointer(_arrow_array_stream), do: :erlang.nif_error(:not_loaded)
 

@@ -1026,239 +1026,159 @@ static ERL_NIF_TERM adbc_database_new(ErlNifEnv *env, int argc, const ERL_NIF_TE
     return erlang::nif::ok(env, ret);
 }
 
+template <typename T, typename GetString, typename GetBytes, typename GetInt, typename GetDouble>
+static ERL_NIF_TERM adbc_get_option(ErlNifEnv *env, const ERL_NIF_TERM argv[], GetString& get_string, GetBytes& get_bytes, GetInt& get_int, GetDouble& get_double) {
+    using res_type = NifRes<T>;
+
+    ERL_NIF_TERM error{};
+    res_type * resource = nullptr;
+    if ((resource = res_type::get_resource(env, argv[0], error)) == nullptr) {
+        return error;
+    }
+
+    std::string type, key;
+    if (!erlang::nif::get(env, argv[1], type)) {
+        return enif_make_badarg(env);
+    }
+    if (!erlang::nif::get(env, argv[2], key)) {
+        return enif_make_badarg(env);
+    }
+
+    struct AdbcError adbc_error{};
+    if (type == "string" || type == "binary") {
+        int is_string = type == "string";
+        uint8_t value[64] = {'\0'};
+        constexpr size_t value_buffer_size = sizeof(value) / sizeof(value[0]);
+        size_t value_len = value_buffer_size;
+        AdbcStatusCode code;
+        size_t elem_size = 0;
+        if (is_string) {
+            elem_size = sizeof(char);
+            code = get_string(&resource->val, key.c_str(), (char *)value, &value_len, &adbc_error);
+        } else {
+            elem_size = sizeof(uint8_t);
+            code = get_bytes(&resource->val, key.c_str(), value, &value_len, &adbc_error);
+        }
+        if (code != ADBC_STATUS_OK) {
+            return nif_error_from_adbc_error(env, &adbc_error);
+        }
+
+        if (value_len > value_buffer_size) {
+            uint8_t * out_value = (uint8_t *)enif_alloc(elem_size * (value_len + 1));
+            memset(out_value, 0, elem_size * (value_len + 1));
+            value_len += 1;
+            if (is_string) {
+                code = get_string(&resource->val, key.c_str(), (char *)out_value, &value_len, &adbc_error);
+            } else {
+                code = get_bytes(&resource->val, key.c_str(), out_value, &value_len, &adbc_error);
+            }
+            
+            if (code != ADBC_STATUS_OK) {
+                return nif_error_from_adbc_error(env, &adbc_error);
+            }
+
+            // minus 1 to remove the null terminator for strings
+            ERL_NIF_TERM ret;
+            ret = erlang::nif::make_binary(env, (const char *)out_value, value_len - (is_string ? 1 : 0));
+            enif_free(out_value);
+            return erlang::nif::ok(env, ret);
+        } else {
+            // minus 1 to remove the null terminator for strings
+            return erlang::nif::ok(env, erlang::nif::make_binary(env, (const char *)value, value_len - (is_string ? 1 : 0)));
+        }
+    } else if (type == "integer") {
+        int64_t value = 0;
+        AdbcStatusCode code = get_int(&resource->val, key.c_str(), &value, &adbc_error);
+        if (code != ADBC_STATUS_OK) {
+            return nif_error_from_adbc_error(env, &adbc_error);
+        }
+
+        return erlang::nif::ok(env, erlang::nif::make(env, value));
+    } else if (type == "float") {
+        double value = 0;
+        AdbcStatusCode code = get_double(&resource->val, key.c_str(), &value, &adbc_error);
+        if (code != ADBC_STATUS_OK) {
+            return nif_error_from_adbc_error(env, &adbc_error);
+        }
+
+        return erlang::nif::ok(env, erlang::nif::make(env, value));
+    } else {
+        return enif_make_badarg(env);
+    }
+}
+
+template <typename T, typename SetString, typename SetBytes, typename SetInt, typename SetDouble>
+static ERL_NIF_TERM adbc_set_option(ErlNifEnv *env, const ERL_NIF_TERM argv[], SetString& set_string, SetBytes &set_bytes, SetInt &set_int, SetDouble &set_double) {
+    using res_type = NifRes<T>;
+
+    ERL_NIF_TERM error{};
+    res_type * resource = nullptr;
+    if ((resource = res_type::get_resource(env, argv[0], error)) == nullptr) {
+        return error;
+    }
+
+    std::string type, key;
+    if (!erlang::nif::get_atom(env, argv[1], type)) {
+        return enif_make_badarg(env);
+    }
+    if (!erlang::nif::get(env, argv[2], key)) {
+        return enif_make_badarg(env);
+    }
+
+    struct AdbcError adbc_error{};
+    AdbcStatusCode code;
+    if (type == "string" || type == "binary") {
+        std::string value;
+        if (!erlang::nif::get(env, argv[3], value)) {
+            return enif_make_badarg(env);
+        }
+        if (type == "string") {
+            code = set_string(&resource->val, key.c_str(), value.c_str(), &adbc_error);
+        } else {
+            code = set_bytes(&resource->val, key.c_str(), (const uint8_t *)value.data(), value.length(), &adbc_error);
+        }
+    } else if (type == "integer") {
+        int64_t value;
+        if (!erlang::nif::get(env, argv[3], &value)) {
+            return enif_make_badarg(env);
+        }
+        code = set_int(&resource->val, key.c_str(), value, &adbc_error);
+    } else if (type == "float") {
+        double value;
+        if (!erlang::nif::get(env, argv[3], &value)) {
+            return enif_make_badarg(env);
+        }
+        code = set_double(&resource->val, key.c_str(), value, &adbc_error);
+    } else {
+        return enif_make_badarg(env);
+    }
+
+    if (code != ADBC_STATUS_OK) {
+        return nif_error_from_adbc_error(env, &adbc_error);
+    }
+    return erlang::nif::ok(env);
+}
+
 static ERL_NIF_TERM adbc_database_get_option(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
-    using res_type = NifRes<struct AdbcDatabase>;
-
-    ERL_NIF_TERM error{};
-    res_type * database = nullptr;
-    if ((database = res_type::get_resource(env, argv[0], error)) == nullptr) {
-        return error;
-    }
-
-    std::string key;
-    if (!erlang::nif::get(env, argv[1], key)) {
-        return enif_make_badarg(env);
-    }
-
-    struct AdbcError adbc_error{};
-    char value[64] = {'\0'};
-    constexpr size_t value_buffer_size = sizeof(value) / sizeof(value[0]);
-    size_t value_len = value_buffer_size;
-    AdbcStatusCode code = AdbcDatabaseGetOption(&database->val, key.c_str(), value, &value_len, &adbc_error);
-    if (code != ADBC_STATUS_OK) {
-        return nif_error_from_adbc_error(env, &adbc_error);
-    }
-    if (value_len > value_buffer_size) {
-        char * out_value = (char *)enif_alloc(sizeof(char) * (value_len + 1));
-        memset(out_value, 0, sizeof(char) * (value_len + 1));
-        value_len += 1;
-        code = AdbcDatabaseGetOption(&database->val, key.c_str(), out_value, &value_len, &adbc_error);
-        if (code != ADBC_STATUS_OK) {
-            return nif_error_from_adbc_error(env, &adbc_error);
-        }
-        // minus 1 to remove the null terminator
-        ERL_NIF_TERM ret = erlang::nif::make_binary(env, out_value, value_len - 1);
-        enif_free(out_value);
-        return erlang::nif::ok(env, ret);
-    } else {
-        // minus 1 to remove the null terminator
-        return erlang::nif::ok(env, erlang::nif::make_binary(env, value, value_len - 1));
-    }
-}
-
-static ERL_NIF_TERM adbc_database_get_option_bytes(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
-    using res_type = NifRes<struct AdbcDatabase>;
-
-    ERL_NIF_TERM error{};
-    res_type * database = nullptr;
-    if ((database = res_type::get_resource(env, argv[0], error)) == nullptr) {
-        return error;
-    }
-
-    std::string key;
-    if (!erlang::nif::get(env, argv[1], key)) {
-        return enif_make_badarg(env);
-    }
-
-    struct AdbcError adbc_error{};
-    uint8_t value[64] = {'\0'};
-    constexpr size_t value_buffer_size = sizeof(value) / sizeof(value[0]);
-    size_t value_len = value_buffer_size;
-    AdbcStatusCode code = AdbcDatabaseGetOptionBytes(&database->val, key.c_str(), value, &value_len, &adbc_error);
-    if (code != ADBC_STATUS_OK) {
-        return nif_error_from_adbc_error(env, &adbc_error);
-    }
-    if (value_len > value_buffer_size) {
-        uint8_t * out_value = (uint8_t *)enif_alloc(sizeof(uint8_t) * (value_len + 1));
-        if (!out_value) {
-            return erlang::nif::error(env, "out of memory");
-        }
-        memset(out_value, 0, sizeof(uint8_t) * (value_len + 1));
-        value_len += 1;
-        code = AdbcDatabaseGetOptionBytes(&database->val, key.c_str(), out_value, &value_len, &adbc_error);
-        if (code != ADBC_STATUS_OK) {
-            return nif_error_from_adbc_error(env, &adbc_error);
-        }
-        ERL_NIF_TERM ret = erlang::nif::make_binary(env, (const char *)out_value, value_len);
-        enif_free(out_value);
-        return erlang::nif::ok(env, ret);
-    } else {
-        return erlang::nif::ok(env, erlang::nif::make_binary(env, (const char *)value, value_len));
-    }
-}
-
-static ERL_NIF_TERM adbc_database_get_option_int(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
-    using res_type = NifRes<struct AdbcDatabase>;
-
-    ERL_NIF_TERM error{};
-    res_type * database = nullptr;
-    if ((database = res_type::get_resource(env, argv[0], error)) == nullptr) {
-        return error;
-    }
-
-    std::string key;
-    if (!erlang::nif::get(env, argv[1], key)) {
-        return enif_make_badarg(env);
-    }
-
-    struct AdbcError adbc_error{};
-    int64_t value = 0;
-    AdbcStatusCode code = AdbcDatabaseGetOptionInt(&database->val, key.c_str(), &value, &adbc_error);
-    if (code != ADBC_STATUS_OK) {
-        return nif_error_from_adbc_error(env, &adbc_error);
-    }
-
-    return erlang::nif::ok(env, erlang::nif::make(env, value));
-}
-
-static ERL_NIF_TERM adbc_database_get_option_double(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
-    using res_type = NifRes<struct AdbcDatabase>;
-
-    ERL_NIF_TERM error{};
-    res_type * database = nullptr;
-    if ((database = res_type::get_resource(env, argv[0], error)) == nullptr) {
-        return error;
-    }
-
-    std::string key;
-    if (!erlang::nif::get(env, argv[1], key)) {
-        return enif_make_badarg(env);
-    }
-
-    struct AdbcError adbc_error{};
-    double value = 0;
-    AdbcStatusCode code = AdbcDatabaseGetOptionDouble(&database->val, key.c_str(), &value, &adbc_error);
-    if (code != ADBC_STATUS_OK) {
-        return nif_error_from_adbc_error(env, &adbc_error);
-    }
-
-    return erlang::nif::ok(env, erlang::nif::make(env, value));
+    return adbc_get_option<struct AdbcDatabase>(
+        env,
+        argv,
+        AdbcDatabaseGetOption,
+        AdbcDatabaseGetOptionBytes,
+        AdbcDatabaseGetOptionInt,
+        AdbcDatabaseGetOptionDouble
+    );
 }
 
 static ERL_NIF_TERM adbc_database_set_option(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
-    using res_type = NifRes<struct AdbcDatabase>;
-
-    ERL_NIF_TERM error{};
-    res_type * database = nullptr;
-    if ((database = res_type::get_resource(env, argv[0], error)) == nullptr) {
-        return error;
-    }
-
-    std::string key, value;
-    if (!erlang::nif::get(env, argv[1], key)) {
-        return enif_make_badarg(env);
-    }
-    if (!erlang::nif::get(env, argv[2], value)) {
-        return enif_make_badarg(env);
-    }
-
-    struct AdbcError adbc_error{};
-    AdbcStatusCode code = AdbcDatabaseSetOption(&database->val, key.c_str(), value.c_str(), &adbc_error);
-    if (code != ADBC_STATUS_OK) {
-        return nif_error_from_adbc_error(env, &adbc_error);
-    }
-
-    return erlang::nif::ok(env);
-}
-
-static ERL_NIF_TERM adbc_database_set_option_bytes(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
-    using res_type = NifRes<struct AdbcDatabase>;
-
-    ERL_NIF_TERM error{};
-    res_type * database = nullptr;
-    if ((database = res_type::get_resource(env, argv[0], error)) == nullptr) {
-        return error;
-    }
-
-    std::string key, value;
-    if (!erlang::nif::get(env, argv[1], key)) {
-        return enif_make_badarg(env);
-    }
-    if (!erlang::nif::get(env, argv[2], value)) {
-        return enif_make_badarg(env);
-    }
-
-    struct AdbcError adbc_error{};
-    AdbcStatusCode code = AdbcDatabaseSetOptionBytes(&database->val, key.c_str(), (const uint8_t *)value.data(), value.length(), &adbc_error);
-    if (code != ADBC_STATUS_OK) {
-        return nif_error_from_adbc_error(env, &adbc_error);
-    }
-
-    return erlang::nif::ok(env);
-}
-
-static ERL_NIF_TERM adbc_database_set_option_int(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
-    using res_type = NifRes<struct AdbcDatabase>;
-
-    ERL_NIF_TERM error{};
-    res_type * database = nullptr;
-    if ((database = res_type::get_resource(env, argv[0], error)) == nullptr) {
-        return error;
-    }
-
-    std::string key;
-    int64_t value;
-    if (!erlang::nif::get(env, argv[1], key)) {
-        return enif_make_badarg(env);
-    }
-    if (!erlang::nif::get(env, argv[2], &value)) {
-        return enif_make_badarg(env);
-    }
-
-    struct AdbcError adbc_error{};
-    AdbcStatusCode code = AdbcDatabaseSetOptionInt(&database->val, key.c_str(), value, &adbc_error);
-    if (code != ADBC_STATUS_OK) {
-        return nif_error_from_adbc_error(env, &adbc_error);
-    }
-
-    return erlang::nif::ok(env);
-}
-
-static ERL_NIF_TERM adbc_database_set_option_double(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
-    using res_type = NifRes<struct AdbcDatabase>;
-
-    ERL_NIF_TERM error{};
-    res_type * database = nullptr;
-    if ((database = res_type::get_resource(env, argv[0], error)) == nullptr) {
-        return error;
-    }
-
-    std::string key;
-    double value;
-    if (!erlang::nif::get(env, argv[1], key)) {
-        return enif_make_badarg(env);
-    }
-    if (!erlang::nif::get(env, argv[2], &value)) {
-        return enif_make_badarg(env);
-    }
-
-    struct AdbcError adbc_error{};
-    AdbcStatusCode code = AdbcDatabaseSetOptionDouble(&database->val, key.c_str(), value, &adbc_error);
-    if (code != ADBC_STATUS_OK) {
-        return nif_error_from_adbc_error(env, &adbc_error);
-    }
-
-    return erlang::nif::ok(env);
+    return adbc_set_option<struct AdbcDatabase>(
+        env,
+        argv,
+        AdbcDatabaseSetOption,
+        AdbcDatabaseSetOptionBytes,
+        AdbcDatabaseSetOptionInt,
+        AdbcDatabaseSetOptionDouble
+    );
 }
 
 static ERL_NIF_TERM adbc_database_init(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
@@ -1299,238 +1219,25 @@ static ERL_NIF_TERM adbc_connection_new(ErlNifEnv *env, int argc, const ERL_NIF_
 }
 
 static ERL_NIF_TERM adbc_connection_get_option(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
-    using res_type = NifRes<struct AdbcConnection>;
-
-    ERL_NIF_TERM error{};
-    res_type * connection = res_type::get_resource(env, argv[0], error);
-    if (connection == nullptr) {
-        return error;
-    }
-
-    std::string key;
-    if (!erlang::nif::get(env, argv[1], key)) {
-        return enif_make_badarg(env);
-    }
-
-    struct AdbcError adbc_error{};
-    char value[64] = {'\0'};
-    constexpr size_t value_buffer_size = sizeof(value) / sizeof(value[0]);
-    size_t value_len = value_buffer_size;
-    AdbcStatusCode code = AdbcConnectionGetOption(&connection->val, key.c_str(), value, &value_len, &adbc_error);
-    if (code != ADBC_STATUS_OK) {
-        return nif_error_from_adbc_error(env, &adbc_error);
-    }
-    if (value_len > value_buffer_size) {
-        char * out_value = (char *)enif_alloc(sizeof(char) * (value_len + 1));
-        memset(out_value, 0, sizeof(char) * (value_len + 1));
-        value_len += 1;
-        code = AdbcConnectionGetOption(&connection->val, key.c_str(), out_value, &value_len, &adbc_error);
-        if (code != ADBC_STATUS_OK) {
-            return nif_error_from_adbc_error(env, &adbc_error);
-        }
-        // minus 1 to remove the null terminator
-        ERL_NIF_TERM ret = erlang::nif::make_binary(env, out_value, value_len - 1);
-        enif_free(out_value);
-        return erlang::nif::ok(env, ret);
-    } else {
-        // minus 1 to remove the null terminator
-        return erlang::nif::ok(env, erlang::nif::make_binary(env, value, value_len - 1));
-    }
-}
-
-static ERL_NIF_TERM adbc_connection_get_option_bytes(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
-    using res_type = NifRes<struct AdbcConnection>;
-
-    ERL_NIF_TERM error{};
-    res_type * connection = nullptr;
-    if ((connection = res_type::get_resource(env, argv[0], error)) == nullptr) {
-        return error;
-    }
-
-    std::string key;
-    if (!erlang::nif::get(env, argv[1], key)) {
-        return enif_make_badarg(env);
-    }
-
-    struct AdbcError adbc_error{};
-    uint8_t value[64] = {'\0'};
-    constexpr size_t value_buffer_size = sizeof(value) / sizeof(value[0]);
-    size_t value_len = value_buffer_size;
-    AdbcStatusCode code = AdbcConnectionGetOptionBytes(&connection->val, key.c_str(), value, &value_len, &adbc_error);
-    if (code != ADBC_STATUS_OK) {
-        return nif_error_from_adbc_error(env, &adbc_error);
-    }
-    if (value_len > value_buffer_size) {
-        uint8_t * out_value = (uint8_t *)enif_alloc(sizeof(uint8_t) * (value_len + 1));
-        if (!out_value) {
-            return erlang::nif::error(env, "out of memory");
-        }
-        memset(out_value, 0, sizeof(uint8_t) * (value_len + 1));
-        value_len += 1;
-        code = AdbcConnectionGetOptionBytes(&connection->val, key.c_str(), out_value, &value_len, &adbc_error);
-        if (code != ADBC_STATUS_OK) {
-            return nif_error_from_adbc_error(env, &adbc_error);
-        }
-        ERL_NIF_TERM ret = erlang::nif::make_binary(env, (const char *)out_value, value_len);
-        enif_free(out_value);
-        return erlang::nif::ok(env, ret);
-    } else {
-        return erlang::nif::ok(env, erlang::nif::make_binary(env, (const char *)value, value_len));
-    }
-}
-
-static ERL_NIF_TERM adbc_connection_get_option_int(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
-    using res_type = NifRes<struct AdbcConnection>;
-
-    ERL_NIF_TERM error{};
-    res_type * connection = nullptr;
-    if ((connection = res_type::get_resource(env, argv[0], error)) == nullptr) {
-        return error;
-    }
-
-    std::string key;
-    if (!erlang::nif::get(env, argv[1], key)) {
-        return enif_make_badarg(env);
-    }
-
-    struct AdbcError adbc_error{};
-    int64_t value = 0;
-    AdbcStatusCode code = AdbcConnectionGetOptionInt(&connection->val, key.c_str(), &value, &adbc_error);
-    if (code != ADBC_STATUS_OK) {
-        return nif_error_from_adbc_error(env, &adbc_error);
-    }
-
-    return erlang::nif::ok(env, erlang::nif::make(env, value));
-}
-
-static ERL_NIF_TERM adbc_connection_get_option_double(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
-    using res_type = NifRes<struct AdbcConnection>;
-
-    ERL_NIF_TERM error{};
-    res_type * connection = nullptr;
-    if ((connection = res_type::get_resource(env, argv[0], error)) == nullptr) {
-        return error;
-    }
-
-    std::string key;
-    if (!erlang::nif::get(env, argv[1], key)) {
-        return enif_make_badarg(env);
-    }
-
-    struct AdbcError adbc_error{};
-    double value = 0;
-    AdbcStatusCode code = AdbcConnectionGetOptionDouble(&connection->val, key.c_str(), &value, &adbc_error);
-    if (code != ADBC_STATUS_OK) {
-        return nif_error_from_adbc_error(env, &adbc_error);
-    }
-
-    return erlang::nif::ok(env, erlang::nif::make(env, value));
+    return adbc_get_option<struct AdbcConnection>(
+        env,
+        argv,
+        AdbcConnectionGetOption,
+        AdbcConnectionGetOptionBytes,
+        AdbcConnectionGetOptionInt,
+        AdbcConnectionGetOptionDouble
+    );
 }
 
 static ERL_NIF_TERM adbc_connection_set_option(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
-    using res_type = NifRes<struct AdbcConnection>;
-
-    ERL_NIF_TERM error{};
-    res_type * connection = res_type::get_resource(env, argv[0], error);
-    if (connection == nullptr) {
-        return error;
-    }
-
-    std::string key, value;
-    if (!erlang::nif::get(env, argv[1], key)) {
-        return enif_make_badarg(env);
-    }
-    if (!erlang::nif::get(env, argv[2], value)) {
-        return enif_make_badarg(env);
-    }
-
-    struct AdbcError adbc_error{};
-    AdbcStatusCode code = AdbcConnectionSetOption(&connection->val, key.c_str(), value.c_str(), &adbc_error);
-    if (code != ADBC_STATUS_OK) {
-        return nif_error_from_adbc_error(env, &adbc_error);
-    }
-
-    return erlang::nif::ok(env);
-}
-
-static ERL_NIF_TERM adbc_connection_set_option_bytes(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
-    using res_type = NifRes<struct AdbcConnection>;
-
-    ERL_NIF_TERM error{};
-    res_type * connection = res_type::get_resource(env, argv[0], error);
-    if (connection == nullptr) {
-        return error;
-    }
-
-    std::string key, value;
-    if (!erlang::nif::get(env, argv[1], key)) {
-        return enif_make_badarg(env);
-    }
-    if (!erlang::nif::get(env, argv[2], value)) {
-        return enif_make_badarg(env);
-    }
-
-    struct AdbcError adbc_error{};
-    AdbcStatusCode code = AdbcConnectionSetOptionBytes(&connection->val, key.c_str(), (const uint8_t *)value.data(), value.length(), &adbc_error);
-    if (code != ADBC_STATUS_OK) {
-        return nif_error_from_adbc_error(env, &adbc_error);
-    }
-
-    return erlang::nif::ok(env);
-}
-
-static ERL_NIF_TERM adbc_connection_set_option_int(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
-    using res_type = NifRes<struct AdbcConnection>;
-
-    ERL_NIF_TERM error{};
-    res_type * connection = res_type::get_resource(env, argv[0], error);
-    if (connection == nullptr) {
-        return error;
-    }
-
-    std::string key;
-    int64_t value;
-    if (!erlang::nif::get(env, argv[1], key)) {
-        return enif_make_badarg(env);
-    }
-    if (!erlang::nif::get(env, argv[2], &value)) {
-        return enif_make_badarg(env);
-    }
-
-    struct AdbcError adbc_error{};
-    AdbcStatusCode code = AdbcConnectionSetOptionInt(&connection->val, key.c_str(), value, &adbc_error);
-    if (code != ADBC_STATUS_OK) {
-        return nif_error_from_adbc_error(env, &adbc_error);
-    }
-
-    return erlang::nif::ok(env);
-}
-
-static ERL_NIF_TERM adbc_connection_set_option_double(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
-    using res_type = NifRes<struct AdbcConnection>;
-
-    ERL_NIF_TERM error{};
-    res_type * connection = res_type::get_resource(env, argv[0], error);
-    if (connection == nullptr) {
-        return error;
-    }
-
-    std::string key;
-    double value;
-    if (!erlang::nif::get(env, argv[1], key)) {
-        return enif_make_badarg(env);
-    }
-    if (!erlang::nif::get(env, argv[2], &value)) {
-        return enif_make_badarg(env);
-    }
-
-    struct AdbcError adbc_error{};
-    AdbcStatusCode code = AdbcConnectionSetOptionDouble(&connection->val, key.c_str(), value, &adbc_error);
-    if (code != ADBC_STATUS_OK) {
-        return nif_error_from_adbc_error(env, &adbc_error);
-    }
-
-    return erlang::nif::ok(env);
+    return adbc_set_option<struct AdbcConnection>(
+        env,
+        argv,
+        AdbcConnectionSetOption,
+        AdbcConnectionSetOptionBytes,
+        AdbcConnectionSetOptionInt,
+        AdbcConnectionSetOptionDouble
+    );
 }
 
 static ERL_NIF_TERM adbc_connection_init(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
@@ -1847,238 +1554,25 @@ static ERL_NIF_TERM adbc_statement_new(ErlNifEnv *env, int argc, const ERL_NIF_T
 }
 
 static ERL_NIF_TERM adbc_statement_get_option(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
-    using res_type = NifRes<struct AdbcStatement>;
-
-    ERL_NIF_TERM error{};
-    res_type * statement = res_type::get_resource(env, argv[0], error);
-    if (statement == nullptr) {
-        return error;
-    }
-
-    std::string key;
-    if (!erlang::nif::get(env, argv[1], key)) {
-        return enif_make_badarg(env);
-    }
-
-    struct AdbcError adbc_error{};
-    char value[64] = {'\0'};
-    constexpr size_t value_buffer_size = sizeof(value) / sizeof(value[0]);
-    size_t value_len = value_buffer_size;
-    AdbcStatusCode code = AdbcStatementGetOption(&statement->val, key.c_str(), value, &value_len, &adbc_error);
-    if (code != ADBC_STATUS_OK) {
-        return nif_error_from_adbc_error(env, &adbc_error);
-    }
-    if (value_len > value_buffer_size) {
-        char * out_value = (char *)enif_alloc(sizeof(char) * (value_len + 1));
-        memset(out_value, 0, sizeof(char) * (value_len + 1));
-        value_len += 1;
-        code = AdbcStatementGetOption(&statement->val, key.c_str(), out_value, &value_len, &adbc_error);
-        if (code != ADBC_STATUS_OK) {
-            return nif_error_from_adbc_error(env, &adbc_error);
-        }
-        // minus 1 to remove the null terminator
-        ERL_NIF_TERM ret = erlang::nif::make_binary(env, out_value, value_len - 1);
-        enif_free(out_value);
-        return erlang::nif::ok(env, ret);
-    } else {
-        // minus 1 to remove the null terminator
-        return erlang::nif::ok(env, erlang::nif::make_binary(env, value, value_len - 1));
-    }
-}
-
-static ERL_NIF_TERM adbc_statement_get_option_bytes(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
-    using res_type = NifRes<struct AdbcStatement>;
-
-    ERL_NIF_TERM error{};
-    res_type * statement = nullptr;
-    if ((statement = res_type::get_resource(env, argv[0], error)) == nullptr) {
-        return error;
-    }
-
-    std::string key;
-    if (!erlang::nif::get(env, argv[1], key)) {
-        return enif_make_badarg(env);
-    }
-
-    struct AdbcError adbc_error{};
-    uint8_t value[64] = {'\0'};
-    constexpr size_t value_buffer_size = sizeof(value) / sizeof(value[0]);
-    size_t value_len = value_buffer_size;
-    AdbcStatusCode code = AdbcStatementGetOptionBytes(&statement->val, key.c_str(), value, &value_len, &adbc_error);
-    if (code != ADBC_STATUS_OK) {
-        return nif_error_from_adbc_error(env, &adbc_error);
-    }
-    if (value_len > value_buffer_size) {
-        uint8_t * out_value = (uint8_t *)enif_alloc(sizeof(uint8_t) * (value_len + 1));
-        if (!out_value) {
-            return erlang::nif::error(env, "out of memory");
-        }
-        memset(out_value, 0, sizeof(uint8_t) * (value_len + 1));
-        value_len += 1;
-        code = AdbcStatementGetOptionBytes(&statement->val, key.c_str(), out_value, &value_len, &adbc_error);
-        if (code != ADBC_STATUS_OK) {
-            return nif_error_from_adbc_error(env, &adbc_error);
-        }
-        ERL_NIF_TERM ret = erlang::nif::make_binary(env, (const char *)out_value, value_len);
-        enif_free(out_value);
-        return erlang::nif::ok(env, ret);
-    } else {
-        return erlang::nif::ok(env, erlang::nif::make_binary(env, (const char *)value, value_len));
-    }
-}
-
-static ERL_NIF_TERM adbc_statement_get_option_int(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
-    using res_type = NifRes<struct AdbcStatement>;
-
-    ERL_NIF_TERM error{};
-    res_type * statement = nullptr;
-    if ((statement = res_type::get_resource(env, argv[0], error)) == nullptr) {
-        return error;
-    }
-
-    std::string key;
-    if (!erlang::nif::get(env, argv[1], key)) {
-        return enif_make_badarg(env);
-    }
-
-    struct AdbcError adbc_error{};
-    int64_t value = 0;
-    AdbcStatusCode code = AdbcStatementGetOptionInt(&statement->val, key.c_str(), &value, &adbc_error);
-    if (code != ADBC_STATUS_OK) {
-        return nif_error_from_adbc_error(env, &adbc_error);
-    }
-
-    return erlang::nif::ok(env, erlang::nif::make(env, value));
-}
-
-static ERL_NIF_TERM adbc_statement_get_option_double(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
-    using res_type = NifRes<struct AdbcStatement>;
-
-    ERL_NIF_TERM error{};
-    res_type * statement = nullptr;
-    if ((statement = res_type::get_resource(env, argv[0], error)) == nullptr) {
-        return error;
-    }
-
-    std::string key;
-    if (!erlang::nif::get(env, argv[1], key)) {
-        return enif_make_badarg(env);
-    }
-
-    struct AdbcError adbc_error{};
-    double value = 0;
-    AdbcStatusCode code = AdbcStatementGetOptionDouble(&statement->val, key.c_str(), &value, &adbc_error);
-    if (code != ADBC_STATUS_OK) {
-        return nif_error_from_adbc_error(env, &adbc_error);
-    }
-
-    return erlang::nif::ok(env, erlang::nif::make(env, value));
+    return adbc_get_option<struct AdbcStatement>(
+        env,
+        argv,
+        AdbcStatementGetOption,
+        AdbcStatementGetOptionBytes,
+        AdbcStatementGetOptionInt,
+        AdbcStatementGetOptionDouble
+    );
 }
 
 static ERL_NIF_TERM adbc_statement_set_option(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
-    using res_type = NifRes<struct AdbcStatement>;
-
-    ERL_NIF_TERM error{};
-    res_type * statement = res_type::get_resource(env, argv[0], error);
-    if (statement == nullptr) {
-        return error;
-    }
-
-    std::string key, value;
-    if (!erlang::nif::get(env, argv[1], key)) {
-        return enif_make_badarg(env);
-    }
-    if (!erlang::nif::get(env, argv[2], value)) {
-        return enif_make_badarg(env);
-    }
-
-    struct AdbcError adbc_error{};
-    AdbcStatusCode code = AdbcStatementSetOption(&statement->val, key.c_str(), value.c_str(), &adbc_error);
-    if (code != ADBC_STATUS_OK) {
-        return nif_error_from_adbc_error(env, &adbc_error);
-    }
-
-    return erlang::nif::ok(env);
-}
-
-static ERL_NIF_TERM adbc_statement_set_option_bytes(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
-    using res_type = NifRes<struct AdbcStatement>;
-
-    ERL_NIF_TERM error{};
-    res_type * statement = res_type::get_resource(env, argv[0], error);
-    if (statement == nullptr) {
-        return error;
-    }
-
-    std::string key, value;
-    if (!erlang::nif::get(env, argv[1], key)) {
-        return enif_make_badarg(env);
-    }
-    if (!erlang::nif::get(env, argv[2], value)) {
-        return enif_make_badarg(env);
-    }
-
-    struct AdbcError adbc_error{};
-    AdbcStatusCode code = AdbcStatementSetOptionBytes(&statement->val, key.c_str(), (const uint8_t *)value.data(), value.length(), &adbc_error);
-    if (code != ADBC_STATUS_OK) {
-        return nif_error_from_adbc_error(env, &adbc_error);
-    }
-
-    return erlang::nif::ok(env);
-}
-
-static ERL_NIF_TERM adbc_statement_set_option_int(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
-    using res_type = NifRes<struct AdbcStatement>;
-
-    ERL_NIF_TERM error{};
-    res_type * statement = res_type::get_resource(env, argv[0], error);
-    if (statement == nullptr) {
-        return error;
-    }
-
-    std::string key;
-    int64_t value;
-    if (!erlang::nif::get(env, argv[1], key)) {
-        return enif_make_badarg(env);
-    }
-    if (!erlang::nif::get(env, argv[2], &value)) {
-        return enif_make_badarg(env);
-    }
-
-    struct AdbcError adbc_error{};
-    AdbcStatusCode code = AdbcStatementSetOptionInt(&statement->val, key.c_str(), value, &adbc_error);
-    if (code != ADBC_STATUS_OK) {
-        return nif_error_from_adbc_error(env, &adbc_error);
-    }
-    
-    return erlang::nif::ok(env);
-}
-
-static ERL_NIF_TERM adbc_statement_set_option_double(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
-    using res_type = NifRes<struct AdbcStatement>;
-
-    ERL_NIF_TERM error{};
-    res_type * statement = res_type::get_resource(env, argv[0], error);
-    if (statement == nullptr) {
-        return error;
-    }
-
-    std::string key;
-    double value;
-    if (!erlang::nif::get(env, argv[1], key)) {
-        return enif_make_badarg(env);
-    }
-    if (!erlang::nif::get(env, argv[2], &value)) {
-        return enif_make_badarg(env);
-    }
-
-    struct AdbcError adbc_error{};
-    AdbcStatusCode code = AdbcStatementSetOptionDouble(&statement->val, key.c_str(), value, &adbc_error);
-    if (code != ADBC_STATUS_OK) {
-        return nif_error_from_adbc_error(env, &adbc_error);
-    }
-
-    return erlang::nif::ok(env);
+    return adbc_set_option<struct AdbcStatement>(
+        env,
+        argv,
+        AdbcStatementSetOption,
+        AdbcStatementSetOptionBytes,
+        AdbcStatementSetOptionInt,
+        AdbcStatementSetOptionDouble
+    );
 }
 
 static ERL_NIF_TERM adbc_statement_execute_query(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
@@ -2365,39 +1859,21 @@ static int on_upgrade(ErlNifEnv *, void **, void **, ERL_NIF_TERM) {
 
 static ErlNifFunc nif_functions[] = {
     {"adbc_database_new", 0, adbc_database_new, 0},
-    {"adbc_database_get_option", 2, adbc_database_get_option, 0},
-    {"adbc_database_get_option_bytes", 2, adbc_database_get_option_bytes, 0},
-    {"adbc_database_get_option_int", 2, adbc_database_get_option_int, 0},
-    {"adbc_database_get_option_double", 2, adbc_database_get_option_double, 0},
-    {"adbc_database_set_option", 3, adbc_database_set_option, 0},
-    {"adbc_database_set_option_bytes", 3, adbc_database_set_option_bytes, 0},
-    {"adbc_database_set_option_int", 3, adbc_database_set_option_int, 0},
-    {"adbc_database_set_option_double", 3, adbc_database_set_option_double, 0},
+    {"adbc_database_get_option", 3, adbc_database_get_option, 0},
+    {"adbc_database_set_option", 4, adbc_database_set_option, 0},
     {"adbc_database_init", 1, adbc_database_init, 0},
 
     {"adbc_connection_new", 0, adbc_connection_new, 0},
-    {"adbc_connection_get_option", 2, adbc_connection_get_option, 0},
-    {"adbc_connection_get_option_bytes", 2, adbc_connection_get_option_bytes, 0},
-    {"adbc_connection_get_option_int", 2, adbc_connection_get_option_int, 0},
-    {"adbc_connection_get_option_double", 2, adbc_connection_get_option_double, 0},
-    {"adbc_connection_set_option", 3, adbc_connection_set_option, 0},
-    {"adbc_connection_set_option_bytes", 3, adbc_connection_set_option_bytes, 0},
-    {"adbc_connection_set_option_int", 3, adbc_connection_set_option_int, 0},
-    {"adbc_connection_set_option_double", 3, adbc_connection_set_option_double, 0},
+    {"adbc_connection_get_option", 3, adbc_connection_get_option, 0},
+    {"adbc_connection_set_option", 4, adbc_connection_set_option, 0},
     {"adbc_connection_init", 2, adbc_connection_init, 0},
     {"adbc_connection_get_info", 2, adbc_connection_get_info, 0},
     {"adbc_connection_get_objects", 7, adbc_connection_get_objects, 0},
     {"adbc_connection_get_table_types", 1, adbc_connection_get_table_types, 0},
 
     {"adbc_statement_new", 1, adbc_statement_new, 0},
-    {"adbc_statement_get_option", 2, adbc_statement_get_option, 0},
-    {"adbc_statement_get_option_bytes", 2, adbc_statement_get_option_bytes, 0},
-    {"adbc_statement_get_option_int", 2, adbc_statement_get_option_int, 0},
-    {"adbc_statement_get_option_double", 2, adbc_statement_get_option_double, 0},
-    {"adbc_statement_set_option", 3, adbc_statement_set_option, 0},
-    {"adbc_statement_set_option_bytes", 3, adbc_statement_set_option_bytes, 0},
-    {"adbc_statement_set_option_int", 3, adbc_statement_set_option_int, 0},
-    {"adbc_statement_set_option_double", 3, adbc_statement_set_option_double, 0},
+    {"adbc_statement_get_option", 3, adbc_statement_get_option, 0},
+    {"adbc_statement_set_option", 4, adbc_statement_set_option, 0},
     {"adbc_statement_execute_query", 1, adbc_statement_execute_query, 0},
     {"adbc_statement_prepare", 1, adbc_statement_prepare, 0},
     {"adbc_statement_set_sql_query", 2, adbc_statement_set_sql_query, 0},

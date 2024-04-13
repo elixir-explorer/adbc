@@ -60,13 +60,7 @@ defmodule Adbc.Connection do
   """
   @spec get_string_option(pid(), atom() | String.t()) :: {:ok, String.t()} | {:error, String.t()}
   def get_string_option(conn, key) when is_pid(conn) do
-    case GenServer.call(conn, {:get_option, to_string(key)}) do
-      {:ok, value} ->
-        {:ok, value}
-
-      {:error, reason} ->
-        {:error, error_to_exception(reason)}
-    end
+    Adbc.Helper.option(conn, :adbc_connection_get_option, [:string, to_string(key)])
   end
 
   @doc """
@@ -74,13 +68,7 @@ defmodule Adbc.Connection do
   """
   @spec get_binary_option(pid(), atom() | String.t()) :: {:ok, binary()} | {:error, String.t()}
   def get_binary_option(conn, key) when is_pid(conn) do
-    case GenServer.call(conn, {:get_option, :bytes, to_string(key)}) do
-      {:ok, value} ->
-        {:ok, value}
-
-      {:error, reason} ->
-        {:error, error_to_exception(reason)}
-    end
+    Adbc.Helper.option(conn, :adbc_connection_get_option, [:binary, to_string(key)])
   end
 
   @doc """
@@ -88,13 +76,7 @@ defmodule Adbc.Connection do
   """
   @spec get_integer_option(pid(), atom() | String.t()) :: {:ok, integer()} | {:error, String.t()}
   def get_integer_option(conn, key) when is_pid(conn) do
-    case GenServer.call(conn, {:get_option, :int, to_string(key)}) do
-      {:ok, value} ->
-        {:ok, value}
-
-      {:error, reason} ->
-        {:error, error_to_exception(reason)}
-    end
+    Adbc.Helper.option(conn, :adbc_connection_get_option, [:integer, to_string(key)])
   end
 
   @doc """
@@ -102,114 +84,70 @@ defmodule Adbc.Connection do
   """
   @spec get_float_option(pid(), atom() | String.t()) :: {:ok, float()} | {:error, String.t()}
   def get_float_option(conn, key) when is_pid(conn) do
-    case GenServer.call(conn, {:get_option, :double, to_string(key)}) do
-      {:ok, value} ->
-        {:ok, value}
-
-      {:error, reason} ->
-        {:error, error_to_exception(reason)}
-    end
+    Adbc.Helper.option(conn, :adbc_connection_get_option, [:float, to_string(key)])
   end
 
   @doc """
   Set option for the connection.
 
   - If `value` is an atom or a string, then corresponding string option will be set.
-  - If `value` is a `{:byte, binary()}`-tuple, then corresponding binary option will be set.
+  - If `value` is a `{:binary, binary()}`-tuple, then corresponding binary option will be set.
   - If `value` is an integer, then corresponding integer option will be set.
   - If `value` is a float, then corresponding float option will be set.
   """
   @spec set_option(
           pid(),
           atom() | String.t(),
-          atom() | {:bytes, binary()} | String.t() | number()
+          atom() | {:binary, binary()} | String.t() | number()
         ) ::
           :ok | {:error, String.t()}
-  def set_option(conn, key, value) when is_pid(conn) do
-    case GenServer.call(conn, {:set_option, to_string(key), value}) do
-      :ok ->
-        :ok
+  def set_option(conn, key, value)
 
-      {:error, reason} ->
-        {:error, error_to_exception(reason)}
-    end
+  def set_option(conn, key, value) when is_pid(conn) and (is_atom(value) or is_binary(value)) do
+    Adbc.Helper.option(conn, :adbc_connection_set_option, [:string, key, value])
   end
 
-  @doc """
-  Set a string type option for the connection.
-  """
-  @spec set_string_option(pid(), atom() | String.t(), term()) ::
-          :ok | {:error, String.t()}
-  def set_string_option(conn, key, value) when is_pid(conn) do
-    case GenServer.call(conn, {:set_option, to_string(key), to_string(value)}) do
-      :ok ->
-        :ok
-
-      {:error, reason} ->
-        {:error, error_to_exception(reason)}
-    end
+  def set_option(conn, key, {:binary, value}) when is_pid(conn) and is_binary(value) do
+    Adbc.Helper.option(conn, :adbc_connection_set_option, [:binary, key, value])
   end
 
-  @doc """
-  Set a binary type option for the connection.
-  """
-  @spec set_binary_option(pid(), atom() | String.t(), binary()) ::
-          :ok | {:error, String.t()}
-  def set_binary_option(conn, key, value) when is_pid(conn) and is_binary(value) do
-    case GenServer.call(conn, {:set_option, to_string(key), {:bytes, value}}) do
-      :ok ->
-        :ok
-
-      {:error, reason} ->
-        {:error, error_to_exception(reason)}
-    end
+  def set_option(conn, key, value) when is_pid(conn) and is_integer(value) do
+    Adbc.Helper.option(conn, :adbc_connection_set_option, [:integer, key, value])
   end
 
-  @doc """
-  Set an integer type option for the connection.
-  """
-  @spec set_integer_option(pid(), atom() | String.t(), integer()) ::
-          :ok | {:error, String.t()}
-  def set_integer_option(conn, key, value) when is_pid(conn) and is_integer(value) do
-    case GenServer.call(conn, {:set_option, to_string(key), value}) do
-      :ok ->
-        :ok
-
-      {:error, reason} ->
-        {:error, error_to_exception(reason)}
-    end
-  end
-
-  @doc """
-  Set a float type option for the connection.
-  """
-  @spec set_float_option(pid(), atom() | String.t(), float()) ::
-          :ok | {:error, String.t()}
-  def set_float_option(conn, key, value) when is_pid(conn) and is_float(value) do
-    case GenServer.call(conn, {:set_option, to_string(key), value}) do
-      :ok ->
-        :ok
-
-      {:error, reason} ->
-        {:error, error_to_exception(reason)}
-    end
+  def set_option(conn, key, value) when is_pid(conn) and is_float(value) do
+    Adbc.Helper.option(conn, :adbc_connection_set_option, [:float, key, value])
   end
 
   defp init_options(ref, opts) do
-    Enum.reduce_while(opts, :ok, fn {key, value}, :ok ->
-      case Adbc.Helper.set_option(:connection, ref, key, value) do
-        :ok -> {:cont, :ok}
-        {:error, _} = error -> {:halt, error}
-      end
+    Enum.reduce_while(opts, :ok, fn
+      {key, value}, :ok when is_atom(value) or is_binary(value) ->
+        Adbc.Helper.option_ok_or_halt(ref, :adbc_connection_set_option, [:string, key, value])
+
+      {key, {:binary, value}}, :ok when is_binary(value) ->
+        Adbc.Helper.option_ok_or_halt(ref, :adbc_connection_set_option, [:binary, key, value])
+
+      {key, value}, :ok when is_integer(value) ->
+        Adbc.Helper.option_ok_or_halt(ref, :adbc_connection_set_option, [:integer, key, value])
+
+      {key, value}, :ok when is_float(value) ->
+        Adbc.Helper.option_ok_or_halt(ref, :adbc_connection_set_option, [:float, key, value])
     end)
   end
 
   defp init_statement_options(ref, opts) do
-    Enum.reduce_while(opts, :ok, fn {key, value}, :ok ->
-      case Adbc.Helper.set_option(:statement, ref, key, value) do
-        :ok -> {:cont, :ok}
-        {:error, _} = error -> {:halt, error}
-      end
+    Enum.reduce_while(opts, :ok, fn
+      {key, value}, :ok when is_atom(value) or is_binary(value) ->
+        Adbc.Helper.option_ok_or_halt(ref, :adbc_statement_set_option, [:string, key, value])
+
+      {key, {:binary, value}}, :ok when is_binary(value) ->
+        Adbc.Helper.option_ok_or_halt(ref, :adbc_statement_set_option, [:binary, key, value])
+
+      {key, value}, :ok when is_integer(value) ->
+        Adbc.Helper.option_ok_or_halt(ref, :adbc_statement_set_option, [:integer, key, value])
+
+      {key, value}, :ok when is_float(value) ->
+        Adbc.Helper.option_ok_or_halt(ref, :adbc_statement_set_option, [:float, key, value])
     end)
   end
 
@@ -515,12 +453,8 @@ defmodule Adbc.Connection do
     {:noreply, maybe_dequeue(state)}
   end
 
-  def handle_call({:get_option, option_type, key}, _from, state = %{conn: conn}) do
-    {:reply, Adbc.Helper.get_option(:connection, option_type, conn, key), state}
-  end
-
-  def handle_call({:set_option, key, value}, _from, state = %{conn: conn}) do
-    {:reply, Adbc.Helper.set_option(:connection, conn, key, value), state}
+  def handle_call({:option, func, args}, _from, state = %{conn: conn}) do
+    {:reply, Adbc.Helper.option(conn, func, args), state}
   end
 
   @impl true

@@ -14,107 +14,32 @@ defmodule Adbc.Helper do
     Adbc.Error.exception(message: message, vendor_code: vendor_code, state: state)
   end
 
-  def get_option(type, :string, ref, key) do
-    case type do
-      :statement ->
-        Adbc.Nif.adbc_statement_get_option(ref, to_string(key))
+  def error_to_exception(%Adbc.Error{} = exception) do
+    exception
+  end
 
-      :connection ->
-        Adbc.Nif.adbc_connection_get_option(ref, to_string(key))
+  def option(callee, func, args)
 
-      :database ->
-        Adbc.Nif.adbc_database_get_option(ref, to_string(key))
+  def option(pid, func, args) when is_pid(pid) do
+    case GenServer.call(pid, {:option, func, args}) do
+      :ok ->
+        :ok
+
+      {:error, reason} ->
+        {:error, error_to_exception(reason)}
     end
   end
 
-  def get_option(type, :bytes, ref, key) do
-    case type do
-      :statement ->
-        Adbc.Nif.adbc_statement_get_option_bytes(ref, to_string(key))
-
-      :connection ->
-        Adbc.Nif.adbc_connection_get_option_bytes(ref, to_string(key))
-
-      :database ->
-        Adbc.Nif.adbc_database_get_option_bytes(ref, to_string(key))
+  def option(ref, func, [type, key | args]) when is_reference(ref) do
+    with {:error, reason} <- apply(Adbc.Nif, func, [ref, type, to_string(key) | args]) do
+      {:error, error_to_exception(reason)}
     end
   end
 
-  def get_option(type, :int, ref, key) do
-    case type do
-      :statement ->
-        Adbc.Nif.adbc_statement_get_option_int(ref, to_string(key))
-
-      :connection ->
-        Adbc.Nif.adbc_connection_get_option_int(ref, to_string(key))
-
-      :database ->
-        Adbc.Nif.adbc_database_get_option_int(ref, to_string(key))
-    end
-  end
-
-  def get_option(type, :double, ref, key) do
-    case type do
-      :statement ->
-        Adbc.Nif.adbc_statement_get_option_double(ref, to_string(key))
-
-      :connection ->
-        Adbc.Nif.adbc_connection_get_option_double(ref, to_string(key))
-
-      :database ->
-        Adbc.Nif.adbc_database_get_option_double(ref, to_string(key))
-    end
-  end
-
-  def set_option(type, ref, key, value) when is_binary(value) or is_atom(value) do
-    case type do
-      :statement ->
-        Adbc.Nif.adbc_statement_set_option(ref, to_string(key), to_string(value))
-
-      :connection ->
-        Adbc.Nif.adbc_connection_set_option(ref, to_string(key), to_string(value))
-
-      :database ->
-        Adbc.Nif.adbc_database_set_option(ref, to_string(key), to_string(value))
-    end
-  end
-
-  def set_option(type, ref, key, {:bytes, value}) when is_binary(value) do
-    case type do
-      :statement ->
-        Adbc.Nif.adbc_statement_set_option_bytes(ref, to_string(key), value)
-
-      :connection ->
-        Adbc.Nif.adbc_connection_set_option_bytes(ref, to_string(key), value)
-
-      :database ->
-        Adbc.Nif.adbc_database_set_option_bytes(ref, to_string(key), value)
-    end
-  end
-
-  def set_option(type, ref, key, value) when is_integer(value) do
-    case type do
-      :statement ->
-        Adbc.Nif.adbc_statement_set_option_int(ref, to_string(key), value)
-
-      :connection ->
-        Adbc.Nif.adbc_connection_set_option_int(ref, to_string(key), value)
-
-      :database ->
-        Adbc.Nif.adbc_database_set_option_int(ref, to_string(key), value)
-    end
-  end
-
-  def set_option(type, ref, key, value) when is_float(value) do
-    case type do
-      :statement ->
-        Adbc.Nif.adbc_statement_set_option_double(ref, to_string(key), value)
-
-      :connection ->
-        Adbc.Nif.adbc_connection_set_option_double(ref, to_string(key), value)
-
-      :database ->
-        Adbc.Nif.adbc_database_set_option_double(ref, to_string(key), value)
+  def option_ok_or_halt(callee, func, args) do
+    case option(callee, func, args) do
+      :ok -> {:cont, :ok}
+      {:error, _} = error -> {:halt, error}
     end
   end
 

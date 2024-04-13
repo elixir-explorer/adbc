@@ -222,12 +222,8 @@ defmodule Adbc.Database do
     end
   end
 
-  def handle_call({:get_option, option_type, key}, _from, {driver, db}) do
-    {:reply, Adbc.Helper.get_option(:database, option_type, db, key), {driver, db}}
-  end
-
-  def handle_call({:set_option, key, value}, _from, {driver, db}) do
-    {:reply, Adbc.Helper.set_option(:database, db, key, value), {driver, db}}
+  def handle_call({:option, func, args}, _from, {driver, db}) do
+    {:reply, Adbc.Helper.option(db, func, args), {driver, db}}
   end
 
   @impl true
@@ -235,17 +231,24 @@ defmodule Adbc.Database do
 
   defp init_driver(ref, driver) do
     case Adbc.Driver.so_path(driver) do
-      {:ok, path} -> Adbc.Helper.set_option(:database, ref, "driver", path)
+      {:ok, path} -> Adbc.Helper.option(ref, :adbc_database_set_option, [:string, "driver", path])
       {:error, reason} -> {:error, reason}
     end
   end
 
   defp init_options(ref, opts) do
-    Enum.reduce_while(opts, :ok, fn {key, value}, :ok ->
-      case Adbc.Helper.set_option(:database, ref, key, value) do
-        :ok -> {:cont, :ok}
-        {:error, _} = error -> {:halt, error}
-      end
+    Enum.reduce_while(opts, :ok, fn
+      {key, value}, :ok when is_binary(value) or is_atom(value) ->
+        Adbc.Helper.option_ok_or_halt(ref, :adbc_database_set_option, [:string, key, value])
+
+      {key, {:binary, value}}, :ok when is_binary(value) ->
+        Adbc.Helper.option_ok_or_halt(ref, :adbc_database_set_option, [:binary, key, value])
+
+      {key, value}, :ok when is_integer(value) ->
+        Adbc.Helper.option_ok_or_halt(ref, :adbc_database_set_option, [:integer, key, value])
+
+      {key, value}, :ok when is_float(value) ->
+        Adbc.Helper.option_ok_or_halt(ref, :adbc_database_set_option, [:float, key, value])
     end)
   end
 end

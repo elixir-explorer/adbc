@@ -235,7 +235,7 @@ defmodule Adbc.Connection.Test do
       conn = start_supervised!({Connection, database: db})
 
       assert %Adbc.Result{data: %{"num" => [123], "bool" => [1]}} ==
-               Connection.query_with_options!(conn, "SELECT 123 as num, true as bool",
+               Connection.query!(conn, "SELECT 123 as num, true as bool", [],
                  "adbc.sqlite.query.batch_rows": 1
                )
     end
@@ -244,7 +244,7 @@ defmodule Adbc.Connection.Test do
       conn = start_supervised!({Connection, database: db})
 
       assert %Adbc.Result{data: %{"num" => [579]}} ==
-               Connection.query_with_options!(conn, "SELECT 123 + ? as num", [456],
+               Connection.query!(conn, "SELECT 123 + ? as num", [456],
                  "adbc.sqlite.query.batch_rows": 10
                )
     end
@@ -253,7 +253,7 @@ defmodule Adbc.Connection.Test do
       conn = start_supervised!({Connection, database: db})
 
       assert {:error, %Adbc.Error{} = error} =
-               Connection.query_with_options(conn, "SELECT 123 as num", foo: 1)
+               Connection.query(conn, "SELECT 123 as num", [], foo: 1)
 
       assert Exception.message(error) == "[SQLite] Unknown statement option foo=1"
     end
@@ -262,7 +262,7 @@ defmodule Adbc.Connection.Test do
       conn = start_supervised!({Connection, database: db})
 
       assert {:error, %Adbc.Error{} = error} =
-               Connection.query_with_options(conn, "SELECT 123 as num, true as bool",
+               Connection.query(conn, "SELECT 123 as num, true as bool", [],
                  "adbc.sqlite.query.batch_rows": 0
                )
 

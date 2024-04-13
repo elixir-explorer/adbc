@@ -152,45 +152,24 @@ defmodule Adbc.Connection do
   end
 
   @doc """
-  Runs the given `query` with `params`.
+  Runs the given `query` with `params` and `statement_options`.
   """
-  @spec query(t(), binary | reference, [term]) :: {:ok, result_set} | {:error, Exception.t()}
-  def query(conn, query, params \\ [])
-      when (is_binary(query) or is_reference(query)) and is_list(params) do
-    stream(conn, {:query, query, params}, &stream_results/2)
-  end
-
-  @doc """
-  Same as `query/3` but raises an exception on error.
-  """
-  @spec query!(t(), binary | reference, [term]) :: result_set
-  def query!(conn, query, params \\ [])
-      when (is_binary(query) or is_reference(query)) and is_list(params) do
-    case query(conn, query, params) do
-      {:ok, result} -> result
-      {:error, reason} -> raise reason
-    end
-  end
-
-  @doc """
-  Runs the given `query` with `params`.
-  """
-  @spec query_with_options(t(), binary | reference, [term], Keyword.t()) ::
+  @spec query(t(), binary | reference, [term], Keyword.t()) ::
           {:ok, result_set} | {:error, Exception.t()}
-  def query_with_options(conn, query, params \\ [], statement_options)
+  def query(conn, query, params \\ [], statement_options \\ [])
       when (is_binary(query) or is_reference(query)) and is_list(params) and
              is_list(statement_options) do
     stream(conn, {:query, query, params, statement_options}, &stream_results/2)
   end
 
   @doc """
-  Same as `query_with_options/4` but raises an exception on error.
+  Same as `query/4` but raises an exception on error.
   """
-  @spec query_with_options!(t(), binary | reference, [term], Keyword.t()) :: result_set
-  def query_with_options!(conn, query, params \\ [], statement_options)
+  @spec query!(t(), binary | reference, [term], Keyword.t()) :: result_set
+  def query!(conn, query, params \\ [], statement_options \\ [])
       when (is_binary(query) or is_reference(query)) and is_list(params) and
              is_list(statement_options) do
-    case query_with_options(conn, query, params, statement_options) do
+    case query(conn, query, params, statement_options) do
       {:ok, result} -> result
       {:error, reason} -> raise reason
     end

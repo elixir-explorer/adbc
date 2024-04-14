@@ -1037,7 +1037,7 @@ static ERL_NIF_TERM adbc_get_option(ErlNifEnv *env, const ERL_NIF_TERM argv[], G
     }
 
     std::string type, key;
-    if (!erlang::nif::get(env, argv[1], type)) {
+    if (!erlang::nif::get_atom(env, argv[1], type)) {
         return enif_make_badarg(env);
     }
     if (!erlang::nif::get(env, argv[2], key)) {

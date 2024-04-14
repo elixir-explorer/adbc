@@ -33,4 +33,18 @@ defmodule Adbc.DatabaseTest do
       assert Exception.message(error) == "[SQLite] Unknown database option who_knows=123"
     end
   end
+
+  describe "get/set options" do
+    test "get non-existed option" do
+      {:ok, pid} = Database.start_link(driver: :sqlite)
+      assert {:error, %Adbc.Error{} = error} = Database.get_string_option(pid, "foo")
+      assert Exception.message(error) == "Unknown option"
+    end
+
+    test "set non-existed option" do
+      {:ok, pid} = Database.start_link(driver: :sqlite)
+      assert {:error, %Adbc.Error{} = error} = Database.set_option(pid, "foo", "bar")
+      assert Exception.message(error) == "[SQLite] Unknown database option foo='bar'"
+    end
+  end
 end

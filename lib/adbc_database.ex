@@ -64,13 +64,7 @@ defmodule Adbc.Database do
   """
   @spec get_string_option(pid(), atom() | String.t()) :: {:ok, String.t()} | {:error, String.t()}
   def get_string_option(db, key) when is_pid(db) do
-    case GenServer.call(db, {:get_option, :string, to_string(key)}) do
-      {:ok, value} ->
-        {:ok, value}
-
-      {:error, reason} ->
-        {:error, error_to_exception(reason)}
-    end
+    Adbc.Helper.option(db, :adbc_database_get_option, [:string, to_string(key)])
   end
 
   @doc """
@@ -78,13 +72,7 @@ defmodule Adbc.Database do
   """
   @spec get_binary_option(pid(), atom() | String.t()) :: {:ok, binary()} | {:error, String.t()}
   def get_binary_option(db, key) when is_pid(db) do
-    case GenServer.call(db, {:get_option, :bytes, to_string(key)}) do
-      {:ok, value} ->
-        {:ok, value}
-
-      {:error, reason} ->
-        {:error, error_to_exception(reason)}
-    end
+    Adbc.Helper.option(db, :adbc_database_get_option, [:binary, to_string(key)])
   end
 
   @doc """
@@ -92,13 +80,7 @@ defmodule Adbc.Database do
   """
   @spec get_integer_option(pid(), atom() | String.t()) :: {:ok, integer()} | {:error, String.t()}
   def get_integer_option(db, key) when is_pid(db) do
-    case GenServer.call(db, {:get_option, :int, to_string(key)}) do
-      {:ok, value} ->
-        {:ok, value}
-
-      {:error, reason} ->
-        {:error, error_to_exception(reason)}
-    end
+    Adbc.Helper.option(db, :adbc_database_get_option, [:integer, to_string(key)])
   end
 
   @doc """
@@ -106,97 +88,39 @@ defmodule Adbc.Database do
   """
   @spec get_float_option(pid(), atom() | String.t()) :: {:ok, float()} | {:error, String.t()}
   def get_float_option(db, key) when is_pid(db) do
-    case GenServer.call(db, {:get_option, :double, to_string(key)}) do
-      {:ok, value} ->
-        {:ok, value}
-
-      {:error, reason} ->
-        {:error, error_to_exception(reason)}
-    end
+    Adbc.Helper.option(db, :adbc_database_get_option, [:float, to_string(key)])
   end
 
   @doc """
-  Set option for the database.
+  Set option for the connection.
 
   - If `value` is an atom or a string, then corresponding string option will be set.
-  - If `value` is a `{:byte, binary()}`-tuple, then corresponding binary option will be set.
+  - If `value` is a `{:binary, binary()}`-tuple, then corresponding binary option will be set.
   - If `value` is an integer, then corresponding integer option will be set.
   - If `value` is a float, then corresponding float option will be set.
   """
   @spec set_option(
           pid(),
           atom() | String.t(),
-          atom() | {:bytes, binary()} | String.t() | number()
+          atom() | {:binary, binary()} | String.t() | number()
         ) ::
           :ok | {:error, String.t()}
-  def set_option(db, key, value) when is_pid(db) do
-    case GenServer.call(db, {:set_option, to_string(key), value}) do
-      :ok ->
-        :ok
+  def set_option(conn, key, value)
 
-      {:error, reason} ->
-        {:error, error_to_exception(reason)}
-    end
+  def set_option(conn, key, value) when is_pid(conn) and (is_atom(value) or is_binary(value)) do
+    Adbc.Helper.option(conn, :adbc_database_set_option, [:string, key, value])
   end
 
-  @doc """
-  Set a string type option for the database.
-  """
-  @spec set_string_option(pid(), atom() | String.t(), term()) ::
-          :ok | {:error, String.t()}
-  def set_string_option(db, key, value) when is_pid(db) do
-    case GenServer.call(db, {:set_option, to_string(key), to_string(value)}) do
-      :ok ->
-        :ok
-
-      {:error, reason} ->
-        {:error, error_to_exception(reason)}
-    end
+  def set_option(conn, key, {:binary, value}) when is_pid(conn) and is_binary(value) do
+    Adbc.Helper.option(conn, :adbc_database_set_option, [:binary, key, value])
   end
 
-  @doc """
-  Set a binary type option for the database.
-  """
-  @spec set_binary_option(pid(), atom() | String.t(), binary()) ::
-          :ok | {:error, String.t()}
-  def set_binary_option(db, key, value) when is_pid(db) and is_binary(value) do
-    case GenServer.call(db, {:set_option, to_string(key), {:bytes, value}}) do
-      :ok ->
-        :ok
-
-      {:error, reason} ->
-        {:error, error_to_exception(reason)}
-    end
+  def set_option(conn, key, value) when is_pid(conn) and is_integer(value) do
+    Adbc.Helper.option(conn, :adbc_database_set_option, [:integer, key, value])
   end
 
-  @doc """
-  Set an integer type option for the database.
-  """
-  @spec set_integer_option(pid(), atom() | String.t(), integer()) ::
-          :ok | {:error, String.t()}
-  def set_integer_option(db, key, value) when is_pid(db) and is_integer(value) do
-    case GenServer.call(db, {:set_option, to_string(key), value}) do
-      :ok ->
-        :ok
-
-      {:error, reason} ->
-        {:error, error_to_exception(reason)}
-    end
-  end
-
-  @doc """
-  Set a float type option for the database.
-  """
-  @spec set_float_option(pid(), atom() | String.t(), float()) ::
-          :ok | {:error, String.t()}
-  def set_float_option(db, key, value) when is_pid(db) and is_float(value) do
-    case GenServer.call(db, {:set_option, to_string(key), value}) do
-      :ok ->
-        :ok
-
-      {:error, reason} ->
-        {:error, error_to_exception(reason)}
-    end
+  def set_option(conn, key, value) when is_pid(conn) and is_float(value) do
+    Adbc.Helper.option(conn, :adbc_database_set_option, [:float, key, value])
   end
 
   defp driver_default_options(:duckdb), do: [entrypoint: "duckdb_adbc_init"]

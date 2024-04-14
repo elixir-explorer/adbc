@@ -191,9 +191,10 @@ defmodule Adbc.Connection do
   the duration of the function. The function may call
   native code that consumes the ArrowStream accordingly.
   """
-  def query_pointer(conn, query, params \\ [], fun)
-      when (is_binary(query) or is_reference(query)) and is_list(params) and is_function(fun) do
-    stream(conn, {:query, query, params}, fn stream_ref, rows_affected ->
+  def query_pointer(conn, query, params \\ [], fun, statement_options \\ [])
+      when (is_binary(query) or is_reference(query)) and is_list(params) and is_function(fun) and
+             is_list(statement_options) do
+    stream(conn, {:query, query, params, statement_options}, fn stream_ref, rows_affected ->
       {:ok, fun.(Adbc.Nif.adbc_arrow_array_stream_get_pointer(stream_ref), rows_affected)}
     end)
   end
@@ -489,13 +490,6 @@ defmodule Adbc.Connection do
     end
   end
 
-  defp handle_stream({:query, query_or_prepared, params}, conn) do
-    with {:ok, stmt} <- ensure_statement(conn, query_or_prepared),
-         :ok <- maybe_bind(stmt, params) do
-      Adbc.Nif.adbc_statement_execute_query(stmt)
-    end
-  end
-
   defp handle_stream({:query, query_or_prepared, params, statement_options}, conn) do
     with {:ok, stmt} <- ensure_statement(conn, query_or_prepared, statement_options),
          :ok <- maybe_bind(stmt, params) do
@@ -508,8 +502,6 @@ defmodule Adbc.Connection do
       {:ok, stream_ref, -1}
     end
   end
-
-  defp ensure_statement(conn, query, statement_options \\ [])
 
   defp ensure_statement(conn, query, statement_options)
        when is_binary(query) and is_list(statement_options),

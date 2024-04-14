@@ -36,7 +36,7 @@ defmodule Adbc.Connection.Test do
 
       assert {:error, %Adbc.Error{} = error} = Connection.start_link(database: db, who_knows: 123)
 
-      assert Exception.message(error) == "[SQLite] Unknown connection option who_knows='123'"
+      assert Exception.message(error) == "[SQLite] Unknown connection option who_knows=123"
     end
   end
 
@@ -227,6 +227,47 @@ defmodule Adbc.Connection.Test do
       assert_raise Adbc.Error,
                    ~s([SQLite] Failed to prepare query: near "NOT": syntax error\nquery: NOT VALID SQL),
                    fn -> Connection.query!(conn, "NOT VALID SQL") end
+    end
+  end
+
+  describe "query with statement options" do
+    test "without parameters", %{db: db} do
+      conn = start_supervised!({Connection, database: db})
+
+      assert %Adbc.Result{data: %{"num" => [123], "bool" => [1]}} ==
+               Connection.query!(conn, "SELECT 123 as num, true as bool", [],
+                 "adbc.sqlite.query.batch_rows": 1
+               )
+    end
+
+    test "with parameters", %{db: db} do
+      conn = start_supervised!({Connection, database: db})
+
+      assert %Adbc.Result{data: %{"num" => [579]}} ==
+               Connection.query!(conn, "SELECT 123 + ? as num", [456],
+                 "adbc.sqlite.query.batch_rows": 10
+               )
+    end
+
+    test "invalid statement option key", %{db: db} do
+      conn = start_supervised!({Connection, database: db})
+
+      assert {:error, %Adbc.Error{} = error} =
+               Connection.query(conn, "SELECT 123 as num", [], foo: 1)
+
+      assert Exception.message(error) == "[SQLite] Unknown statement option foo=1"
+    end
+
+    test "invalid statement option value", %{db: db} do
+      conn = start_supervised!({Connection, database: db})
+
+      assert {:error, %Adbc.Error{} = error} =
+               Connection.query(conn, "SELECT 123 as num, true as bool", [],
+                 "adbc.sqlite.query.batch_rows": 0
+               )
+
+      assert Exception.message(error) ==
+               "[SQLite] Invalid statement option value adbc.sqlite.query.batch_rows=0 (value is non-positive or out of range of int)"
     end
   end
 

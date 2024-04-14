@@ -59,6 +59,70 @@ defmodule Adbc.Database do
     end
   end
 
+  @doc """
+  Get a string type option of the database.
+  """
+  @spec get_string_option(pid(), atom() | String.t()) :: {:ok, String.t()} | {:error, String.t()}
+  def get_string_option(db, key) when is_pid(db) do
+    Adbc.Helper.option(db, :adbc_database_get_option, [:string, to_string(key)])
+  end
+
+  @doc """
+  Get a binary (bytes) type option of the database.
+  """
+  @spec get_binary_option(pid(), atom() | String.t()) :: {:ok, binary()} | {:error, String.t()}
+  def get_binary_option(db, key) when is_pid(db) do
+    Adbc.Helper.option(db, :adbc_database_get_option, [:binary, to_string(key)])
+  end
+
+  @doc """
+  Get an integer type option of the database.
+  """
+  @spec get_integer_option(pid(), atom() | String.t()) :: {:ok, integer()} | {:error, String.t()}
+  def get_integer_option(db, key) when is_pid(db) do
+    Adbc.Helper.option(db, :adbc_database_get_option, [:integer, to_string(key)])
+  end
+
+  @doc """
+  Get a float type option of the database.
+  """
+  @spec get_float_option(pid(), atom() | String.t()) :: {:ok, float()} | {:error, String.t()}
+  def get_float_option(db, key) when is_pid(db) do
+    Adbc.Helper.option(db, :adbc_database_get_option, [:float, to_string(key)])
+  end
+
+  @doc """
+  Set option for the connection.
+
+  - If `value` is an atom or a string, then corresponding string option will be set.
+  - If `value` is a `{:binary, binary()}`-tuple, then corresponding binary option will be set.
+  - If `value` is an integer, then corresponding integer option will be set.
+  - If `value` is a float, then corresponding float option will be set.
+  """
+  @spec set_option(
+          pid(),
+          atom() | String.t(),
+          atom() | {:binary, binary()} | String.t() | number()
+        ) ::
+          :ok | {:error, String.t()}
+  def set_option(conn, key, value)
+
+  def set_option(conn, key, value) when is_pid(conn) and (is_atom(value) or is_binary(value)) do
+    Adbc.Helper.option(conn, :adbc_database_set_option, [:string, key, value])
+  end
+
+  def set_option(conn, key, {:binary, value}) when is_pid(conn) and is_binary(value) do
+    Adbc.Helper.option(conn, :adbc_database_set_option, [:binary, key, value])
+  end
+
+  def set_option(conn, key, value) when is_pid(conn) and is_integer(value) do
+    Adbc.Helper.option(conn, :adbc_database_set_option, [:integer, key, value])
+  end
+
+  def set_option(conn, key, value) when is_pid(conn) and is_float(value) do
+    Adbc.Helper.option(conn, :adbc_database_set_option, [:float, key, value])
+  end
+
   defp driver_default_options(:duckdb), do: [entrypoint: "duckdb_adbc_init"]
   defp driver_default_options(_), do: []
 
@@ -82,22 +146,33 @@ defmodule Adbc.Database do
     end
   end
 
+  def handle_call({:option, func, args}, _from, {driver, db}) do
+    {:reply, Adbc.Helper.option(db, func, args), {driver, db}}
+  end
+
   @impl true
   def handle_info(_msg, state), do: {:noreply, state}
 
   defp init_driver(ref, driver) do
     case Adbc.Driver.so_path(driver) do
-      {:ok, path} -> Adbc.Nif.adbc_database_set_option(ref, "driver", path)
+      {:ok, path} -> Adbc.Helper.option(ref, :adbc_database_set_option, [:string, "driver", path])
       {:error, reason} -> {:error, reason}
     end
   end
 
   defp init_options(ref, opts) do
-    Enum.reduce_while(opts, :ok, fn {key, value}, :ok ->
-      case Adbc.Nif.adbc_database_set_option(ref, to_string(key), to_string(value)) do
-        :ok -> {:cont, :ok}
-        {:error, _} = error -> {:halt, error}
-      end
+    Enum.reduce_while(opts, :ok, fn
+      {key, value}, :ok when is_binary(value) or is_atom(value) ->
+        Adbc.Helper.option_ok_or_halt(ref, :adbc_database_set_option, [:string, key, value])
+
+      {key, {:binary, value}}, :ok when is_binary(value) ->
+        Adbc.Helper.option_ok_or_halt(ref, :adbc_database_set_option, [:binary, key, value])
+
+      {key, value}, :ok when is_integer(value) ->
+        Adbc.Helper.option_ok_or_halt(ref, :adbc_database_set_option, [:integer, key, value])
+
+      {key, value}, :ok when is_float(value) ->
+        Adbc.Helper.option_ok_or_halt(ref, :adbc_database_set_option, [:float, key, value])
     end)
   end
 end

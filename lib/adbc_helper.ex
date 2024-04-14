@@ -14,6 +14,35 @@ defmodule Adbc.Helper do
     Adbc.Error.exception(message: message, vendor_code: vendor_code, state: state)
   end
 
+  def error_to_exception(%Adbc.Error{} = exception) do
+    exception
+  end
+
+  def option(callee, func, args)
+
+  def option(pid, func, args) when is_pid(pid) do
+    case GenServer.call(pid, {:option, func, args}) do
+      :ok ->
+        :ok
+
+      {:error, reason} ->
+        {:error, error_to_exception(reason)}
+    end
+  end
+
+  def option(ref, func, [type, key | args]) when is_reference(ref) do
+    with {:error, reason} <- apply(Adbc.Nif, func, [ref, type, to_string(key) | args]) do
+      {:error, error_to_exception(reason)}
+    end
+  end
+
+  def option_ok_or_halt(callee, func, args) do
+    case option(callee, func, args) do
+      :ok -> {:cont, :ok}
+      {:error, _} = error -> {:halt, error}
+    end
+  end
+
   @doc false
   def download(url, ignore_proxy) do
     url_charlist = String.to_charlist(url)

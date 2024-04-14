@@ -55,31 +55,121 @@ defmodule Adbc.Connection do
     end
   end
 
+  @doc """
+  Get a string type option of the connection.
+  """
+  @spec get_string_option(pid(), atom() | String.t()) :: {:ok, String.t()} | {:error, String.t()}
+  def get_string_option(conn, key) when is_pid(conn) do
+    Adbc.Helper.option(conn, :adbc_connection_get_option, [:string, to_string(key)])
+  end
+
+  @doc """
+  Get a binary (bytes) type option of the connection.
+  """
+  @spec get_binary_option(pid(), atom() | String.t()) :: {:ok, binary()} | {:error, String.t()}
+  def get_binary_option(conn, key) when is_pid(conn) do
+    Adbc.Helper.option(conn, :adbc_connection_get_option, [:binary, to_string(key)])
+  end
+
+  @doc """
+  Get an integer type option of the connection.
+  """
+  @spec get_integer_option(pid(), atom() | String.t()) :: {:ok, integer()} | {:error, String.t()}
+  def get_integer_option(conn, key) when is_pid(conn) do
+    Adbc.Helper.option(conn, :adbc_connection_get_option, [:integer, to_string(key)])
+  end
+
+  @doc """
+  Get a float type option of the connection.
+  """
+  @spec get_float_option(pid(), atom() | String.t()) :: {:ok, float()} | {:error, String.t()}
+  def get_float_option(conn, key) when is_pid(conn) do
+    Adbc.Helper.option(conn, :adbc_connection_get_option, [:float, to_string(key)])
+  end
+
+  @doc """
+  Set option for the connection.
+
+  - If `value` is an atom or a string, then corresponding string option will be set.
+  - If `value` is a `{:binary, binary()}`-tuple, then corresponding binary option will be set.
+  - If `value` is an integer, then corresponding integer option will be set.
+  - If `value` is a float, then corresponding float option will be set.
+  """
+  @spec set_option(
+          pid(),
+          atom() | String.t(),
+          atom() | {:binary, binary()} | String.t() | number()
+        ) ::
+          :ok | {:error, String.t()}
+  def set_option(conn, key, value)
+
+  def set_option(conn, key, value) when is_pid(conn) and (is_atom(value) or is_binary(value)) do
+    Adbc.Helper.option(conn, :adbc_connection_set_option, [:string, key, value])
+  end
+
+  def set_option(conn, key, {:binary, value}) when is_pid(conn) and is_binary(value) do
+    Adbc.Helper.option(conn, :adbc_connection_set_option, [:binary, key, value])
+  end
+
+  def set_option(conn, key, value) when is_pid(conn) and is_integer(value) do
+    Adbc.Helper.option(conn, :adbc_connection_set_option, [:integer, key, value])
+  end
+
+  def set_option(conn, key, value) when is_pid(conn) and is_float(value) do
+    Adbc.Helper.option(conn, :adbc_connection_set_option, [:float, key, value])
+  end
+
   defp init_options(ref, opts) do
-    Enum.reduce_while(opts, :ok, fn {key, value}, :ok ->
-      case Adbc.Nif.adbc_connection_set_option(ref, to_string(key), to_string(value)) do
-        :ok -> {:cont, :ok}
-        {:error, _} = error -> {:halt, error}
-      end
+    Enum.reduce_while(opts, :ok, fn
+      {key, value}, :ok when is_atom(value) or is_binary(value) ->
+        Adbc.Helper.option_ok_or_halt(ref, :adbc_connection_set_option, [:string, key, value])
+
+      {key, {:binary, value}}, :ok when is_binary(value) ->
+        Adbc.Helper.option_ok_or_halt(ref, :adbc_connection_set_option, [:binary, key, value])
+
+      {key, value}, :ok when is_integer(value) ->
+        Adbc.Helper.option_ok_or_halt(ref, :adbc_connection_set_option, [:integer, key, value])
+
+      {key, value}, :ok when is_float(value) ->
+        Adbc.Helper.option_ok_or_halt(ref, :adbc_connection_set_option, [:float, key, value])
+    end)
+  end
+
+  defp init_statement_options(ref, opts) do
+    Enum.reduce_while(opts, :ok, fn
+      {key, value}, :ok when is_atom(value) or is_binary(value) ->
+        Adbc.Helper.option_ok_or_halt(ref, :adbc_statement_set_option, [:string, key, value])
+
+      {key, {:binary, value}}, :ok when is_binary(value) ->
+        Adbc.Helper.option_ok_or_halt(ref, :adbc_statement_set_option, [:binary, key, value])
+
+      {key, value}, :ok when is_integer(value) ->
+        Adbc.Helper.option_ok_or_halt(ref, :adbc_statement_set_option, [:integer, key, value])
+
+      {key, value}, :ok when is_float(value) ->
+        Adbc.Helper.option_ok_or_halt(ref, :adbc_statement_set_option, [:float, key, value])
     end)
   end
 
   @doc """
-  Runs the given `query` with `params`.
+  Runs the given `query` with `params` and `statement_options`.
   """
-  @spec query(t(), binary | reference, [term]) :: {:ok, result_set} | {:error, Exception.t()}
-  def query(conn, query, params \\ [])
-      when (is_binary(query) or is_reference(query)) and is_list(params) do
-    stream(conn, {:query, query, params}, &stream_results/2)
+  @spec query(t(), binary | reference, [term], Keyword.t()) ::
+          {:ok, result_set} | {:error, Exception.t()}
+  def query(conn, query, params \\ [], statement_options \\ [])
+      when (is_binary(query) or is_reference(query)) and is_list(params) and
+             is_list(statement_options) do
+    stream(conn, {:query, query, params, statement_options}, &stream_results/2)
   end
 
   @doc """
-  Same as `query/3` but raises an exception on error.
+  Same as `query/4` but raises an exception on error.
   """
-  @spec query!(t(), binary | reference, [term]) :: result_set
-  def query!(conn, query, params \\ [])
-      when (is_binary(query) or is_reference(query)) and is_list(params) do
-    case query(conn, query, params) do
+  @spec query!(t(), binary | reference, [term], Keyword.t()) :: result_set
+  def query!(conn, query, params \\ [], statement_options \\ [])
+      when (is_binary(query) or is_reference(query)) and is_list(params) and
+             is_list(statement_options) do
+    case query(conn, query, params, statement_options) do
       {:ok, result} -> result
       {:error, reason} -> raise reason
     end
@@ -101,9 +191,10 @@ defmodule Adbc.Connection do
   the duration of the function. The function may call
   native code that consumes the ArrowStream accordingly.
   """
-  def query_pointer(conn, query, params \\ [], fun)
-      when (is_binary(query) or is_reference(query)) and is_list(params) and is_function(fun) do
-    stream(conn, {:query, query, params}, fn stream_ref, rows_affected ->
+  def query_pointer(conn, query, params \\ [], fun, statement_options \\ [])
+      when (is_binary(query) or is_reference(query)) and is_list(params) and is_function(fun) and
+             is_list(statement_options) do
+    stream(conn, {:query, query, params, statement_options}, fn stream_ref, rows_affected ->
       {:ok, fun.(Adbc.Nif.adbc_arrow_array_stream_get_pointer(stream_ref), rows_affected)}
     end)
   end
@@ -342,6 +433,10 @@ defmodule Adbc.Connection do
     {:noreply, maybe_dequeue(state)}
   end
 
+  def handle_call({:option, func, args}, _from, state = %{conn: conn}) do
+    {:reply, Adbc.Helper.option(conn, func, args), state}
+  end
+
   @impl true
   def handle_cast({:unlock, ref}, %{lock: {ref, stream_ref}} = state) do
     # We could let the GC be the one release it but,
@@ -395,8 +490,8 @@ defmodule Adbc.Connection do
     end
   end
 
-  defp handle_stream({:query, query_or_prepared, params}, conn) do
-    with {:ok, stmt} <- ensure_statement(conn, query_or_prepared),
+  defp handle_stream({:query, query_or_prepared, params, statement_options}, conn) do
+    with {:ok, stmt} <- ensure_statement(conn, query_or_prepared, statement_options),
          :ok <- maybe_bind(stmt, params) do
       Adbc.Nif.adbc_statement_execute_query(stmt)
     end
@@ -408,12 +503,17 @@ defmodule Adbc.Connection do
     end
   end
 
-  defp ensure_statement(conn, query) when is_binary(query), do: create_statement(conn, query)
-  defp ensure_statement(_conn, prepared) when is_reference(prepared), do: {:ok, prepared}
+  defp ensure_statement(conn, query, statement_options)
+       when is_binary(query) and is_list(statement_options),
+       do: create_statement(conn, query, statement_options)
 
-  defp create_statement(conn, query) do
+  defp ensure_statement(_conn, prepared, _statement_options) when is_reference(prepared),
+    do: {:ok, prepared}
+
+  defp create_statement(conn, query, statement_options \\ []) when is_list(statement_options) do
     with {:ok, stmt} <- Adbc.Nif.adbc_statement_new(conn),
-         :ok <- Adbc.Nif.adbc_statement_set_sql_query(stmt, query) do
+         :ok <- Adbc.Nif.adbc_statement_set_sql_query(stmt, query),
+         :ok <- init_statement_options(stmt, statement_options) do
       {:ok, stmt}
     end
   end

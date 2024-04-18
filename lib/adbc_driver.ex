@@ -163,7 +163,7 @@ defmodule Adbc.Driver do
     end
   end
 
-  def current_triplet do
+  defp current_triplet do
     current_target(:os.type())
   end
 

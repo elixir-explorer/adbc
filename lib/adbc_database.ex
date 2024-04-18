@@ -92,7 +92,7 @@ defmodule Adbc.Database do
   end
 
   @doc """
-  Set option for the connection.
+  Set option for the database.
 
   - If `value` is an atom or a string, then corresponding string option will be set.
   - If `value` is a `{:binary, binary()}`-tuple, then corresponding binary option will be set.
@@ -105,22 +105,22 @@ defmodule Adbc.Database do
           atom() | {:binary, binary()} | String.t() | number()
         ) ::
           :ok | {:error, String.t()}
-  def set_option(conn, key, value)
+  def set_option(db, key, value)
 
-  def set_option(conn, key, value) when is_pid(conn) and (is_atom(value) or is_binary(value)) do
-    Adbc.Helper.option(conn, :adbc_database_set_option, [:string, key, value])
+  def set_option(db, key, value) when is_pid(db) and (is_atom(value) or is_binary(value)) do
+    Adbc.Helper.option(db, :adbc_database_set_option, [:string, key, value])
   end
 
-  def set_option(conn, key, {:binary, value}) when is_pid(conn) and is_binary(value) do
-    Adbc.Helper.option(conn, :adbc_database_set_option, [:binary, key, value])
+  def set_option(db, key, {:binary, value}) when is_pid(db) and is_binary(value) do
+    Adbc.Helper.option(db, :adbc_database_set_option, [:binary, key, value])
   end
 
-  def set_option(conn, key, value) when is_pid(conn) and is_integer(value) do
-    Adbc.Helper.option(conn, :adbc_database_set_option, [:integer, key, value])
+  def set_option(db, key, value) when is_pid(db) and is_integer(value) do
+    Adbc.Helper.option(db, :adbc_database_set_option, [:integer, key, value])
   end
 
-  def set_option(conn, key, value) when is_pid(conn) and is_float(value) do
-    Adbc.Helper.option(conn, :adbc_database_set_option, [:float, key, value])
+  def set_option(db, key, value) when is_pid(db) and is_float(value) do
+    Adbc.Helper.option(db, :adbc_database_set_option, [:float, key, value])
   end
 
   defp driver_default_options(:duckdb), do: [entrypoint: "duckdb_adbc_init"]

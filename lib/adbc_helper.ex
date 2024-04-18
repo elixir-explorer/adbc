@@ -25,6 +25,9 @@ defmodule Adbc.Helper do
       :ok ->
         :ok
 
+      {:ok, value} ->
+        {:ok, value}
+
       {:error, reason} ->
         {:error, error_to_exception(reason)}
     end

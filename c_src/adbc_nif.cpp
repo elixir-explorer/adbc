@@ -1128,14 +1128,19 @@ static ERL_NIF_TERM adbc_set_option(ErlNifEnv *env, const ERL_NIF_TERM argv[], S
     struct AdbcError adbc_error{};
     AdbcStatusCode code;
     if (type == "string" || type == "binary") {
-        std::string value;
-        if (!erlang::nif::get(env, argv[3], value)) {
-            return enif_make_badarg(env);
-        }
         if (type == "string") {
+            std::string value;
+            if (!erlang::nif::get(env, argv[3], value)) {
+                return enif_make_badarg(env);
+            }
             code = set_string(&resource->val, key.c_str(), value.c_str(), &adbc_error);
         } else {
-            code = set_bytes(&resource->val, key.c_str(), (const uint8_t *)value.data(), value.length(), &adbc_error);
+            ErlNifBinary bin;
+            ERL_NIF_TERM ret = enif_inspect_binary(env, argv[3], &bin);
+            if (!ret) {
+                return enif_make_badarg(env);
+            }
+            code = set_bytes(&resource->val, key.c_str(), bin.data, bin.size, &adbc_error);
         }
     } else if (type == "integer") {
         int64_t value;

@@ -25,7 +25,7 @@ defmodule Adbc.Buffer do
   defstruct name: nil,
             type: nil,
             nullable: false,
-            metadata: nil,
+            metadata: %{},
             data: nil
 
   @spec buffer(atom, list, Keyword.t()) :: %Adbc.Buffer{}
@@ -41,6 +41,29 @@ defmodule Adbc.Buffer do
       metadata: metadata,
       data: data
     }
+  end
+
+  @spec get_metadata(%Adbc.Buffer{}, String.t(), String.t()) :: String.t() | nil
+  def get_metadata(%Adbc.Buffer{metadata: metadata}, key, default \\ nil)
+      when is_binary(key) or is_atom(key) do
+    metadata[to_string(key)] || default
+  end
+
+  @spec set_metadata(%Adbc.Buffer{}, String.t(), String.t()) :: %Adbc.Buffer{}
+  def set_metadata(buffer = %Adbc.Buffer{metadata: metadata}, key, value)
+      when (is_binary(key) or is_atom(key)) and (is_binary(value) or is_atom(value)) do
+    %Adbc.Buffer{buffer | metadata: Map.put(metadata, to_string(key), to_string(value))}
+  end
+
+  @spec delete_metadata(%Adbc.Buffer{}, String.t()) :: %Adbc.Buffer{}
+  def delete_metadata(buffer = %Adbc.Buffer{metadata: metadata}, key)
+      when is_binary(key) or is_atom(key) do
+    %Adbc.Buffer{buffer | metadata: Map.delete(metadata, to_string(key))}
+  end
+
+  @spec delete_all_metadata(%Adbc.Buffer{}) :: %Adbc.Buffer{}
+  def delete_all_metadata(buffer = %Adbc.Buffer{})
+    %Adbc.Buffer{buffer | metadata: %{}}
   end
 
   @spec boolean([0..255], Keyword.t()) :: %Adbc.Buffer{}

@@ -67,6 +67,8 @@ constexpr int kErrorBufferGetMapValue = 3;
 constexpr int kErrorBufferWrongStruct = 4;
 constexpr int kErrorBufferDataIsNotAList = 5;
 constexpr int kErrorBufferUnknownType = 6;
+constexpr int kErrorBufferGetMetadataKey = 7;
+constexpr int kErrorBufferGetMetadataValue = 8;
 
 static ERL_NIF_TERM nif_error_from_adbc_error(ErlNifEnv *env, struct AdbcError * adbc_error) {
     char const* message = (adbc_error->message == nullptr) ? "unknown error" : adbc_error->message;
@@ -1811,7 +1813,7 @@ int get_list_string(ErlNifEnv *env, ERL_NIF_TERM list, bool nullable, const std:
             val.data = (const char *)bytes.data;
             val.size_bytes = static_cast<int64_t>(bytes.size);
             callback(val, false);
-        } if (nullable && enif_is_identical(head, kAtomNil)) {
+        } else if (nullable && enif_is_identical(head, kAtomNil)) {
             callback(val, true);
         } else {
             return 1;
@@ -1959,8 +1961,45 @@ int adbc_buffer_to_adbc_field(ErlNifEnv *env, ERL_NIF_TERM adbc_buffer, struct A
 
     bool nullable = enif_is_identical(nullable_term, kAtomTrue);
 
+    struct ArrowBuffer metadata_buffer{};
+    NANOARROW_RETURN_NOT_OK(ArrowMetadataBuilderInit(&metadata_buffer, nullptr));
+    if (enif_is_map(env, metadata_term)) {
+        ERL_NIF_TERM metadata_key, metadata_value;
+        ErlNifMapIterator iter;
+        enif_map_iterator_create(env, metadata_term, &iter, ERL_NIF_MAP_ITERATOR_FIRST);
+        while (enif_map_iterator_get_pair(env, &iter, &metadata_key, &metadata_value)) {
+            ErlNifBinary key_bytes, value_bytes;
+            struct ArrowStringView key_view{};
+            struct ArrowStringView value_view{};
+            if (enif_is_binary(env, metadata_key) && enif_inspect_binary(env, metadata_key, &key_bytes)) {
+                key_view.data = (const char *)key_bytes.data;
+                key_view.size_bytes = static_cast<int64_t>(key_bytes.size);
+            } else {
+                ArrowBufferReset(&metadata_buffer);
+                enif_map_iterator_destroy(env, &iter);
+                snprintf(error_out->message, sizeof(error_out->message), "cannot get metadata key");
+                return kErrorBufferGetMetadataKey;
+            }
+            if (enif_is_binary(env, metadata_value) && enif_inspect_binary(env, metadata_value, &value_bytes)) {
+                value_view.data = (const char *)value_bytes.data;
+                value_view.size_bytes = static_cast<int64_t>(value_bytes.size);
+            } else {
+                ArrowBufferReset(&metadata_buffer);
+                enif_map_iterator_destroy(env, &iter);
+                enif_snprintf(error_out->message, sizeof(error_out->message), "cannot get metadata value for key: `%T`", metadata_key);
+                return kErrorBufferGetMetadataValue;
+            }
+
+            NANOARROW_RETURN_NOT_OK(ArrowMetadataBuilderAppend(&metadata_buffer, key_view, value_view));
+            enif_map_iterator_next(env, &iter);
+        }
+        enif_map_iterator_destroy(env, &iter);
+    }
+
     ArrowSchemaInit(schema_out);
-    ArrowSchemaSetName(schema_out, name.c_str());
+    NANOARROW_RETURN_NOT_OK(ArrowSchemaSetName(schema_out, name.c_str()));
+    NANOARROW_RETURN_NOT_OK(ArrowSchemaSetMetadata(schema_out, (const char*)metadata_buffer.data));
+    ArrowBufferReset(&metadata_buffer);
 
     if (enif_is_identical(type_term, kAdbcBufferTypeI8)) {
         do_get_list_integer<int8_t>(env, data_term, nullable, NANOARROW_TYPE_INT8, array_out, schema_out, error_out);
@@ -2099,6 +2138,8 @@ int adbc_buffer_to_arrow_type_struct(ErlNifEnv *env, ERL_NIF_TERM values, struct
                 snprintf(error_out->message, sizeof(error_out->message), "Expected the `data` field of `Adbc.Buffer` to be a list of values.");
                 return 1;
             case kErrorBufferUnknownType:
+            case kErrorBufferGetMetadataKey:
+            case kErrorBufferGetMetadataValue:
                 // error message is already set
                 return 1;
             default:

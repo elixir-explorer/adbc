@@ -66,7 +66,7 @@ defmodule Adbc.Buffer do
     %Adbc.Buffer{buffer | metadata: %{}}
   end
 
-  @spec boolean([0..255], Keyword.t()) :: %Adbc.Buffer{}
+  @spec boolean([boolean()], Keyword.t()) :: %Adbc.Buffer{}
   def boolean(data, opts \\ []) when is_list(data) and is_list(opts) do
     buffer(:boolean, data, opts)
   end

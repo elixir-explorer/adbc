@@ -14,10 +14,30 @@ template<> ErlNifResourceType * NifRes<struct AdbcStatement>::type = nullptr;
 template<> ErlNifResourceType * NifRes<struct AdbcError>::type = nullptr;
 template<> ErlNifResourceType * NifRes<struct ArrowArrayStream>::type = nullptr;
 
+static ERL_NIF_TERM kAtomAdbcError;
+static ERL_NIF_TERM kAtomNil;
+static ERL_NIF_TERM kAtomTrue;
+static ERL_NIF_TERM kAtomFalse;
+static ERL_NIF_TERM kAtomEndOfSeries;
+
+static ERL_NIF_TERM kAtomDateModule;
+static ERL_NIF_TERM kAtomTimeModule;
+static ERL_NIF_TERM kAtomNaiveDateTimeModule;
+static ERL_NIF_TERM kAtomCalendarISO;
+static ERL_NIF_TERM kAtomStructKey;
+static ERL_NIF_TERM kAtomCalendarKey;
+static ERL_NIF_TERM kAtomYearKey;
+static ERL_NIF_TERM kAtomMonthKey;
+static ERL_NIF_TERM kAtomDayKey;
+static ERL_NIF_TERM kAtomHourKey;
+static ERL_NIF_TERM kAtomMinuteKey;
+static ERL_NIF_TERM kAtomSecondKey;
+static ERL_NIF_TERM kAtomMicrosecondKey;
+
 static ERL_NIF_TERM nif_error_from_adbc_error(ErlNifEnv *env, struct AdbcError * adbc_error) {
     char const* message = (adbc_error->message == nullptr) ? "unknown error" : adbc_error->message;
     ERL_NIF_TERM nif_error = erlang::nif::error(env, enif_make_tuple4(env,
-        erlang::nif::atom(env, "adbc_error"),
+        kAtomAdbcError,
         erlang::nif::make_binary(env, message),
         enif_make_int(env, adbc_error->vendor_code),
         erlang::nif::make_binary(env, adbc_error->sqlstate, 5)
@@ -42,7 +62,7 @@ template <typename T, typename M> static ERL_NIF_TERM values_from_buffer(ErlNifE
             if (vbyte & (1 << (i & 0b11111111))) {
                 values[i - offset] = value_to_nif(env, value_buffer[i]);
             } else {
-                values[i - offset] = erlang::nif::atom(env, "nil");
+                values[i - offset] = kAtomNil;
             }
         }
     }
@@ -69,7 +89,7 @@ template <typename M, typename OffsetT> static ERL_NIF_TERM strings_from_buffer(
             OffsetT end_index = offsets_buffer[i + 1];
             size_t nbytes = end_index - offset;
             if (nbytes == 0) {
-                values[i - element_offset] = erlang::nif::atom(env, "nil");
+                values[i - element_offset] = kAtomNil;
             } else {
                 values[i - element_offset] = value_to_nif(env, value_buffer, offset, nbytes);
             }
@@ -83,7 +103,7 @@ template <typename M, typename OffsetT> static ERL_NIF_TERM strings_from_buffer(
             if (nbytes > 0 && vbyte & (1 << (i & 0b11111111))) {
                 values[i - element_offset] = value_to_nif(env, value_buffer, offset, nbytes);
             } else {
-                values[i - element_offset] = erlang::nif::atom(env, "nil");
+                values[i - element_offset] = kAtomNil;
             }
             offset = end_index;
         }
@@ -144,7 +164,7 @@ int get_arrow_array_children_as_list(ErlNifEnv *env, struct ArrowSchema * schema
         if (bitmap_buffer && values->null_count > 0) {
             uint8_t vbyte = bitmap_buffer[child_i / 8];
             if (!(vbyte & (1 << (child_i & 0b11111111)))) {
-                children[child_i - offset] = erlang::nif::atom(env, "nil");
+                children[child_i - offset] = kAtomNil;
                 continue;
             }
         }
@@ -399,7 +419,7 @@ ERL_NIF_TERM get_arrow_array_list_children(ErlNifEnv *env, struct ArrowSchema * 
             if (bitmap_buffer && values->null_count > 0) {
                 uint8_t vbyte = bitmap_buffer[child_i / 8];
                 if (!(vbyte & (1 << (child_i & 0b11111111)))) {
-                    children[child_i - offset] = erlang::nif::atom(env, "nil");
+                    children[child_i - offset] = kAtomNil;
                     continue;
                 }
             }
@@ -637,9 +657,9 @@ int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct 
                 (const value_type *)values->buffers[data_buffer_index],
                 [](ErlNifEnv *env, bool val) -> ERL_NIF_TERM {
                     if (val) {
-                        return erlang::nif::atom(env, "true");
+                        return kAtomTrue;
                     }
-                    return erlang::nif::atom(env, "false");
+                    return kAtomFalse;
                 }
             );
         } else if (format[0] == 'u' || format[0] == 'z') {
@@ -703,7 +723,7 @@ int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct 
                 if (end_of_series) {
                     *end_of_series = true;
                 }
-                children_term = erlang::nif::atom(env, "end_of_series");
+                children_term = kAtomEndOfSeries;
             }
         } else if (strncmp("+m", format, 2) == 0) {
             // NANOARROW_TYPE_MAP
@@ -739,14 +759,14 @@ int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct 
             if (unit == 'D' || unit == 'm') {
                 // NANOARROW_TYPE_DATE32
                 // NANOARROW_TYPE_DATE64
-                ERL_NIF_TERM date_module = erlang::nif::atom(env, "Elixir.Date");
-                ERL_NIF_TERM calendar_iso = erlang::nif::atom(env, "Elixir.Calendar.ISO");
+                ERL_NIF_TERM date_module = kAtomDateModule;
+                ERL_NIF_TERM calendar_iso = kAtomCalendarISO;
                 ERL_NIF_TERM keys[] = {
-                    erlang::nif::atom(env, "__struct__"),
-                    erlang::nif::atom(env, "calendar"),
-                    erlang::nif::atom(env, "year"),
-                    erlang::nif::atom(env, "month"),
-                    erlang::nif::atom(env, "day")
+                    kAtomStructKey,
+                    kAtomCalendarKey,
+                    kAtomYearKey,
+                    kAtomMonthKey,
+                    kAtomDayKey,
                 };
 
                 auto convert = [unit, date_module, calendar_iso, &keys](ErlNifEnv *env, uint64_t val) -> ERL_NIF_TERM {
@@ -841,16 +861,16 @@ int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct 
                 }
 
                 ERL_NIF_TERM keys[] = {
-                    erlang::nif::atom(env, "__struct__"),
-                    erlang::nif::atom(env, "calendar"),
-                    erlang::nif::atom(env, "hour"),
-                    erlang::nif::atom(env, "minute"),
-                    erlang::nif::atom(env, "second"),
-                    erlang::nif::atom(env, "microsecond")
+                    kAtomStructKey,
+                    kAtomCalendarKey,
+                    kAtomHourKey,
+                    kAtomMinuteKey,
+                    kAtomSecondKey,
+                    kAtomMicrosecondKey,
                 };
 
-                ERL_NIF_TERM time_module = erlang::nif::atom(env, "Elixir.Time");
-                ERL_NIF_TERM calendar_iso = erlang::nif::atom(env, "Elixir.Calendar.ISO");
+                ERL_NIF_TERM time_module = kAtomTimeModule;
+                ERL_NIF_TERM calendar_iso = kAtomCalendarISO;
 
                 current_term = values_from_buffer(
                     env,
@@ -919,19 +939,19 @@ int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct 
                     return 1;
                 }
 
-                ERL_NIF_TERM naive_dt_module = erlang::nif::atom(env, "Elixir.NaiveDateTime");
-                ERL_NIF_TERM calendar_iso = erlang::nif::atom(env, "Elixir.Calendar.ISO");
+                ERL_NIF_TERM naive_dt_module = kAtomNaiveDateTimeModule;
+                ERL_NIF_TERM calendar_iso = kAtomCalendarISO;
 
                 ERL_NIF_TERM keys[] = {
-                    erlang::nif::atom(env, "__struct__"),
-                    erlang::nif::atom(env, "calendar"),
-                    erlang::nif::atom(env, "year"),
-                    erlang::nif::atom(env, "month"),
-                    erlang::nif::atom(env, "day"),
-                    erlang::nif::atom(env, "hour"),
-                    erlang::nif::atom(env, "minute"),
-                    erlang::nif::atom(env, "second"),
-                    erlang::nif::atom(env, "microsecond"),
+                    kAtomStructKey,
+                    kAtomCalendarKey,
+                    kAtomYearKey,
+                    kAtomMonthKey,
+                    kAtomDayKey,
+                    kAtomHourKey,
+                    kAtomMinuteKey,
+                    kAtomSecondKey,
+                    kAtomMicrosecondKey,
                 };
 
                 current_term = values_from_buffer(
@@ -1710,35 +1730,29 @@ int elixir_to_arrow_type_struct(ErlNifEnv *env, ERL_NIF_TERM values, struct Arro
             NANOARROW_RETURN_NOT_OK(ArrowArrayStartAppending(child_i));
             NANOARROW_RETURN_NOT_OK(ArrowArrayAppendBytes(child_i, view));
         } else if (enif_is_atom(env, head)) {
-            std::string atom_val;
             int64_t val{};
-            if (erlang::nif::get_atom(env, head, atom_val)) {
-                auto type = NANOARROW_TYPE_BOOL;
-                if (atom_val == "true" || atom_val == "TRUE") {
-                    val = 1;
-                } else if (atom_val == "false" || atom_val == "FALSE") {
-                    val = 0;
-                } else if (atom_val == "nil") {
-                    type = NANOARROW_TYPE_NA;
-                } else {
-                    snprintf(error_out->message, sizeof(error_out->message), "atom `:%s` is not supported yet.", atom_val.c_str());
-                    return 1;
-                }
-
-                NANOARROW_RETURN_NOT_OK(ArrowSchemaSetType(schema_i, type));
-                NANOARROW_RETURN_NOT_OK(ArrowSchemaSetName(schema_i, ""));
-                NANOARROW_RETURN_NOT_OK(ArrowArrayInitFromSchema(child_i, schema_i, error_out));
-                NANOARROW_RETURN_NOT_OK(ArrowArrayStartAppending(child_i));
-                if (type == NANOARROW_TYPE_BOOL) {
-                    NANOARROW_RETURN_NOT_OK(ArrowArrayAppendInt(child_i, val));
-                } else {
-                    // 1x Null
-                    val = 1;
-                    NANOARROW_RETURN_NOT_OK(ArrowArrayAppendNull(child_i, val));
-                }
+            auto type = NANOARROW_TYPE_BOOL;
+            if (enif_is_identical(head, kAtomTrue)) {
+                val = 1;
+            } else if (enif_is_identical(head, kAtomFalse)) {
+                val = 0;
+            } else if (enif_is_identical(head, kAtomNil)) {
+                type = NANOARROW_TYPE_NA;
             } else {
-                snprintf(error_out->message, sizeof(error_out->message), "failed to get atom");
+                enif_snprintf(error_out->message, sizeof(error_out->message), "atom `:%T` is not supported yet.", head);
                 return 1;
+            }
+            
+            NANOARROW_RETURN_NOT_OK(ArrowSchemaSetType(schema_i, type));
+            NANOARROW_RETURN_NOT_OK(ArrowSchemaSetName(schema_i, ""));
+            NANOARROW_RETURN_NOT_OK(ArrowArrayInitFromSchema(child_i, schema_i, error_out));
+            NANOARROW_RETURN_NOT_OK(ArrowArrayStartAppending(child_i));
+            if (type == NANOARROW_TYPE_BOOL) {
+                NANOARROW_RETURN_NOT_OK(ArrowArrayAppendInt(child_i, val));
+            } else {
+                // 1x Null
+                val = 1;
+                NANOARROW_RETURN_NOT_OK(ArrowArrayAppendNull(child_i, val));
             }
         } else {
             snprintf(error_out->message, sizeof(error_out->message), "type not supported yet.");
@@ -1850,6 +1864,25 @@ static int on_load(ErlNifEnv *env, void **, ERL_NIF_TERM) {
         if (!rt) return -1;
         res_type::type = rt;
     }
+
+    kAtomAdbcError = erlang::nif::atom(env, "adbc_error");
+    kAtomNil = erlang::nif::atom(env, "nil");
+    kAtomTrue = erlang::nif::atom(env, "true");
+    kAtomFalse = erlang::nif::atom(env, "false");
+    kAtomEndOfSeries = erlang::nif::atom(env, "end_of_series");
+    kAtomDateModule = erlang::nif::atom(env, "Elixir.Date");
+    kAtomCalendarISO = erlang::nif::atom(env, "Elixir.Calendar.ISO");
+    kAtomTimeModule = erlang::nif::atom(env, "Elixir.Time");
+    kAtomNaiveDateTimeModule = erlang::nif::atom(env, "Elixir.NaiveDateTime");
+    kAtomStructKey = erlang::nif::atom(env, "__struct__");
+    kAtomCalendarKey = erlang::nif::atom(env, "calendar");
+    kAtomYearKey = erlang::nif::atom(env, "year");
+    kAtomMonthKey = erlang::nif::atom(env, "month");
+    kAtomDayKey = erlang::nif::atom(env, "day");
+    kAtomHourKey = erlang::nif::atom(env, "hour");
+    kAtomMinuteKey = erlang::nif::atom(env, "minute");
+    kAtomSecondKey = erlang::nif::atom(env, "second");
+    kAtomMicrosecondKey = erlang::nif::atom(env, "microsecond");
 
     return 0;
 }

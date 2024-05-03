@@ -1,4 +1,27 @@
 defmodule Adbc.Buffer do
+  @moduledoc """
+  Documentation for `Adbc.Buffer`.
+
+  One `Adbc.Buffer` corresponds to a column in the table. It contains the column's name, type, and
+  data. The data is a list of values of the column's type. The type can be one of the following:
+
+  * `:boolean`
+  * `:u8`
+  * `:u16`
+  * `:u32`
+  * `:u64`
+  * `:i8`
+  * `:i16`
+  * `:i32`
+  * `:i64`
+  * `:f32`
+  * `:f64`
+  * `:string`
+  * `:large_string`, when the size of the string is larger than 4GB
+  * `:binary`
+  * `:large_binary`, when the size of the binary is larger than 4GB
+  * `:fixed_size_binary`
+  """
   defstruct name: nil,
             type: nil,
             nullable: false,
@@ -94,5 +117,10 @@ defmodule Adbc.Buffer do
   @spec large_binary([binary()], Keyword.t()) :: %Adbc.Buffer{}
   def large_binary(data, opts \\ []) when is_list(data) and is_list(opts) do
     buffer(:large_binary, data, opts)
+  end
+
+  @spec fixed_size_binary([binary()], Keyword.t()) :: %Adbc.Buffer{}
+  def fixed_size_binary(data, opts \\ []) when is_list(data) and is_list(opts) do
+    buffer(:fixed_size_binary, data, opts)
   end
 end

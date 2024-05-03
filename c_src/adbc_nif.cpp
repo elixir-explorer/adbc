@@ -58,6 +58,7 @@ static ERL_NIF_TERM kAdbcBufferTypeString;
 static ERL_NIF_TERM kAdbcBufferTypeLargeString;
 static ERL_NIF_TERM kAdbcBufferTypeBinary;
 static ERL_NIF_TERM kAdbcBufferTypeLargeBinary;
+static ERL_NIF_TERM kAdbcBufferTypeFixedSizeBinary;
 static ERL_NIF_TERM kAdbcBufferTypeBool;
 
 constexpr int kErrorBufferIsNotAMap = 1;
@@ -1872,6 +1873,43 @@ int do_get_list_boolean(ErlNifEnv *env, ERL_NIF_TERM list, bool nullable, ArrowT
     }
 }
 
+int get_list_fixed_size_binary(ErlNifEnv *env, ERL_NIF_TERM list, bool nullable, const std::function<void(struct ArrowBufferView val, bool is_nil)> &callback) {
+    ERL_NIF_TERM head, tail;
+    tail = list;
+    while (enif_get_list_cell(env, tail, &head, &tail)) {
+        ErlNifBinary bytes;
+        struct ArrowBufferView val{};
+        if (enif_is_binary(env, head) && enif_inspect_binary(env, head, &bytes)) {
+            val.data.data = bytes.data;
+            val.size_bytes = static_cast<int64_t>(bytes.size);
+            callback(val, false);
+        } if (nullable && enif_is_identical(head, kAtomNil)) {
+            callback(val, true);
+        } else {
+            return 1;
+        }
+    }
+    return 0;
+}
+
+int do_get_list_fixed_size_binary(ErlNifEnv *env, ERL_NIF_TERM list, bool nullable, ArrowType nanoarrow_type, struct ArrowArray* array_out, struct ArrowSchema* schema_out, struct ArrowError* error_out) {
+    NANOARROW_RETURN_NOT_OK(ArrowSchemaSetType(schema_out, nanoarrow_type));
+    NANOARROW_RETURN_NOT_OK(ArrowArrayInitFromSchema(array_out, schema_out, error_out));
+    NANOARROW_RETURN_NOT_OK(ArrowArrayStartAppending(array_out));
+    if (nullable) {
+        return get_list_fixed_size_binary(env, list, nullable, [&array_out](struct ArrowBufferView val, bool is_nil) -> void {
+            ArrowArrayAppendBytes(array_out, val);
+            if (is_nil) {
+                ArrowArrayAppendNull(array_out, 1);
+            }
+        });
+    } else {
+        return get_list_fixed_size_binary(env, list, nullable, [&array_out](struct ArrowBufferView val, bool) -> void {
+            ArrowArrayAppendBytes(array_out, val);
+        });
+    }
+}
+
 // non-zero return value indicating errors
 int adbc_buffer_to_adbc_field(ErlNifEnv *env, ERL_NIF_TERM adbc_buffer, struct ArrowArray* array_out, struct ArrowSchema* schema_out, struct ArrowError* error_out) {
     array_out->release = NULL;
@@ -1952,6 +1990,8 @@ int adbc_buffer_to_adbc_field(ErlNifEnv *env, ERL_NIF_TERM adbc_buffer, struct A
         do_get_list_string(env, data_term, nullable, NANOARROW_TYPE_BINARY, array_out, schema_out, error_out);
     } else if (enif_is_identical(type_term, kAdbcBufferTypeLargeBinary)) {
         do_get_list_string(env, data_term, nullable, NANOARROW_TYPE_LARGE_BINARY, array_out, schema_out, error_out);
+    } else if (enif_is_identical(type_term, kAdbcBufferTypeFixedSizeBinary)) {
+        do_get_list_fixed_size_binary(env, data_term, nullable, NANOARROW_TYPE_FIXED_SIZE_BINARY, array_out, schema_out, error_out);
     } else if (enif_is_identical(type_term, kAdbcBufferTypeBool)) {
         do_get_list_boolean(env, data_term, nullable, NANOARROW_TYPE_BOOL, array_out, schema_out, error_out);
     } else {
@@ -2216,6 +2256,7 @@ static int on_load(ErlNifEnv *env, void **, ERL_NIF_TERM) {
     kAdbcBufferTypeLargeString = enif_make_atom(env, "large_string");
     kAdbcBufferTypeBinary = enif_make_atom(env, "binary");
     kAdbcBufferTypeLargeBinary = enif_make_atom(env, "large_binary");
+    kAdbcBufferTypeFixedSizeBinary = enif_make_atom(env, "fixed_size_binary");
     kAdbcBufferTypeBool = enif_make_atom(env, "boolean");
 
     return 0;

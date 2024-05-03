@@ -1816,27 +1816,27 @@ int adbc_buffer_to_arrow_type_struct(ErlNifEnv *env, ERL_NIF_TERM values, struct
         auto child_i = array_out->children[processed];
         adbc_buffer_to_adbc_field(env, head, child_i, schema_i, error_out);
 
-        // ErlNifSInt64 i64;
-        // double f64;
-        // ErlNifBinary bytes;
+        ErlNifSInt64 i64;
+        double f64;
+        ErlNifBinary bytes;
 
-        // if (enif_get_int64(env, head, &i64)) {
-        //     NANOARROW_RETURN_NOT_OK(ArrowSchemaSetType(schema_i, NANOARROW_TYPE_INT64));
-        //     NANOARROW_RETURN_NOT_OK(ArrowSchemaSetName(schema_i, ""));
-        //     NANOARROW_RETURN_NOT_OK(ArrowArrayInitFromSchema(child_i, schema_i, error_out));
-        //     NANOARROW_RETURN_NOT_OK(ArrowArrayStartAppending(child_i));
-        //     NANOARROW_RETURN_NOT_OK(ArrowArrayAppendInt(child_i, i64));
-        // } else if (enif_get_double(env, head, &f64)) {
-        //     NANOARROW_RETURN_NOT_OK(ArrowSchemaSetType(schema_i, NANOARROW_TYPE_DOUBLE));
-        //     NANOARROW_RETURN_NOT_OK(ArrowSchemaSetName(schema_i, ""));
-        //     NANOARROW_RETURN_NOT_OK(ArrowArrayInitFromSchema(child_i, schema_i, error_out));
-        //     NANOARROW_RETURN_NOT_OK(ArrowArrayStartAppending(child_i));
-        //     NANOARROW_RETURN_NOT_OK(ArrowArrayAppendDouble(child_i, f64));
-        // } else if (enif_is_binary(env, head) && enif_inspect_binary(env, head, &bytes)) {
-        //     auto type = NANOARROW_TYPE_BINARY;
-        //     if (bytes.size > INT32_MAX) {
-        //         type = NANOARROW_TYPE_LARGE_BINARY;
-        //     }
+        if (enif_get_int64(env, head, &i64)) {
+            NANOARROW_RETURN_NOT_OK(ArrowSchemaSetType(schema_i, NANOARROW_TYPE_INT64));
+            NANOARROW_RETURN_NOT_OK(ArrowSchemaSetName(schema_i, ""));
+            NANOARROW_RETURN_NOT_OK(ArrowArrayInitFromSchema(child_i, schema_i, error_out));
+            NANOARROW_RETURN_NOT_OK(ArrowArrayStartAppending(child_i));
+            NANOARROW_RETURN_NOT_OK(ArrowArrayAppendInt(child_i, i64));
+        } else if (enif_get_double(env, head, &f64)) {
+            NANOARROW_RETURN_NOT_OK(ArrowSchemaSetType(schema_i, NANOARROW_TYPE_DOUBLE));
+            NANOARROW_RETURN_NOT_OK(ArrowSchemaSetName(schema_i, ""));
+            NANOARROW_RETURN_NOT_OK(ArrowArrayInitFromSchema(child_i, schema_i, error_out));
+            NANOARROW_RETURN_NOT_OK(ArrowArrayStartAppending(child_i));
+            NANOARROW_RETURN_NOT_OK(ArrowArrayAppendDouble(child_i, f64));
+        } else if (enif_is_binary(env, head) && enif_inspect_binary(env, head, &bytes)) {
+            auto type = NANOARROW_TYPE_BINARY;
+            if (bytes.size > INT32_MAX) {
+                type = NANOARROW_TYPE_LARGE_BINARY;
+            }
 
             struct ArrowBufferView view{};
             view.data.data = bytes.data;

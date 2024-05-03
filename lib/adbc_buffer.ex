@@ -62,7 +62,7 @@ defmodule Adbc.Buffer do
   end
 
   @spec delete_all_metadata(%Adbc.Buffer{}) :: %Adbc.Buffer{}
-  def delete_all_metadata(buffer = %Adbc.Buffer{})
+  def delete_all_metadata(buffer = %Adbc.Buffer{}) do
     %Adbc.Buffer{buffer | metadata: %{}}
   end
 

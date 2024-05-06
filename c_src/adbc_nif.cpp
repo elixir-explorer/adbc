@@ -2,6 +2,8 @@
 #include <cstdbool>
 #include <cstdio>
 #include <climits>
+#include <functional>
+#include <optional>
 #include <map>
 #include "nif_utils.hpp"
 #include <adbc.h>
@@ -33,6 +35,40 @@ static ERL_NIF_TERM kAtomHourKey;
 static ERL_NIF_TERM kAtomMinuteKey;
 static ERL_NIF_TERM kAtomSecondKey;
 static ERL_NIF_TERM kAtomMicrosecondKey;
+
+static ERL_NIF_TERM kAdbcBufferStructValue;
+static ERL_NIF_TERM kAdbcBufferNameKey;
+static ERL_NIF_TERM kAdbcBufferTypeKey;
+static ERL_NIF_TERM kAdbcBufferNullableKey;
+static ERL_NIF_TERM kAdbcBufferMetadataKey;
+static ERL_NIF_TERM kAdbcBufferDataKey;
+// static ERL_NIF_TERM kAdbcBufferPrivateKey;
+
+static ERL_NIF_TERM kAdbcBufferTypeU8;
+static ERL_NIF_TERM kAdbcBufferTypeU16;
+static ERL_NIF_TERM kAdbcBufferTypeU32;
+static ERL_NIF_TERM kAdbcBufferTypeU64;
+static ERL_NIF_TERM kAdbcBufferTypeI8;
+static ERL_NIF_TERM kAdbcBufferTypeI16;
+static ERL_NIF_TERM kAdbcBufferTypeI32;
+static ERL_NIF_TERM kAdbcBufferTypeI64;
+static ERL_NIF_TERM kAdbcBufferTypeF32;
+static ERL_NIF_TERM kAdbcBufferTypeF64;
+static ERL_NIF_TERM kAdbcBufferTypeString;
+static ERL_NIF_TERM kAdbcBufferTypeLargeString;
+static ERL_NIF_TERM kAdbcBufferTypeBinary;
+static ERL_NIF_TERM kAdbcBufferTypeLargeBinary;
+static ERL_NIF_TERM kAdbcBufferTypeFixedSizeBinary;
+static ERL_NIF_TERM kAdbcBufferTypeBool;
+
+constexpr int kErrorBufferIsNotAMap = 1;
+constexpr int kErrorBufferGetDataListLength = 2;
+constexpr int kErrorBufferGetMapValue = 3;
+constexpr int kErrorBufferWrongStruct = 4;
+constexpr int kErrorBufferDataIsNotAList = 5;
+constexpr int kErrorBufferUnknownType = 6;
+constexpr int kErrorBufferGetMetadataKey = 7;
+constexpr int kErrorBufferGetMetadataValue = 8;
 
 static ERL_NIF_TERM nif_error_from_adbc_error(ErlNifEnv *env, struct AdbcError * adbc_error) {
     char const* message = (adbc_error->message == nullptr) ? "unknown error" : adbc_error->message;
@@ -148,7 +184,7 @@ int get_arrow_array_children_as_list(ErlNifEnv *env, struct ArrowSchema * schema
         error =  erlang::nif::error(env, "invalid ArrowArray or ArrowSchema, values->n_children != schema->n_children");
         return 1;
     }
-    if (offset < 0 || offset >= values->n_children) {
+    if (offset < 0 || (offset != 0 && offset >= values->n_children)) {
         error =  erlang::nif::error(env, "invalid offset value, offset < 0 || offset >= values->n_children");
         return 1;
     }
@@ -1674,8 +1710,341 @@ static ERL_NIF_TERM adbc_statement_set_sql_query(ErlNifEnv *env, int argc, const
     return erlang::nif::ok(env);
 }
 
+
+template <typename Integer, typename std::enable_if<
+        std::is_integral<Integer>{} && std::is_signed<Integer>{}, bool>::type = true>
+int get_list_integer(ErlNifEnv *env, ERL_NIF_TERM list, bool nullable, const std::function<void(Integer val, bool is_nil)> &callback) {
+    ERL_NIF_TERM head, tail;
+    tail = list;
+    while (enif_get_list_cell(env, tail, &head, &tail)) {
+        int64_t val;
+        if (!erlang::nif::get(env, head, &val)) {
+            if (nullable && enif_is_identical(head, kAtomNil)) {
+                callback(0, true);
+            } else {
+                return 1;
+            }
+        }
+        callback((Integer)val, false);
+    }
+    return 0;
+}
+
+template <typename Integer, typename std::enable_if<
+        std::is_integral<Integer>{} && !std::is_signed<Integer>{}, bool>::type = true>
+int get_list_integer(ErlNifEnv *env, ERL_NIF_TERM list, bool nullable, const std::function<void(Integer val, bool is_nil)> &callback) {
+    ERL_NIF_TERM head, tail;
+    tail = list;
+    while (enif_get_list_cell(env, tail, &head, &tail)) {
+        uint64_t val;
+        if (!erlang::nif::get(env, head, &val)) {
+            if (nullable && enif_is_identical(head, kAtomNil)) {
+                callback(0, true);
+            } else {
+                return 1;
+            }
+        }
+        callback((Integer)val, false);
+    }
+    return 0;
+}
+
+template <typename T>
+int do_get_list_integer(ErlNifEnv *env, ERL_NIF_TERM list, bool nullable, ArrowType nanoarrow_type, struct ArrowArray* array_out, struct ArrowSchema* schema_out, struct ArrowError* error_out) {
+    NANOARROW_RETURN_NOT_OK(ArrowSchemaSetType(schema_out, nanoarrow_type));
+    NANOARROW_RETURN_NOT_OK(ArrowArrayInitFromSchema(array_out, schema_out, error_out));
+    NANOARROW_RETURN_NOT_OK(ArrowArrayStartAppending(array_out));
+    if (nullable) {
+        return get_list_integer<T>(env, list, nullable, [&array_out](T val, bool is_nil) -> void {
+            ArrowArrayAppendInt(array_out, val);
+            if (is_nil) {
+                ArrowArrayAppendNull(array_out, 1);
+            }
+        });
+    } else {
+        return get_list_integer<T>(env, list, nullable, [&array_out](T val, bool) -> void {
+            ArrowArrayAppendInt(array_out, val);
+        });
+    }
+}
+
+int get_list_float(ErlNifEnv *env, ERL_NIF_TERM list, bool nullable, const std::function<void(double val, bool is_nil)> &callback) {
+    ERL_NIF_TERM head, tail;
+    tail = list;
+    while (enif_get_list_cell(env, tail, &head, &tail)) {
+        double val;
+        if (!erlang::nif::get(env, head, &val)) {
+            if (nullable && enif_is_identical(head, kAtomNil)) {
+                callback(0, true);
+            } else {
+                return 1;
+            }
+        }
+        callback(val, false);
+    }
+    return 0;
+}
+
+int do_get_list_float(ErlNifEnv *env, ERL_NIF_TERM list, bool nullable, ArrowType nanoarrow_type, struct ArrowArray* array_out, struct ArrowSchema* schema_out, struct ArrowError* error_out) {
+    NANOARROW_RETURN_NOT_OK(ArrowSchemaSetType(schema_out, nanoarrow_type));
+    NANOARROW_RETURN_NOT_OK(ArrowArrayInitFromSchema(array_out, schema_out, error_out));
+    NANOARROW_RETURN_NOT_OK(ArrowArrayStartAppending(array_out));
+    if (nullable) {
+        return get_list_float(env, list, nullable, [&array_out](double val, bool is_nil) -> void {
+            ArrowArrayAppendDouble(array_out, val);
+            if (is_nil) {
+                ArrowArrayAppendNull(array_out, 1);
+            }
+        });
+    } else {
+        return get_list_float(env, list, nullable, [&array_out](double val, bool) -> void {
+            ArrowArrayAppendDouble(array_out, val);
+        });
+    }
+}
+
+int get_list_string(ErlNifEnv *env, ERL_NIF_TERM list, bool nullable, const std::function<void(struct ArrowStringView val, bool is_nil)> &callback) {
+    ERL_NIF_TERM head, tail;
+    tail = list;
+    while (enif_get_list_cell(env, tail, &head, &tail)) {
+        ErlNifBinary bytes;
+        struct ArrowStringView val{};
+        if (enif_is_binary(env, head) && enif_inspect_binary(env, head, &bytes)) {
+            val.data = (const char *)bytes.data;
+            val.size_bytes = static_cast<int64_t>(bytes.size);
+            callback(val, false);
+        } else if (nullable && enif_is_identical(head, kAtomNil)) {
+            callback(val, true);
+        } else {
+            return 1;
+        }
+    }
+    return 0;
+}
+
+int do_get_list_string(ErlNifEnv *env, ERL_NIF_TERM list, bool nullable, ArrowType nanoarrow_type, struct ArrowArray* array_out, struct ArrowSchema* schema_out, struct ArrowError* error_out) {
+    NANOARROW_RETURN_NOT_OK(ArrowSchemaSetType(schema_out, nanoarrow_type));
+    NANOARROW_RETURN_NOT_OK(ArrowArrayInitFromSchema(array_out, schema_out, error_out));
+    NANOARROW_RETURN_NOT_OK(ArrowArrayStartAppending(array_out));
+    if (nullable) {
+        return get_list_string(env, list, nullable, [&array_out](struct ArrowStringView val, bool is_nil) -> void {
+            ArrowArrayAppendString(array_out, val);
+            if (is_nil) {
+                ArrowArrayAppendNull(array_out, 1);
+            }
+        });
+    } else {
+        return get_list_string(env, list, nullable, [&array_out](struct ArrowStringView val, bool) -> void {
+            ArrowArrayAppendString(array_out, val);
+        });
+    }
+}
+
+int get_list_boolean(ErlNifEnv *env, ERL_NIF_TERM list, bool nullable, const std::function<void(bool val, bool is_nil)> &callback) {
+    ERL_NIF_TERM head, tail;
+    tail = list;
+    while (enif_get_list_cell(env, tail, &head, &tail)) {
+        if (enif_is_identical(head, kAtomTrue)) {
+            callback(true, false);
+        } else if (enif_is_identical(head, kAtomFalse)) {
+            callback(false, false);
+        } else if (enif_is_identical(head, kAtomNil)) {
+            callback(true, true);
+        } else {
+            return 1;
+        }
+    }
+    return 0;
+}
+
+int do_get_list_boolean(ErlNifEnv *env, ERL_NIF_TERM list, bool nullable, ArrowType nanoarrow_type, struct ArrowArray* array_out, struct ArrowSchema* schema_out, struct ArrowError* error_out) {
+    NANOARROW_RETURN_NOT_OK(ArrowSchemaSetType(schema_out, nanoarrow_type));
+    NANOARROW_RETURN_NOT_OK(ArrowArrayInitFromSchema(array_out, schema_out, error_out));
+    NANOARROW_RETURN_NOT_OK(ArrowArrayStartAppending(array_out));
+    if (nullable) {
+        return get_list_boolean(env, list, nullable, [&array_out](bool val, bool is_nil) -> void {
+            ArrowArrayAppendInt(array_out, val);
+            if (is_nil) {
+                ArrowArrayAppendNull(array_out, 1);
+            }
+        });
+    } else {
+        return get_list_boolean(env, list, nullable, [&array_out](bool val, bool) -> void {
+            ArrowArrayAppendInt(array_out, val);
+        });
+    }
+}
+
+int get_list_fixed_size_binary(ErlNifEnv *env, ERL_NIF_TERM list, bool nullable, const std::function<void(struct ArrowBufferView val, bool is_nil)> &callback) {
+    ERL_NIF_TERM head, tail;
+    tail = list;
+    while (enif_get_list_cell(env, tail, &head, &tail)) {
+        ErlNifBinary bytes;
+        struct ArrowBufferView val{};
+        if (enif_is_binary(env, head) && enif_inspect_binary(env, head, &bytes)) {
+            val.data.data = bytes.data;
+            val.size_bytes = static_cast<int64_t>(bytes.size);
+            callback(val, false);
+        } if (nullable && enif_is_identical(head, kAtomNil)) {
+            callback(val, true);
+        } else {
+            return 1;
+        }
+    }
+    return 0;
+}
+
+int do_get_list_fixed_size_binary(ErlNifEnv *env, ERL_NIF_TERM list, bool nullable, ArrowType nanoarrow_type, struct ArrowArray* array_out, struct ArrowSchema* schema_out, struct ArrowError* error_out) {
+    NANOARROW_RETURN_NOT_OK(ArrowSchemaSetType(schema_out, nanoarrow_type));
+    NANOARROW_RETURN_NOT_OK(ArrowArrayInitFromSchema(array_out, schema_out, error_out));
+    NANOARROW_RETURN_NOT_OK(ArrowArrayStartAppending(array_out));
+    if (nullable) {
+        return get_list_fixed_size_binary(env, list, nullable, [&array_out](struct ArrowBufferView val, bool is_nil) -> void {
+            ArrowArrayAppendBytes(array_out, val);
+            if (is_nil) {
+                ArrowArrayAppendNull(array_out, 1);
+            }
+        });
+    } else {
+        return get_list_fixed_size_binary(env, list, nullable, [&array_out](struct ArrowBufferView val, bool) -> void {
+            ArrowArrayAppendBytes(array_out, val);
+        });
+    }
+}
+
 // non-zero return value indicating errors
-int elixir_to_arrow_type_struct(ErlNifEnv *env, ERL_NIF_TERM values, struct ArrowArray* array_out, struct ArrowSchema* schema_out, struct ArrowError* error_out) {
+int adbc_buffer_to_adbc_field(ErlNifEnv *env, ERL_NIF_TERM adbc_buffer, struct ArrowArray* array_out, struct ArrowSchema* schema_out, struct ArrowError* error_out) {
+    array_out->release = NULL;
+    schema_out->release = NULL;
+
+    if (!enif_is_map(env, adbc_buffer)) {
+        return kErrorBufferIsNotAMap;
+    }
+
+    ERL_NIF_TERM struct_name_term, name_term, type_term, nullable_term, metadata_term, data_term;
+    if (!enif_get_map_value(env, adbc_buffer, kAtomStructKey, &struct_name_term)) {
+        return kErrorBufferGetMapValue;
+    }
+    if (!enif_is_identical(struct_name_term, kAdbcBufferStructValue)) {
+        return kErrorBufferWrongStruct;
+    }
+
+    if (!enif_get_map_value(env, adbc_buffer, kAdbcBufferNameKey, &name_term)) {
+        return kErrorBufferGetMapValue;
+    }
+    if (!enif_get_map_value(env, adbc_buffer, kAdbcBufferTypeKey, &type_term)) {
+        return kErrorBufferGetMapValue;
+    }
+    if (!enif_get_map_value(env, adbc_buffer, kAdbcBufferNullableKey, &nullable_term)) {
+        return kErrorBufferGetMapValue;
+    }
+    if (!enif_get_map_value(env, adbc_buffer, kAdbcBufferMetadataKey, &metadata_term)) {
+        return kErrorBufferGetMapValue;
+    }
+    if (!enif_get_map_value(env, adbc_buffer, kAdbcBufferDataKey, &data_term)) {
+        return kErrorBufferGetMapValue;
+    }
+    if (!enif_is_list(env, data_term)) {
+        return kErrorBufferDataIsNotAList;
+    }
+    unsigned n_items = 0;
+    if (!enif_get_list_length(env, data_term, &n_items)) {
+        return kErrorBufferGetDataListLength;
+    }
+
+    std::string name;
+    if (!enif_is_identical(struct_name_term, kAtomNil)) {
+        if (!erlang::nif::get(env, name_term, name)) {
+            erlang::nif::get_atom(env, name_term, name);
+        }
+    }
+
+    bool nullable = enif_is_identical(nullable_term, kAtomTrue);
+
+    struct ArrowBuffer metadata_buffer{};
+    NANOARROW_RETURN_NOT_OK(ArrowMetadataBuilderInit(&metadata_buffer, nullptr));
+    if (enif_is_map(env, metadata_term)) {
+        ERL_NIF_TERM metadata_key, metadata_value;
+        ErlNifMapIterator iter;
+        enif_map_iterator_create(env, metadata_term, &iter, ERL_NIF_MAP_ITERATOR_FIRST);
+        while (enif_map_iterator_get_pair(env, &iter, &metadata_key, &metadata_value)) {
+            ErlNifBinary key_bytes, value_bytes;
+            struct ArrowStringView key_view{};
+            struct ArrowStringView value_view{};
+            if (enif_is_binary(env, metadata_key) && enif_inspect_binary(env, metadata_key, &key_bytes)) {
+                key_view.data = (const char *)key_bytes.data;
+                key_view.size_bytes = static_cast<int64_t>(key_bytes.size);
+            } else {
+                ArrowBufferReset(&metadata_buffer);
+                enif_map_iterator_destroy(env, &iter);
+                snprintf(error_out->message, sizeof(error_out->message), "cannot get metadata key");
+                return kErrorBufferGetMetadataKey;
+            }
+            if (enif_is_binary(env, metadata_value) && enif_inspect_binary(env, metadata_value, &value_bytes)) {
+                value_view.data = (const char *)value_bytes.data;
+                value_view.size_bytes = static_cast<int64_t>(value_bytes.size);
+            } else {
+                ArrowBufferReset(&metadata_buffer);
+                enif_map_iterator_destroy(env, &iter);
+                enif_snprintf(error_out->message, sizeof(error_out->message), "cannot get metadata value for key: `%T`", metadata_key);
+                return kErrorBufferGetMetadataValue;
+            }
+
+            NANOARROW_RETURN_NOT_OK(ArrowMetadataBuilderAppend(&metadata_buffer, key_view, value_view));
+            enif_map_iterator_next(env, &iter);
+        }
+        enif_map_iterator_destroy(env, &iter);
+    }
+
+    ArrowSchemaInit(schema_out);
+    NANOARROW_RETURN_NOT_OK(ArrowSchemaSetName(schema_out, name.c_str()));
+    NANOARROW_RETURN_NOT_OK(ArrowSchemaSetMetadata(schema_out, (const char*)metadata_buffer.data));
+    ArrowBufferReset(&metadata_buffer);
+
+    if (enif_is_identical(type_term, kAdbcBufferTypeI8)) {
+        do_get_list_integer<int8_t>(env, data_term, nullable, NANOARROW_TYPE_INT8, array_out, schema_out, error_out);
+    } else if (enif_is_identical(type_term, kAdbcBufferTypeI16)) {
+        do_get_list_integer<int16_t>(env, data_term, nullable, NANOARROW_TYPE_INT16, array_out, schema_out, error_out);
+    } else if (enif_is_identical(type_term, kAdbcBufferTypeI32)) {
+        do_get_list_integer<int32_t>(env, data_term, nullable, NANOARROW_TYPE_INT32, array_out, schema_out, error_out);
+    } else if (enif_is_identical(type_term, kAdbcBufferTypeI64)) {
+        do_get_list_integer<int64_t>(env, data_term, nullable, NANOARROW_TYPE_INT64, array_out, schema_out, error_out);
+    } else if (enif_is_identical(type_term, kAdbcBufferTypeU8)) {
+        do_get_list_integer<uint8_t>(env, data_term, nullable, NANOARROW_TYPE_UINT8, array_out, schema_out, error_out);
+    } else if (enif_is_identical(type_term, kAdbcBufferTypeU16)) {
+        do_get_list_integer<uint16_t>(env, data_term, nullable, NANOARROW_TYPE_UINT16, array_out, schema_out, error_out);
+    } else if (enif_is_identical(type_term, kAdbcBufferTypeU32)) {
+        do_get_list_integer<uint32_t>(env, data_term, nullable, NANOARROW_TYPE_UINT32, array_out, schema_out, error_out);
+    } else if (enif_is_identical(type_term, kAdbcBufferTypeU64)) {
+        do_get_list_integer<uint64_t>(env, data_term, nullable, NANOARROW_TYPE_UINT64, array_out, schema_out, error_out);
+    } else if (enif_is_identical(type_term, kAdbcBufferTypeF32)) {
+        do_get_list_float(env, data_term, nullable, NANOARROW_TYPE_FLOAT, array_out, schema_out, error_out);
+    } else if (enif_is_identical(type_term, kAdbcBufferTypeF64)) {
+        do_get_list_float(env, data_term, nullable, NANOARROW_TYPE_DOUBLE, array_out, schema_out, error_out);
+    } else if (enif_is_identical(type_term, kAdbcBufferTypeString)) {
+        do_get_list_string(env, data_term, nullable, NANOARROW_TYPE_STRING, array_out, schema_out, error_out);
+    } else if (enif_is_identical(type_term, kAdbcBufferTypeLargeString)) {
+        do_get_list_string(env, data_term, nullable, NANOARROW_TYPE_LARGE_STRING, array_out, schema_out, error_out);
+    } else if (enif_is_identical(type_term, kAdbcBufferTypeBinary)) {
+        do_get_list_string(env, data_term, nullable, NANOARROW_TYPE_BINARY, array_out, schema_out, error_out);
+    } else if (enif_is_identical(type_term, kAdbcBufferTypeLargeBinary)) {
+        do_get_list_string(env, data_term, nullable, NANOARROW_TYPE_LARGE_BINARY, array_out, schema_out, error_out);
+    } else if (enif_is_identical(type_term, kAdbcBufferTypeFixedSizeBinary)) {
+        do_get_list_fixed_size_binary(env, data_term, nullable, NANOARROW_TYPE_FIXED_SIZE_BINARY, array_out, schema_out, error_out);
+    } else if (enif_is_identical(type_term, kAdbcBufferTypeBool)) {
+        do_get_list_boolean(env, data_term, nullable, NANOARROW_TYPE_BOOL, array_out, schema_out, error_out);
+    } else {
+        if (schema_out->release) schema_out->release(schema_out);
+        enif_snprintf(error_out->message, sizeof(error_out->message), "type `%T` not supported yet.", type_term);
+        return kErrorBufferUnknownType;
+    }
+
+    NANOARROW_RETURN_NOT_OK(ArrowArrayFinishBuildingDefault(array_out, error_out));
+    return 0;   
+}
+
+// non-zero return value indicating errors
+int adbc_buffer_to_arrow_type_struct(ErlNifEnv *env, ERL_NIF_TERM values, struct ArrowArray* array_out, struct ArrowSchema* schema_out, struct ArrowError* error_out) {
     array_out->release = NULL;
     schema_out->release = NULL;
 
@@ -1698,6 +2067,7 @@ int elixir_to_arrow_type_struct(ErlNifEnv *env, ERL_NIF_TERM values, struct Arro
         ArrowSchemaInit(schema_i);
 
         auto child_i = array_out->children[processed];
+
         ErlNifSInt64 i64;
         double f64;
         ErlNifBinary bytes;
@@ -1715,20 +2085,18 @@ int elixir_to_arrow_type_struct(ErlNifEnv *env, ERL_NIF_TERM values, struct Arro
             NANOARROW_RETURN_NOT_OK(ArrowArrayStartAppending(child_i));
             NANOARROW_RETURN_NOT_OK(ArrowArrayAppendDouble(child_i, f64));
         } else if (enif_is_binary(env, head) && enif_inspect_binary(env, head, &bytes)) {
-            auto type = NANOARROW_TYPE_BINARY;
+            auto type = NANOARROW_TYPE_STRING;
             if (bytes.size > INT32_MAX) {
-                type = NANOARROW_TYPE_LARGE_BINARY;
+                type = NANOARROW_TYPE_LARGE_STRING;
             }
-
+            struct ArrowStringView view{};
+            view.data = (const char*)(bytes.data);
+            view.size_bytes = static_cast<int64_t>(bytes.size);
             NANOARROW_RETURN_NOT_OK(ArrowSchemaSetType(schema_i, type));
             NANOARROW_RETURN_NOT_OK(ArrowSchemaSetName(schema_i, ""));
             NANOARROW_RETURN_NOT_OK(ArrowArrayInitFromSchema(child_i, schema_i, error_out));
-
-            struct ArrowBufferView view{};
-            view.data.data = bytes.data;
-            view.size_bytes = static_cast<int64_t>(bytes.size);
             NANOARROW_RETURN_NOT_OK(ArrowArrayStartAppending(child_i));
-            NANOARROW_RETURN_NOT_OK(ArrowArrayAppendBytes(child_i, view));
+            NANOARROW_RETURN_NOT_OK(ArrowArrayAppendString(child_i, view));
         } else if (enif_is_atom(env, head)) {
             int64_t val{};
             auto type = NANOARROW_TYPE_BOOL;
@@ -1753,6 +2121,29 @@ int elixir_to_arrow_type_struct(ErlNifEnv *env, ERL_NIF_TERM values, struct Arro
                 // 1x Null
                 val = 1;
                 NANOARROW_RETURN_NOT_OK(ArrowArrayAppendNull(child_i, val));
+            }
+        } else if (enif_is_map(env, head)) {
+            int ret = adbc_buffer_to_adbc_field(env, head, child_i, schema_i, error_out);
+            switch (ret)
+            {
+            case kErrorBufferIsNotAMap:
+            case kErrorBufferWrongStruct:
+                snprintf(error_out->message, sizeof(error_out->message), "Expected `%%Adbc.Buffer{}` or primitive data types.");
+                return 1;
+            case kErrorBufferGetMapValue:
+                snprintf(error_out->message, sizeof(error_out->message), "Invalid `%%Adbc.Buffer{}`.");
+                return 1;
+            case kErrorBufferGetDataListLength:
+            case kErrorBufferDataIsNotAList:
+                snprintf(error_out->message, sizeof(error_out->message), "Expected the `data` field of `Adbc.Buffer` to be a list of values.");
+                return 1;
+            case kErrorBufferUnknownType:
+            case kErrorBufferGetMetadataKey:
+            case kErrorBufferGetMetadataValue:
+                // error message is already set
+                return 1;
+            default:
+                break;
             }
         } else {
             snprintf(error_out->message, sizeof(error_out->message), "type not supported yet.");
@@ -1785,7 +2176,7 @@ static ERL_NIF_TERM adbc_statement_bind(ErlNifEnv *env, int argc, const ERL_NIF_
     struct AdbcError adbc_error{};
     AdbcStatusCode code{};
 
-    if (elixir_to_arrow_type_struct(env, argv[1], &values, &schema, &arrow_error)) {
+    if (adbc_buffer_to_arrow_type_struct(env, argv[1], &values, &schema, &arrow_error)) {
         ret = erlang::nif::error(env, arrow_error.message);
         goto cleanup;
     }
@@ -1883,6 +2274,31 @@ static int on_load(ErlNifEnv *env, void **, ERL_NIF_TERM) {
     kAtomMinuteKey = erlang::nif::atom(env, "minute");
     kAtomSecondKey = erlang::nif::atom(env, "second");
     kAtomMicrosecondKey = erlang::nif::atom(env, "microsecond");
+
+    kAdbcBufferStructValue = enif_make_atom(env, "Elixir.Adbc.Buffer");
+    kAdbcBufferNameKey = enif_make_atom(env, "name");
+    kAdbcBufferTypeKey = enif_make_atom(env, "type");
+    kAdbcBufferNullableKey = enif_make_atom(env, "nullable");
+    kAdbcBufferMetadataKey = enif_make_atom(env, "metadata");
+    kAdbcBufferDataKey = enif_make_atom(env, "data");
+    // kAdbcBufferPrivateKey = enif_make_atom(env, "__private__");
+
+    kAdbcBufferTypeU8 = enif_make_atom(env, "u8");
+    kAdbcBufferTypeU16 = enif_make_atom(env, "u16");
+    kAdbcBufferTypeU32 = enif_make_atom(env, "u32");
+    kAdbcBufferTypeU64 = enif_make_atom(env, "u64");
+    kAdbcBufferTypeI8 = enif_make_atom(env, "i8");
+    kAdbcBufferTypeI16 = enif_make_atom(env, "i16");
+    kAdbcBufferTypeI32 = enif_make_atom(env, "i32");
+    kAdbcBufferTypeI64 = enif_make_atom(env, "i64");
+    kAdbcBufferTypeF32 = enif_make_atom(env, "f32");
+    kAdbcBufferTypeF64 = enif_make_atom(env, "f64");
+    kAdbcBufferTypeString = enif_make_atom(env, "string");
+    kAdbcBufferTypeLargeString = enif_make_atom(env, "large_string");
+    kAdbcBufferTypeBinary = enif_make_atom(env, "binary");
+    kAdbcBufferTypeLargeBinary = enif_make_atom(env, "large_binary");
+    kAdbcBufferTypeFixedSizeBinary = enif_make_atom(env, "fixed_size_binary");
+    kAdbcBufferTypeBool = enif_make_atom(env, "boolean");
 
     return 0;
 }

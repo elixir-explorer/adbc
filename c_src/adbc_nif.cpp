@@ -2128,14 +2128,14 @@ int adbc_buffer_to_arrow_type_struct(ErlNifEnv *env, ERL_NIF_TERM values, struct
             {
             case kErrorBufferIsNotAMap:
             case kErrorBufferWrongStruct:
-                snprintf(error_out->message, sizeof(error_out->message), "Expected `%%Adbc.Buffer{}` or primitive data types.");
+                snprintf(error_out->message, sizeof(error_out->message), "Expected `%%Adbc.Column{}` or primitive data types.");
                 return 1;
             case kErrorBufferGetMapValue:
-                snprintf(error_out->message, sizeof(error_out->message), "Invalid `%%Adbc.Buffer{}`.");
+                snprintf(error_out->message, sizeof(error_out->message), "Invalid `%%Adbc.Column{}`.");
                 return 1;
             case kErrorBufferGetDataListLength:
             case kErrorBufferDataIsNotAList:
-                snprintf(error_out->message, sizeof(error_out->message), "Expected the `data` field of `Adbc.Buffer` to be a list of values.");
+                snprintf(error_out->message, sizeof(error_out->message), "Expected the `data` field of `Adbc.Column` to be a list of values.");
                 return 1;
             case kErrorBufferUnknownType:
             case kErrorBufferGetMetadataKey:
@@ -2275,7 +2275,7 @@ static int on_load(ErlNifEnv *env, void **, ERL_NIF_TERM) {
     kAtomSecondKey = erlang::nif::atom(env, "second");
     kAtomMicrosecondKey = erlang::nif::atom(env, "microsecond");
 
-    kAdbcBufferStructValue = enif_make_atom(env, "Elixir.Adbc.Buffer");
+    kAdbcBufferStructValue = enif_make_atom(env, "Elixir.Adbc.Column");
     kAdbcBufferNameKey = enif_make_atom(env, "name");
     kAdbcBufferTypeKey = enif_make_atom(env, "type");
     kAdbcBufferNullableKey = enif_make_atom(env, "nullable");

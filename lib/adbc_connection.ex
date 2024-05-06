@@ -260,27 +260,27 @@ defmodule Adbc.Connection do
 
   `COLUMN_SCHEMA` is a Struct with fields:
 
-  | Field Name               | Field Type  | Null Contstraint | Comments |
-  |--------------------------|-------------|-----------       |----------|
-  | `column_name`              | `utf8`    | not null         |          |
-  | `ordinal_position`         | `int32`   |                  | (1)      |
-  | `remarks`                  | `utf8`    |                  | (2)      |
-  | `xdbc_data_type`           | `int16`   |                  | (3)      |
-  | `xdbc_type_name`           | `utf8`    |                  | (3)      |
-  | `xdbc_column_size`         | `int32`   |                  | (3)      |
-  | `xdbc_decimal_digits`      | `int16`   |                  | (3)      |
-  | `xdbc_num_prec_radix`      | `int16`   |                  | (3)      |
-  | `xdbc_nullable`            | `int16`   |                  | (3)      |
-  | `xdbc_column_def`          | `utf8`    |                  | (3)      |
-  | `xdbc_sql_data_type`       | `int16`   |                  | (3)      |
-  | `xdbc_datetime_sub`        | `int16`   |                  | (3)      |
-  | `xdbc_char_octet_length`   | `int32`   |                  | (3)      |
-  | `xdbc_is_nullable`         | `utf8`    |                  | (3)      |
-  | `xdbc_scope_catalog`       | `utf8`    |                  | (3)      |
-  | `xdbc_scope_schema`        | `utf8`    |                  | (3)      |
-  | `xdbc_scope_table`         | `utf8`    |                  | (3)      |
-  | `xdbc_is_autoincrement`    | `bool`    |                  | (3)      |
-  | `xdbc_is_generatedcolumn`  | `bool`    |                  | (3)      |
+  | Field Name                 | Field Type  | Null Contstraint | Comments |
+  |----------------------------|-------------|------------------|----------|
+  | `column_name`              | `utf8`      | not null         |          |
+  | `ordinal_position`         | `int32`     |                  | (1)      |
+  | `remarks`                  | `utf8`      |                  | (2)      |
+  | `xdbc_data_type`           | `int16`     |                  | (3)      |
+  | `xdbc_type_name`           | `utf8`      |                  | (3)      |
+  | `xdbc_column_size`         | `int32`     |                  | (3)      |
+  | `xdbc_decimal_digits`      | `int16`     |                  | (3)      |
+  | `xdbc_num_prec_radix`      | `int16`     |                  | (3)      |
+  | `xdbc_nullable`            | `int16`     |                  | (3)      |
+  | `xdbc_column_def`          | `utf8`      |                  | (3)      |
+  | `xdbc_sql_data_type`       | `int16`     |                  | (3)      |
+  | `xdbc_datetime_sub`        | `int16`     |                  | (3)      |
+  | `xdbc_char_octet_length`   | `int32`     |                  | (3)      |
+  | `xdbc_is_nullable`         | `utf8`      |                  | (3)      |
+  | `xdbc_scope_catalog`       | `utf8`      |                  | (3)      |
+  | `xdbc_scope_schema`        | `utf8`      |                  | (3)      |
+  | `xdbc_scope_table`         | `utf8`      |                  | (3)      |
+  | `xdbc_is_autoincrement`    | `bool`      |                  | (3)      |
+  | `xdbc_is_generatedcolumn`  | `bool`      |                  | (3)      |
 
   1. The column's ordinal position in the table (starting from 1).
   2. Database-specific description of the column.
@@ -290,8 +290,8 @@ defmodule Adbc.Connection do
 
   `CONSTRAINT_SCHEMA` is a Struct with fields:
 
-  | Field Name                | Field Type         | Null Contstraint | Comments |
-  |---------------------------|--------------------|------------------|----------|
+  | Field Name                | Field Type           | Null Contstraint | Comments |
+  |---------------------------|----------------------|------------------|----------|
   | `constraint_name`         | `utf8`               |                  |          |
   | `constraint_type`         | `utf8`               | not null         | (1)      |
   | `constraint_column_names` | `list<utf8>`         | not null         | (2)      |
@@ -303,8 +303,8 @@ defmodule Adbc.Connection do
 
   `USAGE_SCHEMA` is a Struct with fields:
 
-  | Field Name               | Field Type  | Null Contstraint |
-  |--------------------------|-------------|------------------|
+  | Field Name               | Field Type    | Null Contstraint |
+  |--------------------------|---------------|------------------|
   | `fk_catalog`             | `utf8`        |                  |
   | `fk_db_schema`           | `utf8`        |                  |
   | `fk_table`               | `utf8`        | not null         |

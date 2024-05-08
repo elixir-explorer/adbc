@@ -17,7 +17,7 @@ defmodule Update do
   # To update ADBC drivers, bump the tag and version accordingly
   # https://github.com/apache/arrow-adbc/releases
   @adbc_driver_version "1.0.0"
-  @adbc_tag "apache-arrow-adbc-12-rc0"
+  @adbc_tag "apache-arrow-adbc-12-rc1"
   @adbc_drivers ~w(sqlite postgresql flightsql snowflake)a
 
   def versions do
@@ -79,7 +79,7 @@ defmodule Update do
 
       {aarch64_apple_darwin, wheels} = data_for(wheels, ["macosx", "arm64"])
       {x86_64_apple_darwin, wheels} = data_for(wheels, ["macosx", "x86_64"])
-      # {aarch64_linux_gnu, wheels} = data_for(wheels, ["manylinux", "aarch64"])
+      {aarch64_linux_gnu, wheels} = data_for(wheels, ["manylinux", "aarch64"])
       {x86_64_linux_gnu, wheels} = data_for(wheels, ["manylinux", "x86_64"])
       {x86_64_windows_msvc, wheels} = data_for(wheels, ["win_amd64"])
 
@@ -91,7 +91,7 @@ defmodule Update do
         %{
           "aarch64-apple-darwin" => aarch64_apple_darwin,
           "x86_64-apple-darwin" => x86_64_apple_darwin,
-          # "aarch64-linux-gnu" => aarch64_linux_gnu,
+          "aarch64-linux-gnu" => aarch64_linux_gnu,
           "x86_64-linux-gnu" => x86_64_linux_gnu,
           "x86_64-windows-msvc" => x86_64_windows_msvc
         }

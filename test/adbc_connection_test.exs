@@ -47,33 +47,58 @@ defmodule Adbc.Connection.Test do
       {:ok,
        %Adbc.Result{
          num_rows: nil,
-         data: %{
-           "info_name" => [0, 1, 100, 101, 102],
-           "info_value" => [
-             %{"string_value" => ["SQLite"]},
-             # %{"string_value" => ["3.43.2"]},
-             %{"string_value" => [_]},
-             %{"string_value" => ["ADBC SQLite Driver"]},
-             # %{"string_value" => ["(unknown)"]},
-             %{"string_value" => [_]},
-             # %{"string_value" => ["0.4.0"]}
-             %{"string_value" => [_]}
-           ]
-         }
+         data: [
+           %Adbc.Column{
+             name: "info_name",
+             type: :u32,
+             nullable: false,
+             metadata: nil,
+             data: [0, 1, 100, 101, 102]
+           },
+           %Adbc.Column{
+             name: "info_value",
+             type: :dense_union,
+             nullable: false,
+             metadata: nil,
+             data: [
+               %{"string_value" => ["SQLite"]},
+               # "3.43.2"
+               %{"string_value" => [_]},
+               %{"string_value" => ["ADBC SQLite Driver"]},
+               # "(unknown)"
+               %{"string_value" => [_]},
+               # "0.4.0"
+               %{"string_value" => [_]}
+             ]
+           }
+         ]
        }} = Connection.get_info(conn)
     end
 
     test "get some info from a connection", %{db: db} do
       conn = start_supervised!({Connection, database: db})
 
-      assert {:ok,
-              %Adbc.Result{
-                num_rows: nil,
-                data: %{
-                  "info_name" => [0],
-                  "info_value" => [%{"string_value" => ["SQLite"]}]
-                }
-              }} == Connection.get_info(conn, [0])
+      assert {
+               :ok,
+               %Adbc.Result{
+                 data: [
+                   %Adbc.Column{
+                     name: "info_name",
+                     type: :u32,
+                     nullable: false,
+                     metadata: nil,
+                     data: [0]
+                   },
+                   %Adbc.Column{
+                     name: "info_value",
+                     type: :dense_union,
+                     nullable: false,
+                     metadata: nil,
+                     data: [%{"string_value" => ["SQLite"]}]
+                   }
+                 ]
+               }
+             } == Connection.get_info(conn, [0])
     end
   end
 
@@ -98,53 +123,64 @@ defmodule Adbc.Connection.Test do
 
       {:ok,
        %Adbc.Result{
-         num_rows: nil,
-         data: %{
-           "catalog_db_schemas" => [
-             {"db_schema_name", []},
-             {"db_schema_tables",
-              [
-                {"table_name", []},
-                {"table_type", []},
-                {"table_columns",
-                 [
-                   {"column_name", []},
-                   {"ordinal_position", []},
-                   {"remarks", []},
-                   {"xdbc_data_type", []},
-                   {"xdbc_type_name", []},
-                   {"xdbc_column_size", []},
-                   {"xdbc_decimal_digits", []},
-                   {"xdbc_num_prec_radix", []},
-                   {"xdbc_nullable", []},
-                   {"xdbc_column_def", []},
-                   {"xdbc_sql_data_type", []},
-                   {"xdbc_datetime_sub", []},
-                   {"xdbc_char_octet_length", []},
-                   {"xdbc_is_nullable", []},
-                   {"xdbc_scope_catalog", []},
-                   {"xdbc_scope_schema", []},
-                   {"xdbc_scope_table", []},
-                   {"xdbc_is_autoincrement", []},
-                   {"xdbc_is_generatedcolumn", []}
-                 ]},
-                {"table_constraints",
-                 [
-                   {"constraint_name", []},
-                   {"constraint_type", []},
-                   {"constraint_column_names", [[]]},
-                   {"constraint_column_usage",
-                    [
-                      {"fk_catalog", []},
-                      {"fk_db_schema", []},
-                      {"fk_table", []},
-                      {"fk_column_name", []}
-                    ]}
-                 ]}
-              ]}
-           ],
-           "catalog_name" => []
-         }
+         data: [
+           %Adbc.Column{
+             name: "catalog_name",
+             type: :string,
+             nullable: false,
+             metadata: nil,
+             data: []
+           },
+           %Adbc.Column{
+             name: "catalog_db_schemas",
+             type: :list,
+             nullable: false,
+             metadata: nil,
+             data: [
+               {"db_schema_name", []},
+               {"db_schema_tables",
+                [
+                  {"table_name", []},
+                  {"table_type", []},
+                  {"table_columns",
+                   [
+                     {"column_name", []},
+                     {"ordinal_position", []},
+                     {"remarks", []},
+                     {"xdbc_data_type", []},
+                     {"xdbc_type_name", []},
+                     {"xdbc_column_size", []},
+                     {"xdbc_decimal_digits", []},
+                     {"xdbc_num_prec_radix", []},
+                     {"xdbc_nullable", []},
+                     {"xdbc_column_def", []},
+                     {"xdbc_sql_data_type", []},
+                     {"xdbc_datetime_sub", []},
+                     {"xdbc_char_octet_length", []},
+                     {"xdbc_is_nullable", []},
+                     {"xdbc_scope_catalog", []},
+                     {"xdbc_scope_schema", []},
+                     {"xdbc_scope_table", []},
+                     {"xdbc_is_autoincrement", []},
+                     {"xdbc_is_generatedcolumn", []}
+                   ]},
+                  {"table_constraints",
+                   [
+                     {"constraint_name", []},
+                     {"constraint_type", []},
+                     {"constraint_column_names", [[]]},
+                     {"constraint_column_usage",
+                      [
+                        {"fk_catalog", []},
+                        {"fk_db_schema", []},
+                        {"fk_table", []},
+                        {"fk_column_name", []}
+                      ]}
+                   ]}
+                ]}
+             ]
+           }
+         ]
        }} = Connection.get_objects(conn, 0)
     end
   end
@@ -162,17 +198,56 @@ defmodule Adbc.Connection.Test do
     test "select", %{db: db} do
       conn = start_supervised!({Connection, database: db})
 
-      assert {:ok, %Adbc.Result{data: %{"num" => [123]}}} =
+      assert {:ok,
+              %Adbc.Result{
+                data: [
+                  %Adbc.Column{
+                    name: "num",
+                    type: :i64,
+                    nullable: false,
+                    metadata: nil,
+                    data: [123]
+                  }
+                ]
+              }} =
                Connection.query(conn, "SELECT 123 as num")
 
-      assert {:ok, %Adbc.Result{data: %{"num" => [123], "bool" => [1]}}} =
-               Connection.query(conn, "SELECT 123 as num, true as bool")
+      assert {:ok,
+              %Adbc.Result{
+                data: [
+                  %Adbc.Column{
+                    name: "num",
+                    type: :i64,
+                    nullable: false,
+                    metadata: nil,
+                    data: [123]
+                  },
+                  %Adbc.Column{
+                    name: "bool",
+                    type: :i64,
+                    nullable: false,
+                    metadata: nil,
+                    data: [1]
+                  }
+                ]
+              }} = Connection.query(conn, "SELECT 123 as num, true as bool")
     end
 
     test "select with parameters", %{db: db} do
       conn = start_supervised!({Connection, database: db})
 
-      assert {:ok, %Adbc.Result{data: %{"num" => [579]}}} =
+      assert {:ok,
+              %Adbc.Result{
+                data: [
+                  %Adbc.Column{
+                    name: "num",
+                    type: :i64,
+                    nullable: false,
+                    metadata: nil,
+                    data: [579]
+                  }
+                ]
+              }} =
                Connection.query(conn, "SELECT 123 + ? as num", [456])
     end
 
@@ -186,7 +261,18 @@ defmodule Adbc.Connection.Test do
       conn = start_supervised!({Connection, database: db})
       assert {:ok, ref} = Connection.prepare(conn, "SELECT 123 + ? as num")
 
-      assert {:ok, %Adbc.Result{data: %{"num" => [579]}}} =
+      assert {:ok,
+              %Adbc.Result{
+                data: [
+                  %Adbc.Column{
+                    name: "num",
+                    type: :i64,
+                    nullable: false,
+                    metadata: nil,
+                    data: [579]
+                  }
+                ]
+              }} =
                Connection.query(conn, ref, [456])
     end
 
@@ -195,10 +281,32 @@ defmodule Adbc.Connection.Test do
       assert {:ok, ref_a} = Connection.prepare(conn, "SELECT 123 + ? as num")
       assert {:ok, ref_b} = Connection.prepare(conn, "SELECT 1000 + ? as num")
 
-      assert {:ok, %Adbc.Result{data: %{"num" => [579]}}} =
+      assert {:ok,
+              %Adbc.Result{
+                data: [
+                  %Adbc.Column{
+                    name: "num",
+                    type: :i64,
+                    nullable: false,
+                    metadata: nil,
+                    data: [579]
+                  }
+                ]
+              }} =
                Connection.query(conn, ref_a, [456])
 
-      assert {:ok, %Adbc.Result{data: %{"num" => [1456]}}} =
+      assert {:ok,
+              %Adbc.Result{
+                data: [
+                  %Adbc.Column{
+                    name: "num",
+                    type: :i64,
+                    nullable: false,
+                    metadata: nil,
+                    data: [1456]
+                  }
+                ]
+              }} =
                Connection.query(conn, ref_b, [456])
     end
   end
@@ -207,17 +315,48 @@ defmodule Adbc.Connection.Test do
     test "select", %{db: db} do
       conn = start_supervised!({Connection, database: db})
 
-      assert %Adbc.Result{data: %{"num" => [123]}} =
+      assert %Adbc.Result{
+               data: [
+                 %Adbc.Column{
+                   name: "num",
+                   type: :i64,
+                   nullable: false,
+                   metadata: nil,
+                   data: [123]
+                 }
+               ]
+             } =
                Connection.query!(conn, "SELECT 123 as num")
 
-      assert %Adbc.Result{data: %{"num" => [123], "bool" => [1]}} =
+      assert %Adbc.Result{
+               data: [
+                 %Adbc.Column{
+                   name: "num",
+                   type: :i64,
+                   nullable: false,
+                   metadata: nil,
+                   data: [123]
+                 },
+                 %Adbc.Column{name: "bool", type: :i64, nullable: false, metadata: nil, data: [1]}
+               ]
+             } =
                Connection.query!(conn, "SELECT 123 as num, true as bool")
     end
 
     test "select with parameters", %{db: db} do
       conn = start_supervised!({Connection, database: db})
 
-      assert %Adbc.Result{data: %{"num" => [579]}} =
+      assert %Adbc.Result{
+               data: [
+                 %Adbc.Column{
+                   name: "num",
+                   type: :i64,
+                   nullable: false,
+                   metadata: nil,
+                   data: [579]
+                 }
+               ]
+             } =
                Connection.query!(conn, "SELECT 123 + ? as num", [456])
     end
 
@@ -234,7 +373,18 @@ defmodule Adbc.Connection.Test do
     test "without parameters", %{db: db} do
       conn = start_supervised!({Connection, database: db})
 
-      assert %Adbc.Result{data: %{"num" => [123], "bool" => [1]}} ==
+      assert %Adbc.Result{
+               data: [
+                 %Adbc.Column{
+                   name: "num",
+                   type: :i64,
+                   nullable: false,
+                   metadata: nil,
+                   data: [123]
+                 },
+                 %Adbc.Column{name: "bool", type: :i64, nullable: false, metadata: nil, data: [1]}
+               ]
+             } ==
                Connection.query!(conn, "SELECT 123 as num, true as bool", [],
                  "adbc.sqlite.query.batch_rows": 1
                )
@@ -243,7 +393,17 @@ defmodule Adbc.Connection.Test do
     test "with parameters", %{db: db} do
       conn = start_supervised!({Connection, database: db})
 
-      assert %Adbc.Result{data: %{"num" => [579]}} ==
+      assert %Adbc.Result{
+               data: [
+                 %Adbc.Column{
+                   name: "num",
+                   type: :i64,
+                   nullable: false,
+                   metadata: nil,
+                   data: [579]
+                 }
+               ]
+             } ==
                Connection.query!(conn, "SELECT 123 + ? as num", [456],
                  "adbc.sqlite.query.batch_rows": 10
                )

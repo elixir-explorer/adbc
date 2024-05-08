@@ -71,6 +71,42 @@ defmodule Adbc.Column do
     column(:boolean, data, opts)
   end
 
+  @doc """
+  A buffer for an unsigned 8-bit integer column.
+
+  ## Arguments
+
+  * `data`:
+    * A list of unsigned 8-bit integer values
+    * A single binary type value where each byte represents an unsigned 8-bit integer
+  * `opts` - A keyword list of options
+
+  ## Options
+
+  * `:name` - The name of the column
+  * `:nullable` - A boolean value indicating whether the column is nullable
+  * `:null_count` - The number of null values in the column, defaults to 0, only used when
+    `:nullable` is `true`
+  * `:null`: only used when `:nullable` is `true`, can be one of the following:
+    * A list of booleans with the same length as  indicating whether each value is null
+    * A list of non-negative integers where each integer represents the corresponding index of a
+      null value
+    * A single binary type value where each bit indicates whether each value is null
+  * `:metadata` - A map of metadata
+
+  ## Examples
+
+      iex> Adbc.Buffer.u8([1, 2, 3])
+      %Adbc.Column{
+        name: nil,
+        type: :u8,
+        nullable: false,
+        null_count: 0,
+        null: nil,
+        metadata: %{},
+        data: [1, 2, 3]
+      }
+  """
   @spec u8([0..255] | binary(), Keyword.t()) :: %Adbc.Column{}
   def u8(u8, opts \\ [])
 

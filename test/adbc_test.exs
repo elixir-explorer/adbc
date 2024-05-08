@@ -32,17 +32,50 @@ defmodule AdbcTest do
     end
 
     test "runs queries", %{conn: conn} do
-      assert {:ok, %Adbc.Result{data: %{"num" => [123]}}} =
+      assert {:ok,
+              %Adbc.Result{
+                data: [
+                  %Adbc.Column{
+                    name: "num",
+                    type: :i32,
+                    nullable: false,
+                    metadata: nil,
+                    data: [123]
+                  }
+                ]
+              }} =
                Connection.query(conn, "SELECT 123 as num")
     end
 
     test "list responses", %{conn: conn} do
-      assert {:ok, %Adbc.Result{data: %{"num" => [[1, 2, 3]]}}} =
+      assert {:ok,
+              %Adbc.Result{
+                data: [
+                  %Adbc.Column{
+                    name: "num",
+                    type: :list,
+                    nullable: false,
+                    metadata: nil,
+                    data: [[1, 2, 3]]
+                  }
+                ]
+              }} =
                Connection.query(conn, "SELECT ARRAY[1, 2, 3] as num")
     end
 
     test "list responses with null", %{conn: conn} do
-      assert {:ok, %Adbc.Result{data: %{"num" => [[1, 2, 3, nil, 5]]}}} =
+      assert {:ok,
+              %Adbc.Result{
+                data: [
+                  %Adbc.Column{
+                    name: "num",
+                    type: :list,
+                    nullable: false,
+                    metadata: nil,
+                    data: [[1, 2, 3, nil, 5]]
+                  }
+                ]
+              }} =
                Connection.query(conn, "SELECT ARRAY[1, 2, 3, null, 5] as num")
     end
 
@@ -52,9 +85,15 @@ defmodule AdbcTest do
       """
 
       %Adbc.Result{
-        data: %{
-          "generate_series" => generate_series
-        }
+        data: [
+          %Adbc.Column{
+            name: "generate_series",
+            type: :timestamp,
+            nullable: false,
+            metadata: nil,
+            data: generate_series
+          }
+        ]
       } = Connection.query!(conn, query)
 
       assert Enum.count(generate_series) == 3_506_641
@@ -73,13 +112,43 @@ defmodule AdbcTest do
       """
 
       assert %Adbc.Result{
-               data: %{
-                 "date" => [~D[2023-03-01]],
-                 "datetime" => [~N[2023-03-01 10:23:45.000000]],
-                 "datetime_usec" => [~N[2023-03-01 10:23:45.123456]],
-                 "time" => [~T[10:23:45.000000]],
-                 "time_usec" => [~T[10:23:45.123456]]
-               }
+               data: [
+                 %Adbc.Column{
+                   name: "datetime",
+                   type: :timestamp,
+                   nullable: false,
+                   metadata: nil,
+                   data: [~N[2023-03-01 10:23:45.000000]]
+                 },
+                 %Adbc.Column{
+                   name: "datetime_usec",
+                   type: :timestamp,
+                   nullable: false,
+                   metadata: nil,
+                   data: [~N[2023-03-01 10:23:45.123456]]
+                 },
+                 %Adbc.Column{
+                   name: "date",
+                   type: :date32,
+                   nullable: false,
+                   metadata: nil,
+                   data: [~D[2023-03-01]]
+                 },
+                 %Adbc.Column{
+                   name: "time",
+                   type: :time64,
+                   nullable: false,
+                   metadata: nil,
+                   data: [~T[10:23:45.000000]]
+                 },
+                 %Adbc.Column{
+                   name: "time_usec",
+                   type: :time64,
+                   nullable: false,
+                   metadata: nil,
+                   data: [~T[10:23:45.123456]]
+                 }
+               ]
              } = Connection.query!(conn, query)
     end
   end

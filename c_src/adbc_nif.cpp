@@ -21,45 +21,59 @@ static ERL_NIF_TERM kAtomNil;
 static ERL_NIF_TERM kAtomTrue;
 static ERL_NIF_TERM kAtomFalse;
 static ERL_NIF_TERM kAtomEndOfSeries;
+static ERL_NIF_TERM kAtomStructKey;
+
+static ERL_NIF_TERM kAtomCalendarKey;
+static ERL_NIF_TERM kAtomCalendarISO;
 
 static ERL_NIF_TERM kAtomDateModule;
-static ERL_NIF_TERM kAtomTimeModule;
-static ERL_NIF_TERM kAtomNaiveDateTimeModule;
-static ERL_NIF_TERM kAtomCalendarISO;
-static ERL_NIF_TERM kAtomStructKey;
-static ERL_NIF_TERM kAtomCalendarKey;
 static ERL_NIF_TERM kAtomYearKey;
 static ERL_NIF_TERM kAtomMonthKey;
 static ERL_NIF_TERM kAtomDayKey;
+
+static ERL_NIF_TERM kAtomNaiveDateTimeModule;
+static ERL_NIF_TERM kAtomTimeModule;
 static ERL_NIF_TERM kAtomHourKey;
 static ERL_NIF_TERM kAtomMinuteKey;
 static ERL_NIF_TERM kAtomSecondKey;
 static ERL_NIF_TERM kAtomMicrosecondKey;
 
-static ERL_NIF_TERM kAdbcBufferStructValue;
-static ERL_NIF_TERM kAdbcBufferNameKey;
-static ERL_NIF_TERM kAdbcBufferTypeKey;
-static ERL_NIF_TERM kAdbcBufferNullableKey;
-static ERL_NIF_TERM kAdbcBufferMetadataKey;
-static ERL_NIF_TERM kAdbcBufferDataKey;
-// static ERL_NIF_TERM kAdbcBufferPrivateKey;
+static ERL_NIF_TERM kAtomAdbcColumnModule;
+static ERL_NIF_TERM kAtomNameKey;
+static ERL_NIF_TERM kAtomTypeKey;
+static ERL_NIF_TERM kAtomNullableKey;
+static ERL_NIF_TERM kAtomMetadataKey;
+static ERL_NIF_TERM kAtomDataKey;
+// static ERL_NIF_TERM kAtomPrivateKey;
 
-static ERL_NIF_TERM kAdbcBufferTypeU8;
-static ERL_NIF_TERM kAdbcBufferTypeU16;
-static ERL_NIF_TERM kAdbcBufferTypeU32;
-static ERL_NIF_TERM kAdbcBufferTypeU64;
-static ERL_NIF_TERM kAdbcBufferTypeI8;
-static ERL_NIF_TERM kAdbcBufferTypeI16;
-static ERL_NIF_TERM kAdbcBufferTypeI32;
-static ERL_NIF_TERM kAdbcBufferTypeI64;
-static ERL_NIF_TERM kAdbcBufferTypeF32;
-static ERL_NIF_TERM kAdbcBufferTypeF64;
-static ERL_NIF_TERM kAdbcBufferTypeString;
-static ERL_NIF_TERM kAdbcBufferTypeLargeString;
-static ERL_NIF_TERM kAdbcBufferTypeBinary;
-static ERL_NIF_TERM kAdbcBufferTypeLargeBinary;
-static ERL_NIF_TERM kAdbcBufferTypeFixedSizeBinary;
-static ERL_NIF_TERM kAdbcBufferTypeBool;
+static ERL_NIF_TERM kAdbcColumnTypeU8;
+static ERL_NIF_TERM kAdbcColumnTypeU16;
+static ERL_NIF_TERM kAdbcColumnTypeU32;
+static ERL_NIF_TERM kAdbcColumnTypeU64;
+static ERL_NIF_TERM kAdbcColumnTypeI8;
+static ERL_NIF_TERM kAdbcColumnTypeI16;
+static ERL_NIF_TERM kAdbcColumnTypeI32;
+static ERL_NIF_TERM kAdbcColumnTypeI64;
+static ERL_NIF_TERM kAdbcColumnTypeF32;
+static ERL_NIF_TERM kAdbcColumnTypeF64;
+static ERL_NIF_TERM kAdbcColumnTypeStruct;
+static ERL_NIF_TERM kAdbcColumnTypeMap;
+static ERL_NIF_TERM kAdbcColumnTypeList;
+static ERL_NIF_TERM kAdbcColumnTypeLargeList;
+static ERL_NIF_TERM kAdbcColumnTypeFixedSizeList;
+static ERL_NIF_TERM kAdbcColumnTypeString;
+static ERL_NIF_TERM kAdbcColumnTypeLargeString;
+static ERL_NIF_TERM kAdbcColumnTypeBinary;
+static ERL_NIF_TERM kAdbcColumnTypeLargeBinary;
+static ERL_NIF_TERM kAdbcColumnTypeFixedSizeBinary;
+static ERL_NIF_TERM kAdbcColumnTypeDenseUnion;
+static ERL_NIF_TERM kAdbcColumnTypeSparseUnion;
+static ERL_NIF_TERM kAdbcColumnTypeDate32;
+static ERL_NIF_TERM kAdbcColumnTypeDate64;
+static ERL_NIF_TERM kAdbcColumnTypeTime32;
+static ERL_NIF_TERM kAdbcColumnTypeTime64;
+static ERL_NIF_TERM kAdbcColumnTypeTimestamp;
+static ERL_NIF_TERM kAdbcColumnTypeBool;
 
 constexpr int kErrorBufferIsNotAMap = 1;
 constexpr int kErrorBufferGetDataListLength = 2;
@@ -84,6 +98,42 @@ static ERL_NIF_TERM nif_error_from_adbc_error(ErlNifEnv *env, struct AdbcError *
     }
 
     return nif_error;
+}
+
+
+ERL_NIF_TERM make_adbc_column(ErlNifEnv *env, ERL_NIF_TERM name_term, ERL_NIF_TERM type_term, bool nullable, ERL_NIF_TERM metadata, ERL_NIF_TERM data) {
+    ERL_NIF_TERM nullable_term = nullable ? kAtomTrue : kAtomFalse;
+
+    ERL_NIF_TERM keys[] = {
+        kAtomStructKey,
+        kAtomNameKey,
+        kAtomTypeKey,
+        kAtomNullableKey,
+        kAtomMetadataKey,
+        kAtomDataKey,
+    };
+    ERL_NIF_TERM values[] = {
+        kAtomAdbcColumnModule,
+        name_term,
+        type_term,
+        nullable_term,
+        metadata,
+        data,
+    };
+
+    ERL_NIF_TERM adbc_column;
+    enif_make_map_from_arrays(env, keys, values, sizeof(keys)/sizeof(keys[0]), &adbc_column);
+    return adbc_column;
+}
+
+ERL_NIF_TERM make_adbc_column(ErlNifEnv *env, ERL_NIF_TERM name_term, const char * type, bool nullable, ERL_NIF_TERM metadata, ERL_NIF_TERM data) {
+    ERL_NIF_TERM type_term = erlang::nif::make_binary(env, type);
+    return make_adbc_column(env, name_term, type_term, nullable, metadata, data);
+}
+
+ERL_NIF_TERM make_adbc_column(ErlNifEnv *env, const char * name, const char * type, bool nullable, ERL_NIF_TERM metadata, ERL_NIF_TERM data) {
+    ERL_NIF_TERM name_term = erlang::nif::make_binary(env, name == nullptr ? "" : name);
+    return make_adbc_column(env, name_term, type, nullable, metadata, data);
 }
 
 template <typename T, typename M> static ERL_NIF_TERM values_from_buffer(ErlNifEnv *env, int64_t offset, int64_t count, const uint8_t * validity_bitmap, const T * value_buffer, const M& value_to_nif) {
@@ -158,8 +208,8 @@ template <typename M, typename OffsetT> static ERL_NIF_TERM strings_from_buffer(
     return strings_from_buffer(env, 0, length, validity_bitmap, offsets_buffer, value_buffer, value_to_nif);
 }
 
-static int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct ArrowArray * values, uint64_t level, std::vector<ERL_NIF_TERM> &out_terms, ERL_NIF_TERM &error, bool *end_of_series = nullptr);
-static int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct ArrowArray * values, int64_t offset, int64_t count, int64_t level, std::vector<ERL_NIF_TERM> &out_terms, ERL_NIF_TERM &error, bool *end_of_series = nullptr);
+static int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct ArrowArray * values, uint64_t level, std::vector<ERL_NIF_TERM> &out_terms, ERL_NIF_TERM &value_type, ERL_NIF_TERM &error, bool *end_of_series = nullptr);
+static int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct ArrowArray * values, int64_t offset, int64_t count, int64_t level, std::vector<ERL_NIF_TERM> &out_terms, ERL_NIF_TERM &value_type, ERL_NIF_TERM &error, bool *end_of_series = nullptr);
 static int get_arrow_array_children_as_list(ErlNifEnv *env, struct ArrowSchema * schema, struct ArrowArray * values, uint64_t level, std::vector<ERL_NIF_TERM> &children, ERL_NIF_TERM &error);
 static int get_arrow_array_children_as_list(ErlNifEnv *env, struct ArrowSchema * schema, struct ArrowArray * values, int64_t offset, int64_t count, uint64_t level, std::vector<ERL_NIF_TERM> &children, ERL_NIF_TERM &error);
 static ERL_NIF_TERM get_arrow_array_map_children(ErlNifEnv *env, struct ArrowSchema * schema, struct ArrowArray * values, uint64_t level);
@@ -207,14 +257,15 @@ int get_arrow_array_children_as_list(ErlNifEnv *env, struct ArrowSchema * schema
         struct ArrowSchema * child_schema = schema->children[child_i];
         struct ArrowArray * child_values = values->children[child_i];
         std::vector<ERL_NIF_TERM> childrens;
-        if (arrow_array_to_nif_term(env, child_schema, child_values, level + 1, childrens, error) == 1) {
+        ERL_NIF_TERM child_type;
+        if (arrow_array_to_nif_term(env, child_schema, child_values, level + 1, childrens, child_type, error) == 1) {
             return 1;
         }
 
-        if (childrens.size() == 0) {
+        if (childrens.size() == 1) {
             children[child_i - offset] = childrens[0];
         } else {
-            children[child_i - offset] = enif_make_tuple2(env, childrens[0], childrens[1]);
+            children[child_i - offset] = make_adbc_column(env, childrens[0], child_type, child_values->null_count > 0, kAtomNil, childrens[1]);
         }
     }
 
@@ -331,7 +382,8 @@ ERL_NIF_TERM get_arrow_array_dense_union_children(ErlNifEnv *env, struct ArrowSc
         std::vector<ERL_NIF_TERM> field_values;
         union_element_name[0] = erlang::nif::make_binary(env, field_schema->name);
 
-        if (arrow_array_to_nif_term(env, field_schema, field_array, child_offset, 1, level + 1, field_values, error) == 1) {
+        ERL_NIF_TERM field_type;
+        if (arrow_array_to_nif_term(env, field_schema, field_array, child_offset, 1, level + 1, field_values, field_type, error) == 1) {
             return error;
         }
 
@@ -392,7 +444,8 @@ ERL_NIF_TERM get_arrow_array_sparse_union_children(ErlNifEnv *env, struct ArrowS
         std::vector<ERL_NIF_TERM> field_values;
         union_element_name[0] = erlang::nif::make_binary(env, field_schema->name);
 
-        if (arrow_array_to_nif_term(env, field_schema, field_array, child_i, 1, level + 1, field_values, error) == 1) {
+        ERL_NIF_TERM field_type;
+        if (arrow_array_to_nif_term(env, field_schema, field_array, child_i, 1, level + 1, field_values, field_type, error) == 1) {
             return error;
         }
 
@@ -450,6 +503,7 @@ ERL_NIF_TERM get_arrow_array_list_children(ErlNifEnv *env, struct ArrowSchema * 
         if ((offset + count) > items_values->n_children) {
             return erlang::nif::error(env, "invalid offset for ArrowArray (list), (offset + count) > items_values->n_children");
         }
+        printf("quq list\r\n");
         children.resize(count);
         for (int64_t child_i = offset; child_i < offset + count; child_i++) {
             if (bitmap_buffer && values->null_count > 0) {
@@ -463,20 +517,25 @@ ERL_NIF_TERM get_arrow_array_list_children(ErlNifEnv *env, struct ArrowSchema * 
             struct ArrowArray * item_values = items_values->children[child_i];
 
             std::vector<ERL_NIF_TERM> childrens;
-            if (arrow_array_to_nif_term(env, item_schema, item_values, level + 1, childrens, error) == 1) {
+            ERL_NIF_TERM item_type;
+            if (arrow_array_to_nif_term(env, item_schema, item_values, level + 1, childrens, item_type, error) == 1) {
                 return error;
             }
 
+            // todo: convert to Adbc.Column
             if (childrens.size() == 1) {
                 children[child_i - offset] = childrens[0];
             } else {
                 children[child_i - offset] = enif_make_tuple2(env, childrens[0], childrens[1]);
             }
         }
+        return enif_make_list_from_array(env, children.data(), (unsigned)children.size());
     } else {
         children.resize(1);
+        printf("simple list\r\n");
         std::vector<ERL_NIF_TERM> childrens;
-        if (arrow_array_to_nif_term(env, items_schema, items_values, offset, count, level + 1, childrens, error) == 1) {
+        ERL_NIF_TERM children_type;
+        if (arrow_array_to_nif_term(env, items_schema, items_values, offset, count, level + 1, childrens, children_type, error) == 1) {
             return error;
         }
 
@@ -485,15 +544,15 @@ ERL_NIF_TERM get_arrow_array_list_children(ErlNifEnv *env, struct ArrowSchema * 
         } else {
             children[0] = childrens[1];
         }
+        return enif_make_list_from_array(env, children.data(), (unsigned)children.size());
     }
-    return enif_make_list_from_array(env, children.data(), (unsigned)children.size());
 }
 
 ERL_NIF_TERM get_arrow_array_list_children(ErlNifEnv *env, struct ArrowSchema * schema, struct ArrowArray * values, uint64_t level) {
     return get_arrow_array_list_children(env, schema, values, 0, -1, level);
 }
 
-int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct ArrowArray * values, int64_t offset, int64_t count, int64_t level, std::vector<ERL_NIF_TERM> &out_terms, ERL_NIF_TERM &error, bool *end_of_series) {
+int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct ArrowArray * values, int64_t offset, int64_t count, int64_t level, std::vector<ERL_NIF_TERM> &out_terms, ERL_NIF_TERM &term_type, ERL_NIF_TERM &error, bool *end_of_series) {
     if (schema == nullptr) {
         error = erlang::nif::error(env, "invalid ArrowSchema (nullptr) when invoking next");
         return 1;
@@ -505,6 +564,9 @@ int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct 
 
     const char* format = schema->format ? schema->format : "";
     const char* name = schema->name ? schema->name : "";
+    term_type = kAtomNil;
+
+    // printf("arrow_array_to_nif_term: level=%ld, name=%s, format=%s, offset=%ld, count=%ld\n", level, name, format, offset, count);
 
     ERL_NIF_TERM current_term{}, children_term{};
     std::vector<ERL_NIF_TERM> children;
@@ -520,6 +582,7 @@ int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct 
         if (format[0] == 'l') {
             // NANOARROW_TYPE_INT64
             using value_type = int64_t;
+            term_type = kAdbcColumnTypeI64;
             if (count == -1) count = values->length;
             if (values->n_buffers != 2) {
                 error = erlang::nif::error(env, "invalid n_buffers value for ArrowArray (format=l), values->n_buffers != 2");
@@ -536,6 +599,7 @@ int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct 
         } else if (format[0] == 'c') {
             // NANOARROW_TYPE_INT8
             using value_type = int8_t;
+            term_type = kAdbcColumnTypeI8;
             if (count == -1) count = values->length;
             if (values->n_buffers != 2) {
                 error = erlang::nif::error(env, "invalid n_buffers value for ArrowArray (format=c), values->n_buffers != 2");
@@ -552,6 +616,7 @@ int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct 
         } else if (format[0] == 's') {
             // NANOARROW_TYPE_INT16
             using value_type = int16_t;
+            term_type = kAdbcColumnTypeI16;
             if (count == -1) count = values->length;
             if (values->n_buffers != 2) {
                 error = erlang::nif::error(env, "invalid n_buffers value for ArrowArray (format=s), values->n_buffers != 2");
@@ -568,6 +633,7 @@ int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct 
         } else if (format[0] == 'i') {
             // NANOARROW_TYPE_INT32
             using value_type = int32_t;
+            term_type = kAdbcColumnTypeI32;
             if (count == -1) count = values->length;
             if (values->n_buffers != 2) {
                 error = erlang::nif::error(env, "invalid n_buffers value for ArrowArray (format=i), values->n_buffers != 2");
@@ -584,6 +650,7 @@ int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct 
         } else if (format[0] == 'L') {
             // NANOARROW_TYPE_UINT64
             using value_type = uint64_t;
+            term_type = kAdbcColumnTypeU64;
             if (count == -1) count = values->length;
             if (values->n_buffers != 2) {
                 error = erlang::nif::error(env, "invalid n_buffers value for ArrowArray (format=L), values->n_buffers != 2");
@@ -600,6 +667,7 @@ int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct 
         } else if (format[0] == 'C') {
             // NANOARROW_TYPE_UINT8
             using value_type = uint8_t;
+            term_type = kAdbcColumnTypeU8;
             if (count == -1) count = values->length;
             if (values->n_buffers != 2) {
                 error = erlang::nif::error(env, "invalid n_buffers value for ArrowArray (format=C), values->n_buffers != 2");
@@ -616,6 +684,7 @@ int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct 
         } else if (format[0] == 'S') {
             // NANOARROW_TYPE_UINT16
             using value_type = uint16_t;
+            term_type = kAdbcColumnTypeU16;
             if (count == -1) count = values->length;
             if (values->n_buffers != 2) {
                 error = erlang::nif::error(env, "invalid n_buffers value for ArrowArray (format=S), values->n_buffers != 2");
@@ -632,6 +701,7 @@ int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct 
         } else if (format[0] == 'I') {
             // NANOARROW_TYPE_UINT32
             using value_type = uint32_t;
+            term_type = kAdbcColumnTypeU32;
             if (count == -1) count = values->length;
             if (values->n_buffers != 2) {
                 error = erlang::nif::error(env, "invalid n_buffers value for ArrowArray (format=I), values->n_buffers != 2");
@@ -648,6 +718,7 @@ int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct 
         } else if (format[0] == 'f') {
             // NANOARROW_TYPE_FLOAT
             using value_type = float;
+            term_type = kAdbcColumnTypeF32;
             if (count == -1) count = values->length;
             if (values->n_buffers != 2) {
                 error = erlang::nif::error(env, "invalid n_buffers value for ArrowArray (format=f), values->n_buffers != 2");
@@ -664,6 +735,7 @@ int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct 
         } else if (format[0] == 'g') {
             // NANOARROW_TYPE_DOUBLE
             using value_type = double;
+            term_type = kAdbcColumnTypeF64;
             if (count == -1) count = values->length;
             if (values->n_buffers != 2) {
                 error = erlang::nif::error(env, "invalid n_buffers value for ArrowArray (format=g), values->n_buffers != 2");
@@ -680,6 +752,7 @@ int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct 
         } else if (format[0] == 'b') {
             // NANOARROW_TYPE_BOOL
             using value_type = bool;
+            term_type = kAdbcColumnTypeBool;
             if (count == -1) count = values->length;
             if (values->n_buffers != 2) {
                 error = erlang::nif::error(env, "invalid n_buffers value for ArrowArray (format=b), values->n_buffers != 2");
@@ -701,6 +774,11 @@ int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct 
         } else if (format[0] == 'u' || format[0] == 'z') {
             // NANOARROW_TYPE_BINARY
             // NANOARROW_TYPE_STRING
+            if (format[0] == 'z') {
+                term_type = kAdbcColumnTypeBinary;
+            } else {
+                term_type = kAdbcColumnTypeString;
+            }
             offset_buffer_index = 1;
             data_buffer_index = 2;
             if (count == -1) count = values->length;
@@ -722,6 +800,11 @@ int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct 
         } else if (format[0] == 'U' || format[0] == 'Z') {
             // NANOARROW_TYPE_LARGE_STRING
             // NANOARROW_TYPE_LARGE_BINARY
+            if (format[0] == 'Z') {
+                term_type = kAdbcColumnTypeLargeBinary;
+            } else {
+                term_type = kAdbcColumnTypeLargeString;
+            }
             offset_buffer_index = 1;
             data_buffer_index = 2;
             if (count == -1) count = values->length;
@@ -748,6 +831,7 @@ int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct 
             // NANOARROW_TYPE_STRUCT
             // only handle and return children if this is a struct
             is_struct = true;
+            term_type = kAdbcColumnTypeStruct;
 
             if (values->length > 0 || values->release != nullptr) {
                 if (count == -1) count = values->n_children;
@@ -763,12 +847,15 @@ int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct 
             }
         } else if (strncmp("+m", format, 2) == 0) {
             // NANOARROW_TYPE_MAP
+            term_type = kAdbcColumnTypeMap;
             children_term = get_arrow_array_map_children(env, schema, values, offset, count, level);
         } else if (strncmp("+l", format, 2) == 0) {
             // NANOARROW_TYPE_LIST
+            term_type = kAdbcColumnTypeList;
             children_term = get_arrow_array_list_children(env, schema, values, offset, count, level);
         } else if (strncmp("+L", format, 2) == 0) {
             // NANOARROW_TYPE_LARGE_LIST
+            term_type = kAdbcColumnTypeLargeList;
             children_term = get_arrow_array_list_children(env, schema, values, offset, count, level);
         } else {
             format_processed = false;
@@ -776,18 +863,22 @@ int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct 
     } else if (format_len >= 3) {
         if (strncmp("+w:", format, 3) == 0) {
             // NANOARROW_TYPE_FIXED_SIZE_LIST
+            term_type = kAdbcColumnTypeFixedSizeList;
             children_term = get_arrow_array_list_children(env, schema, values, offset, count, level);
         } else if (format_len > 3 && strncmp("w:", format, 2) == 0) {
             // NANOARROW_TYPE_FIXED_SIZE_BINARY
             if (get_arrow_array_children_as_list(env, schema, values, offset, count, level, children, error) == 1) {
                 return 1;
             }
+            term_type = kAdbcColumnTypeFixedSizeBinary;
             children_term = enif_make_list_from_array(env, children.data(), (unsigned)count);
         } else if (format_len > 4 && (strncmp("+ud:", format, 4) == 0)) {
             // NANOARROW_TYPE_DENSE_UNION
+            term_type = kAdbcColumnTypeDenseUnion;
             children_term = get_arrow_array_dense_union_children(env, schema, values, offset, count, level);
         } else if (format_len > 4 && (strncmp("+us:", format, 4) == 0)) {
             // NANOARROW_TYPE_SPARSE_UNION
+            term_type = kAdbcColumnTypeSparseUnion;
             children_term = get_arrow_array_sparse_union_children(env, schema, values, offset, count, level);
         } else if (strncmp("td", format, 2) == 0) {
             char unit = format[2];
@@ -827,6 +918,7 @@ int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct 
                 };
                 if (unit == 'D') {
                     using value_type = uint32_t;
+                    term_type = kAdbcColumnTypeDate32;
                     if (count == -1) count = values->length;
                     if (values->n_buffers != 2) {
                         error = erlang::nif::error(env, "invalid n_buffers value for ArrowArray (format=tdD), values->n_buffers != 2");
@@ -842,6 +934,7 @@ int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct 
                     );
                 } else {
                     using value_type = uint64_t;
+                    term_type = kAdbcColumnTypeDate64;
                     if (count == -1) count = values->length;
                     if (values->n_buffers != 2) {
                         error = erlang::nif::error(env, "invalid n_buffers value for ArrowArray (format=tdm), values->n_buffers != 2");
@@ -868,21 +961,25 @@ int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct 
                     // NANOARROW_TYPE_TIME32
                     unit = 1000000000;
                     us_precision = 0;
+                    term_type = kAdbcColumnTypeTime32;
                     break;
                 case 'm': // milliseconds
                     // NANOARROW_TYPE_TIME32
                     unit = 1000000;
                     us_precision = 3;
+                    term_type = kAdbcColumnTypeTime32;
                     break;
                 case 'u': // microseconds
                     // NANOARROW_TYPE_TIME64
                     unit = 1000;
                     us_precision = 6;
+                    term_type = kAdbcColumnTypeTime64;
                     break;
                 case 'n': // nanoseconds
                     // NANOARROW_TYPE_TIME64
                     unit = 1;
                     us_precision = 6;
+                    term_type = kAdbcColumnTypeTime64;
                     break;
                 default:
                     format_processed = false;
@@ -938,6 +1035,7 @@ int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct 
         // timestamp
         } else if (strncmp("ts", format, 2) == 0) {
             // NANOARROW_TYPE_TIMESTAMP
+            term_type = kAdbcColumnTypeTimestamp;
             uint64_t unit;
             uint8_t us_precision;
             switch (format[2]) {
@@ -1045,6 +1143,12 @@ int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct 
     out_terms.clear();
 
     if (is_struct) {
+        // if (level == 0) {
+        //     ERL_NIF_TERM adbc_column = make_adbc_column(env, name, schema->format, values->null_count > 0, kAtomNil, children_term);
+        //     out_terms.emplace_back(adbc_column);
+        // } else {
+        //     out_terms.emplace_back(children_term);
+        // }
         out_terms.emplace_back(children_term);
     } else {
         if (schema->children) {
@@ -1054,13 +1158,24 @@ int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct 
             out_terms.emplace_back(erlang::nif::make_binary(env, name));
             out_terms.emplace_back(current_term);
         }
+        // if (level == 0) {
+        //     if (schema->children) {
+        //         ERL_NIF_TERM adbc_column = make_adbc_column(env, name, schema->format, values->null_count > 0, kAtomNil, children_term);
+        //         out_terms.emplace_back(adbc_column);
+        //     } else {
+        //         ERL_NIF_TERM adbc_column = make_adbc_column(env, name, schema->format, values->null_count > 0, kAtomNil, current_term);
+        //         out_terms.emplace_back(adbc_column);
+        //     }
+        // } else {
+            
+        // }
     }
 
     return 0;
 }
 
-int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct ArrowArray * values, uint64_t level, std::vector<ERL_NIF_TERM> &out_terms, ERL_NIF_TERM &error, bool *end_of_series) {
-    return arrow_array_to_nif_term(env, schema, values, 0, -1, level, out_terms, error, end_of_series);
+int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct ArrowArray * values, uint64_t level, std::vector<ERL_NIF_TERM> &out_terms, ERL_NIF_TERM &type_term, ERL_NIF_TERM &error, bool *end_of_series) {
+    return arrow_array_to_nif_term(env, schema, values, 0, -1, level, out_terms, type_term, error, end_of_series);
 }
 
 static ERL_NIF_TERM adbc_database_new(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
@@ -1544,7 +1659,8 @@ static ERL_NIF_TERM adbc_arrow_array_stream_next(ErlNifEnv *env, int argc, const
 
     auto schema = (struct ArrowSchema*)res->private_data;
     bool end_of_series = false;
-    if (arrow_array_to_nif_term(env, schema, &out, 0, out_terms, error, &end_of_series) == 1) {
+    ERL_NIF_TERM out_type;
+    if (arrow_array_to_nif_term(env, schema, &out, 0, out_terms, out_type, error, &end_of_series) == 1) {
         if (out.release) out.release(&out);
         return error;
     }
@@ -1555,9 +1671,11 @@ static ERL_NIF_TERM adbc_arrow_array_stream_next(ErlNifEnv *env, int argc, const
             if (out.release) {
                 out.release(&out);
             }
-            return ret;
+            return kAtomEndOfSeries;
         }
+        // ret = make_adbc_column(env, schema->name == nullptr ? "" : schema->name, out_type, out.null_count > 0, kAtomNil, out_terms[0]);
     } else {
+        // ret = make_adbc_column(env, out_terms[0], out_type, out.null_count > 0, kAtomNil, out_terms[1]);
         ret = enif_make_tuple2(env, out_terms[0], out_terms[1]);
     }
 
@@ -1925,23 +2043,23 @@ int adbc_buffer_to_adbc_field(ErlNifEnv *env, ERL_NIF_TERM adbc_buffer, struct A
     if (!enif_get_map_value(env, adbc_buffer, kAtomStructKey, &struct_name_term)) {
         return kErrorBufferGetMapValue;
     }
-    if (!enif_is_identical(struct_name_term, kAdbcBufferStructValue)) {
+    if (!enif_is_identical(struct_name_term, kAtomAdbcColumnModule)) {
         return kErrorBufferWrongStruct;
     }
 
-    if (!enif_get_map_value(env, adbc_buffer, kAdbcBufferNameKey, &name_term)) {
+    if (!enif_get_map_value(env, adbc_buffer, kAtomNameKey, &name_term)) {
         return kErrorBufferGetMapValue;
     }
-    if (!enif_get_map_value(env, adbc_buffer, kAdbcBufferTypeKey, &type_term)) {
+    if (!enif_get_map_value(env, adbc_buffer, kAtomTypeKey, &type_term)) {
         return kErrorBufferGetMapValue;
     }
-    if (!enif_get_map_value(env, adbc_buffer, kAdbcBufferNullableKey, &nullable_term)) {
+    if (!enif_get_map_value(env, adbc_buffer, kAtomNullableKey, &nullable_term)) {
         return kErrorBufferGetMapValue;
     }
-    if (!enif_get_map_value(env, adbc_buffer, kAdbcBufferMetadataKey, &metadata_term)) {
+    if (!enif_get_map_value(env, adbc_buffer, kAtomMetadataKey, &metadata_term)) {
         return kErrorBufferGetMapValue;
     }
-    if (!enif_get_map_value(env, adbc_buffer, kAdbcBufferDataKey, &data_term)) {
+    if (!enif_get_map_value(env, adbc_buffer, kAtomDataKey, &data_term)) {
         return kErrorBufferGetMapValue;
     }
     if (!enif_is_list(env, data_term)) {
@@ -2001,37 +2119,37 @@ int adbc_buffer_to_adbc_field(ErlNifEnv *env, ERL_NIF_TERM adbc_buffer, struct A
     NANOARROW_RETURN_NOT_OK(ArrowSchemaSetMetadata(schema_out, (const char*)metadata_buffer.data));
     ArrowBufferReset(&metadata_buffer);
 
-    if (enif_is_identical(type_term, kAdbcBufferTypeI8)) {
+    if (enif_is_identical(type_term, kAdbcColumnTypeI8)) {
         do_get_list_integer<int8_t>(env, data_term, nullable, NANOARROW_TYPE_INT8, array_out, schema_out, error_out);
-    } else if (enif_is_identical(type_term, kAdbcBufferTypeI16)) {
+    } else if (enif_is_identical(type_term, kAdbcColumnTypeI16)) {
         do_get_list_integer<int16_t>(env, data_term, nullable, NANOARROW_TYPE_INT16, array_out, schema_out, error_out);
-    } else if (enif_is_identical(type_term, kAdbcBufferTypeI32)) {
+    } else if (enif_is_identical(type_term, kAdbcColumnTypeI32)) {
         do_get_list_integer<int32_t>(env, data_term, nullable, NANOARROW_TYPE_INT32, array_out, schema_out, error_out);
-    } else if (enif_is_identical(type_term, kAdbcBufferTypeI64)) {
+    } else if (enif_is_identical(type_term, kAdbcColumnTypeI64)) {
         do_get_list_integer<int64_t>(env, data_term, nullable, NANOARROW_TYPE_INT64, array_out, schema_out, error_out);
-    } else if (enif_is_identical(type_term, kAdbcBufferTypeU8)) {
+    } else if (enif_is_identical(type_term, kAdbcColumnTypeU8)) {
         do_get_list_integer<uint8_t>(env, data_term, nullable, NANOARROW_TYPE_UINT8, array_out, schema_out, error_out);
-    } else if (enif_is_identical(type_term, kAdbcBufferTypeU16)) {
+    } else if (enif_is_identical(type_term, kAdbcColumnTypeU16)) {
         do_get_list_integer<uint16_t>(env, data_term, nullable, NANOARROW_TYPE_UINT16, array_out, schema_out, error_out);
-    } else if (enif_is_identical(type_term, kAdbcBufferTypeU32)) {
+    } else if (enif_is_identical(type_term, kAdbcColumnTypeU32)) {
         do_get_list_integer<uint32_t>(env, data_term, nullable, NANOARROW_TYPE_UINT32, array_out, schema_out, error_out);
-    } else if (enif_is_identical(type_term, kAdbcBufferTypeU64)) {
+    } else if (enif_is_identical(type_term, kAdbcColumnTypeU64)) {
         do_get_list_integer<uint64_t>(env, data_term, nullable, NANOARROW_TYPE_UINT64, array_out, schema_out, error_out);
-    } else if (enif_is_identical(type_term, kAdbcBufferTypeF32)) {
+    } else if (enif_is_identical(type_term, kAdbcColumnTypeF32)) {
         do_get_list_float(env, data_term, nullable, NANOARROW_TYPE_FLOAT, array_out, schema_out, error_out);
-    } else if (enif_is_identical(type_term, kAdbcBufferTypeF64)) {
+    } else if (enif_is_identical(type_term, kAdbcColumnTypeF64)) {
         do_get_list_float(env, data_term, nullable, NANOARROW_TYPE_DOUBLE, array_out, schema_out, error_out);
-    } else if (enif_is_identical(type_term, kAdbcBufferTypeString)) {
+    } else if (enif_is_identical(type_term, kAdbcColumnTypeString)) {
         do_get_list_string(env, data_term, nullable, NANOARROW_TYPE_STRING, array_out, schema_out, error_out);
-    } else if (enif_is_identical(type_term, kAdbcBufferTypeLargeString)) {
+    } else if (enif_is_identical(type_term, kAdbcColumnTypeLargeString)) {
         do_get_list_string(env, data_term, nullable, NANOARROW_TYPE_LARGE_STRING, array_out, schema_out, error_out);
-    } else if (enif_is_identical(type_term, kAdbcBufferTypeBinary)) {
+    } else if (enif_is_identical(type_term, kAdbcColumnTypeBinary)) {
         do_get_list_string(env, data_term, nullable, NANOARROW_TYPE_BINARY, array_out, schema_out, error_out);
-    } else if (enif_is_identical(type_term, kAdbcBufferTypeLargeBinary)) {
+    } else if (enif_is_identical(type_term, kAdbcColumnTypeLargeBinary)) {
         do_get_list_string(env, data_term, nullable, NANOARROW_TYPE_LARGE_BINARY, array_out, schema_out, error_out);
-    } else if (enif_is_identical(type_term, kAdbcBufferTypeFixedSizeBinary)) {
+    } else if (enif_is_identical(type_term, kAdbcColumnTypeFixedSizeBinary)) {
         do_get_list_fixed_size_binary(env, data_term, nullable, NANOARROW_TYPE_FIXED_SIZE_BINARY, array_out, schema_out, error_out);
-    } else if (enif_is_identical(type_term, kAdbcBufferTypeBool)) {
+    } else if (enif_is_identical(type_term, kAdbcColumnTypeBool)) {
         do_get_list_boolean(env, data_term, nullable, NANOARROW_TYPE_BOOL, array_out, schema_out, error_out);
     } else {
         if (schema_out->release) schema_out->release(schema_out);
@@ -2265,6 +2383,7 @@ static int on_load(ErlNifEnv *env, void **, ERL_NIF_TERM) {
     kAtomCalendarISO = erlang::nif::atom(env, "Elixir.Calendar.ISO");
     kAtomTimeModule = erlang::nif::atom(env, "Elixir.Time");
     kAtomNaiveDateTimeModule = erlang::nif::atom(env, "Elixir.NaiveDateTime");
+    kAtomAdbcColumnModule = erlang::nif::atom(env, "Elixir.Adbc.Column");
     kAtomStructKey = erlang::nif::atom(env, "__struct__");
     kAtomCalendarKey = erlang::nif::atom(env, "calendar");
     kAtomYearKey = erlang::nif::atom(env, "year");
@@ -2275,30 +2394,42 @@ static int on_load(ErlNifEnv *env, void **, ERL_NIF_TERM) {
     kAtomSecondKey = erlang::nif::atom(env, "second");
     kAtomMicrosecondKey = erlang::nif::atom(env, "microsecond");
 
-    kAdbcBufferStructValue = enif_make_atom(env, "Elixir.Adbc.Column");
-    kAdbcBufferNameKey = enif_make_atom(env, "name");
-    kAdbcBufferTypeKey = enif_make_atom(env, "type");
-    kAdbcBufferNullableKey = enif_make_atom(env, "nullable");
-    kAdbcBufferMetadataKey = enif_make_atom(env, "metadata");
-    kAdbcBufferDataKey = enif_make_atom(env, "data");
+    kAtomAdbcColumnModule = erlang::nif::atom(env, "Elixir.Adbc.Column");
+    kAtomNameKey = erlang::nif::atom(env, "name");
+    kAtomTypeKey = erlang::nif::atom(env, "type");
+    kAtomNullableKey = erlang::nif::atom(env, "nullable");
+    kAtomMetadataKey = erlang::nif::atom(env, "metadata");
+    kAtomDataKey = erlang::nif::atom(env, "data");
     // kAdbcBufferPrivateKey = enif_make_atom(env, "__private__");
 
-    kAdbcBufferTypeU8 = enif_make_atom(env, "u8");
-    kAdbcBufferTypeU16 = enif_make_atom(env, "u16");
-    kAdbcBufferTypeU32 = enif_make_atom(env, "u32");
-    kAdbcBufferTypeU64 = enif_make_atom(env, "u64");
-    kAdbcBufferTypeI8 = enif_make_atom(env, "i8");
-    kAdbcBufferTypeI16 = enif_make_atom(env, "i16");
-    kAdbcBufferTypeI32 = enif_make_atom(env, "i32");
-    kAdbcBufferTypeI64 = enif_make_atom(env, "i64");
-    kAdbcBufferTypeF32 = enif_make_atom(env, "f32");
-    kAdbcBufferTypeF64 = enif_make_atom(env, "f64");
-    kAdbcBufferTypeString = enif_make_atom(env, "string");
-    kAdbcBufferTypeLargeString = enif_make_atom(env, "large_string");
-    kAdbcBufferTypeBinary = enif_make_atom(env, "binary");
-    kAdbcBufferTypeLargeBinary = enif_make_atom(env, "large_binary");
-    kAdbcBufferTypeFixedSizeBinary = enif_make_atom(env, "fixed_size_binary");
-    kAdbcBufferTypeBool = enif_make_atom(env, "boolean");
+    kAdbcColumnTypeU8 = erlang::nif::atom(env, "u8");
+    kAdbcColumnTypeU16 = erlang::nif::atom(env, "u16");
+    kAdbcColumnTypeU32 = erlang::nif::atom(env, "u32");
+    kAdbcColumnTypeU64 = erlang::nif::atom(env, "u64");
+    kAdbcColumnTypeI8 = erlang::nif::atom(env, "i8");
+    kAdbcColumnTypeI16 = erlang::nif::atom(env, "i16");
+    kAdbcColumnTypeI32 = erlang::nif::atom(env, "i32");
+    kAdbcColumnTypeI64 = erlang::nif::atom(env, "i64");
+    kAdbcColumnTypeF32 = erlang::nif::atom(env, "f32");
+    kAdbcColumnTypeF64 = erlang::nif::atom(env, "f64");
+    kAdbcColumnTypeStruct = erlang::nif::atom(env, "struct");
+    kAdbcColumnTypeMap = erlang::nif::atom(env, "map");
+    kAdbcColumnTypeList = erlang::nif::atom(env, "list");
+    kAdbcColumnTypeLargeList = erlang::nif::atom(env, "large_list");
+    kAdbcColumnTypeFixedSizeList = erlang::nif::atom(env, "fixed_size_list");
+    kAdbcColumnTypeString = erlang::nif::atom(env, "string");
+    kAdbcColumnTypeLargeString = erlang::nif::atom(env, "large_string");
+    kAdbcColumnTypeBinary = erlang::nif::atom(env, "binary");
+    kAdbcColumnTypeLargeBinary = erlang::nif::atom(env, "large_binary");
+    kAdbcColumnTypeFixedSizeBinary = erlang::nif::atom(env, "fixed_size_binary");
+    kAdbcColumnTypeDenseUnion = erlang::nif::atom(env, "dense_union");
+    kAdbcColumnTypeSparseUnion = erlang::nif::atom(env, "sparse_union");
+    kAdbcColumnTypeDate32 = erlang::nif::atom(env, "date32");
+    kAdbcColumnTypeDate64 = erlang::nif::atom(env, "date64");
+    kAdbcColumnTypeTime32 = erlang::nif::atom(env, "time32");
+    kAdbcColumnTypeTime64 = erlang::nif::atom(env, "time64");
+    kAdbcColumnTypeTimestamp = erlang::nif::atom(env, "timestamp");
+    kAdbcColumnTypeBool = erlang::nif::atom(env, "boolean");
 
     return 0;
 }

@@ -392,20 +392,33 @@ defmodule Adbc.Connection do
   defp normalize_rows(-1), do: nil
   defp normalize_rows(rows) when is_integer(rows) and rows >= 0, do: rows
 
-  defp stream_results(reference, num_rows), do: stream_results(reference, %{}, num_rows)
+  defp stream_results(reference, num_rows), do: stream_results(reference, [], num_rows)
 
   defp stream_results(reference, acc, num_rows) do
     case Adbc.Nif.adbc_arrow_array_stream_next(reference) do
       {:ok, results, _done} ->
-        acc = Map.merge(acc, Map.new(results), fn _k, v1, v2 -> v1 ++ v2 end)
-        stream_results(reference, acc, num_rows)
+        stream_results(reference, acc ++ results, num_rows)
 
       :end_of_series ->
-        {:ok, %Adbc.Result{data: acc, num_rows: num_rows}}
+        {:ok, %Adbc.Result{data: merge_columns(acc), num_rows: num_rows}}
 
       {:error, reason} ->
         {:error, error_to_exception(reason)}
     end
+  end
+
+  defp merge_columns(columns) do
+    Enum.reduce(columns, [], fn column, merged_columns ->
+      case Enum.find_index(merged_columns, &(&1.name == column.name)) do
+        nil ->
+          merged_columns ++ [column]
+
+        index ->
+          merged_column = Enum.at(merged_columns, index)
+          merged_column = %{merged_column | data: merged_column.data ++ column.data}
+          List.replace_at(merged_columns, index, merged_column)
+      end
+    end)
   end
 
   ## Callbacks

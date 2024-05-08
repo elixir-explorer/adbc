@@ -66,32 +66,49 @@ defmodule Adbc.Column do
     %Adbc.Column{buffer | metadata: %{}}
   end
 
+  @doc """
+  A column that contains booleans.
+
+  ## Arguments
+
+  * `data`: A list of booleans
+  * `opts`: A keyword list of options
+
+  ## Options
+
+  * `:name` - The name of the column
+  * `:nullable` - A boolean value indicating whether the column is nullable
+  * `:metadata` - A map of metadata
+
+  ## Examples
+
+      iex> Adbc.Buffer.boolean([true, false, true])
+      %Adbc.Column{
+        name: nil,
+        type: :boolean,
+        nullable: false,
+        metadata: %{},
+        data: [true, false, true]
+      }
+
+  """
   @spec boolean([boolean()], Keyword.t()) :: %Adbc.Column{}
   def boolean(data, opts \\ []) when is_list(data) and is_list(opts) do
     column(:boolean, data, opts)
   end
 
   @doc """
-  A buffer for an unsigned 8-bit integer column.
+  A column that contains unsigned 8-bit integers.
 
   ## Arguments
 
-  * `data`:
-    * A list of unsigned 8-bit integer values
-    * A single binary type value where each byte represents an unsigned 8-bit integer
-  * `opts` - A keyword list of options
+  * `data`: A list of unsigned 8-bit integer values
+  * `opts`: A keyword list of options
 
   ## Options
 
   * `:name` - The name of the column
   * `:nullable` - A boolean value indicating whether the column is nullable
-  * `:null_count` - The number of null values in the column, defaults to 0, only used when
-    `:nullable` is `true`
-  * `:null`: only used when `:nullable` is `true`, can be one of the following:
-    * A list of booleans with the same length as  indicating whether each value is null
-    * A list of non-negative integers where each integer represents the corresponding index of a
-      null value
-    * A single binary type value where each bit indicates whether each value is null
   * `:metadata` - A map of metadata
 
   ## Examples
@@ -101,89 +118,452 @@ defmodule Adbc.Column do
         name: nil,
         type: :u8,
         nullable: false,
-        null_count: 0,
-        null: nil,
         metadata: %{},
         data: [1, 2, 3]
       }
+
   """
   @spec u8([0..255] | binary(), Keyword.t()) :: %Adbc.Column{}
-  def u8(u8, opts \\ [])
-
-  def u8(data, opts) when is_list(data) and is_list(opts) do
+  def u8(data, opts \\ []) when is_list(data) and is_list(opts) do
     column(:u8, data, opts)
   end
 
-  def u8(data, opts) when is_binary(data) and is_list(opts) do
-    column(:u8, data, opts)
-  end
+  @doc """
+  A column that contains unsigned 16-bit integers.
 
+  ## Arguments
+
+  * `data`: A list of unsigned 16-bit integer values
+  * `opts`: A keyword list of options
+
+  ## Options
+
+  * `:name` - The name of the column
+  * `:nullable` - A boolean value indicating whether the column is nullable
+  * `:metadata` - A map of metadata
+
+  ## Examples
+
+      iex> Adbc.Buffer.u16([1, 2, 3])
+      %Adbc.Column{
+        name: nil,
+        type: :u16,
+        nullable: false,
+        metadata: %{},
+        data: [1, 2, 3]
+      }
+
+  """
   @spec u16([0..65535], Keyword.t()) :: %Adbc.Column{}
   def u16(data, opts \\ []) when is_list(data) and is_list(opts) do
     column(:u16, data, opts)
   end
 
+  @doc """
+  A column that contains unsigned 32-bit integers.
+
+  ## Arguments
+
+  * `data`: A list of unsigned 32-bit integer values
+  * `opts`: A keyword list of options
+
+  ## Options
+
+  * `:name` - The name of the column
+  * `:nullable` - A boolean value indicating whether the column is nullable
+  * `:metadata` - A map of metadata
+
+  ## Examples
+
+      iex> Adbc.Buffer.u32([1, 2, 3])
+      %Adbc.Column{
+        name: nil,
+        type: :u32,
+        nullable: false,
+        metadata: %{},
+        data: [1, 2, 3]
+      }
+
+  """
   @spec u32([0..4_294_967_295], Keyword.t()) :: %Adbc.Column{}
   def u32(data, opts \\ []) when is_list(data) and is_list(opts) do
     column(:u32, data, opts)
   end
 
+  @doc """
+  A column that contains unsigned 64-bit integers.
+
+  ## Arguments
+
+  * `data`: A list of unsigned 64-bit integer values
+  * `opts`: A keyword list of options
+
+  ## Options
+
+  * `:name` - The name of the column
+  * `:nullable` - A boolean value indicating whether the column is nullable
+  * `:metadata` - A map of metadata
+
+  ## Examples
+
+      iex> Adbc.Buffer.u32([1, 2, 3])
+      %Adbc.Column{
+        name: nil,
+        type: :u32,
+        nullable: false,
+        metadata: %{},
+        data: [1, 2, 3]
+      }
+
+  """
   @spec u64([0..18_446_744_073_709_551_615], Keyword.t()) :: %Adbc.Column{}
   def u64(data, opts \\ []) when is_list(data) and is_list(opts) do
     column(:u64, data, opts)
   end
 
+  @doc """
+  A column that contains signed 8-bit integers.
+
+  ## Arguments
+
+  * `data`: A list of signed 8-bit integer values
+  * `opts`: A keyword list of options
+
+  ## Options
+
+  * `:name` - The name of the column
+  * `:nullable` - A boolean value indicating whether the column is nullable
+  * `:metadata` - A map of metadata
+
+  ## Examples
+
+      iex> Adbc.Buffer.i8([1, 2, 3])
+      %Adbc.Column{
+        name: nil,
+        type: :i8,
+        nullable: false,
+        metadata: %{},
+        data: [1, 2, 3]
+      }
+
+  """
   @spec i8([-128..127], Keyword.t()) :: %Adbc.Column{}
   def i8(data, opts \\ []) when is_list(data) and is_list(opts) do
     column(:i8, data, opts)
   end
 
+  @doc """
+  A column that contains signed 16-bit integers.
+
+  ## Arguments
+
+  * `data`: A list of signed 16-bit integer values
+  * `opts`: A keyword list of options
+
+  ## Options
+
+  * `:name` - The name of the column
+  * `:nullable` - A boolean value indicating whether the column is nullable
+  * `:metadata` - A map of metadata
+
+  ## Examples
+
+      iex> Adbc.Buffer.i16([1, 2, 3])
+      %Adbc.Column{
+        name: nil,
+        type: :i16,
+        nullable: false,
+        metadata: %{},
+        data: [1, 2, 3]
+      }
+
+  """
   @spec i16([-32768..32767], Keyword.t()) :: %Adbc.Column{}
   def i16(data, opts \\ []) when is_list(data) and is_list(opts) do
     column(:i16, data, opts)
   end
 
+  @doc """
+  A column that contains signed 32-bit integers.
+
+  ## Arguments
+
+  * `data`: A list of signed 32-bit integer values
+  * `opts`: A keyword list of options
+
+  ## Options
+
+  * `:name` - The name of the column
+  * `:nullable` - A boolean value indicating whether the column is nullable
+  * `:metadata` - A map of metadata
+
+  ## Examples
+
+      iex> Adbc.Buffer.i32([1, 2, 3])
+      %Adbc.Column{
+        name: nil,
+        type: :i32,
+        nullable: false,
+        metadata: %{},
+        data: [1, 2, 3]
+      }
+
+  """
   @spec i32([-2_147_483_648..2_147_483_647], Keyword.t()) :: %Adbc.Column{}
   def i32(data, opts \\ []) when is_list(data) and is_list(opts) do
     column(:i32, data, opts)
   end
 
+  @doc """
+  A column that contains signed 64-bit integers.
+
+  ## Arguments
+
+  * `data`: A list of signed 64-bit integer values
+  * `opts`: A keyword list of options
+
+  ## Options
+
+  * `:name` - The name of the column
+  * `:nullable` - A boolean value indicating whether the column is nullable
+  * `:metadata` - A map of metadata
+
+  ## Examples
+
+      iex> Adbc.Buffer.i64([1, 2, 3])
+      %Adbc.Column{
+        name: nil,
+        type: :i64,
+        nullable: false,
+        metadata: %{},
+        data: [1, 2, 3]
+      }
+
+  """
   @spec i64([-9_223_372_036_854_775_808..9_223_372_036_854_775_807], Keyword.t()) ::
           %Adbc.Column{}
   def i64(data, opts \\ []) when is_list(data) and is_list(opts) do
     column(:i64, data, opts)
   end
 
+  @doc """
+  A column that contains 32-bit single-precision floats.
+
+  ## Arguments
+
+  * `data`: A list of 32-bit single-precision float values
+  * `opts`: A keyword list of options
+
+  ## Options
+
+  * `:name` - The name of the column
+  * `:nullable` - A boolean value indicating whether the column is nullable
+  * `:metadata` - A map of metadata
+
+  ## Examples
+
+      iex> Adbc.Buffer.f32([1.0, 2.0, 3.0])
+      %Adbc.Column{
+        name: nil,
+        type: :f32,
+        nullable: false,
+        metadata: %{},
+        data: [1.0, 2.0, 3.0]
+      }
+
+  """
   @spec f32([float], Keyword.t()) :: %Adbc.Column{}
   def f32(data, opts \\ []) when is_list(data) and is_list(opts) do
     column(:f32, data, opts)
   end
 
+  @doc """
+  A column that contains 64-bit double-precision floats.
+
+  ## Arguments
+
+  * `data`: A list of 64-bit double-precision float values
+  * `opts`: A keyword list of options
+
+  ## Options
+
+  * `:name` - The name of the column
+  * `:nullable` - A boolean value indicating whether the column is nullable
+  * `:metadata` - A map of metadata
+
+  ## Examples
+
+      iex> Adbc.Buffer.f64([1.0, 2.0, 3.0])
+      %Adbc.Column{
+        name: nil,
+        type: :f64,
+        nullable: false,
+        metadata: %{},
+        data: [1.0, 2.0, 3.0]
+      }
+
+  """
   @spec f64([float], Keyword.t()) :: %Adbc.Column{}
   def f64(data, opts \\ []) when is_list(data) and is_list(opts) do
     column(:f64, data, opts)
   end
 
+  @doc """
+  A column that contains UTF-8 encoded strings.
+
+  ## Arguments
+
+  * `data`: A list of UTF-8 encoded string values
+  * `opts`: A keyword list of options
+
+  ## Options
+
+  * `:name` - The name of the column
+  * `:nullable` - A boolean value indicating whether the column is nullable
+  * `:metadata` - A map of metadata
+
+  ## Examples
+
+      iex> Adbc.Buffer.string(["a", "ab", "abc"])
+      %Adbc.Column{
+        name: nil,
+        type: :string,
+        nullable: false,
+        metadata: %{},
+        data: ["a", "ab", "abc"]
+      }
+
+  """
   @spec string([String.t()], Keyword.t()) :: %Adbc.Column{}
   def string(data, opts \\ []) when is_list(data) and is_list(opts) do
     column(:string, data, opts)
   end
 
+  @doc """
+  A column that contains UTF-8 encoded large strings.
+
+  Similar to `string/2`, but for strings larger than 2GB.
+
+  ## Arguments
+
+  * `data`: A list of UTF-8 encoded string values
+  * `opts`: A keyword list of options
+
+  ## Options
+
+  * `:name` - The name of the column
+  * `:nullable` - A boolean value indicating whether the column is nullable
+  * `:metadata` - A map of metadata
+
+  ## Examples
+
+      iex> Adbc.Buffer.large_string(["a", "ab", "abc"])
+      %Adbc.Column{
+        name: nil,
+        type: :large_string,
+        nullable: false,
+        metadata: %{},
+        data: ["a", "ab", "abc"]
+      }
+
+  """
   @spec large_string([String.t()], Keyword.t()) :: %Adbc.Column{}
   def large_string(data, opts \\ []) when is_list(data) and is_list(opts) do
     column(:large_string, data, opts)
   end
 
+  @doc """
+  A column that contains binary values.
+
+  ## Arguments
+
+  * `data`: A list of binary values
+  * `opts`: A keyword list of options
+
+  ## Options
+
+  * `:name` - The name of the column
+  * `:nullable` - A boolean value indicating whether the column is nullable
+  * `:metadata` - A map of metadata
+
+  ## Examples
+
+      iex> Adbc.Buffer.binary([<<0>>, <<1>>, <<2>>])
+      %Adbc.Column{
+        name: nil,
+        type: :binary,
+        nullable: false,
+        metadata: %{},
+        data: [<<0>>, <<1>>, <<2>>]
+      }
+
+  """
   @spec binary([binary()], Keyword.t()) :: %Adbc.Column{}
   def binary(data, opts \\ []) when is_list(data) and is_list(opts) do
     column(:binary, data, opts)
   end
 
+  @doc """
+  A column that contains large binary values.
+
+  Similar to `binary/2`, but for binary values larger than 2GB.
+
+  ## Arguments
+
+  * `data`: A list of binary values
+  * `opts`: A keyword list of options
+
+  ## Options
+
+  * `:name` - The name of the column
+  * `:nullable` - A boolean value indicating whether the column is nullable
+  * `:metadata` - A map of metadata
+
+  ## Examples
+
+      iex> Adbc.Buffer.large_binary([<<0>>, <<1>>, <<2>>])
+      %Adbc.Column{
+        name: nil,
+        type: :large_binary,
+        nullable: false,
+        metadata: %{},
+        data: [<<0>>, <<1>>, <<2>>]
+      }
+
+  """
   @spec large_binary([binary()], Keyword.t()) :: %Adbc.Column{}
   def large_binary(data, opts \\ []) when is_list(data) and is_list(opts) do
     column(:large_binary, data, opts)
   end
 
+  @doc """
+  A column that contains fixed size binaries.
+
+  Similar to `binary/2`, but each binary value has the same fixed size in bytes.
+
+  ## Arguments
+
+  * `data`: A list of binary values
+  * `opts`: A keyword list of options
+
+  ## Options
+
+  * `:name` - The name of the column
+  * `:nullable` - A boolean value indicating whether the column is nullable
+  * `:metadata` - A map of metadata
+
+  ## Examples
+
+      iex> Adbc.Buffer.fixed_size_binary([<<0>>, <<1>>, <<2>>])
+      %Adbc.Column{
+        name: nil,
+        type: :fixed_size_binary,
+        nullable: false,
+        metadata: %{},
+        data: [<<0>>, <<1>>, <<2>>]
+      }
+
+  """
   @spec fixed_size_binary([binary()], Keyword.t()) :: %Adbc.Column{}
   def fixed_size_binary(data, opts \\ []) when is_list(data) and is_list(opts) do
     column(:fixed_size_binary, data, opts)

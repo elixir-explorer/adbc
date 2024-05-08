@@ -38,7 +38,7 @@ defmodule AdbcTest do
                   %Adbc.Column{
                     name: "num",
                     type: :i32,
-                    nullable: false,
+                    nullable: true,
                     metadata: nil,
                     data: [123]
                   }
@@ -54,13 +54,13 @@ defmodule AdbcTest do
                   %Adbc.Column{
                     name: "num",
                     type: :list,
-                    nullable: false,
+                    nullable: true,
                     metadata: nil,
                     data: [
                       %Adbc.Column{
                         name: "item",
                         type: :i32,
-                        nullable: false,
+                        nullable: true,
                         metadata: nil,
                         data: [1, 2, 3]
                       }
@@ -78,13 +78,13 @@ defmodule AdbcTest do
                   %Adbc.Column{
                     name: "num",
                     type: :list,
-                    nullable: false,
+                    nullable: true,
                     metadata: nil,
                     data: [
                       %Adbc.Column{
                         name: "item",
                         type: :i32,
-                        nullable: false,
+                        nullable: true,
                         metadata: nil,
                         data: [1, 2, 3, nil, 5]
                       }
@@ -118,13 +118,13 @@ defmodule AdbcTest do
                   %Adbc.Column{
                     name: "num",
                     type: :list,
-                    nullable: false,
+                    nullable: true,
                     metadata: nil,
                     data: [
                       %Adbc.Column{
                         name: "item",
                         type: :i32,
-                        nullable: false,
+                        nullable: true,
                         metadata: nil,
                         data: [1, 2, 3, nil, 5, 6, nil, 7, nil, 9]
                       }
@@ -148,7 +148,7 @@ defmodule AdbcTest do
           %Adbc.Column{
             name: "generate_series",
             type: :timestamp,
-            nullable: false,
+            nullable: true,
             metadata: nil,
             data: generate_series
           }
@@ -175,35 +175,35 @@ defmodule AdbcTest do
                  %Adbc.Column{
                    name: "datetime",
                    type: :timestamp,
-                   nullable: false,
+                   nullable: true,
                    metadata: nil,
                    data: [~N[2023-03-01 10:23:45.000000]]
                  },
                  %Adbc.Column{
                    name: "datetime_usec",
                    type: :timestamp,
-                   nullable: false,
+                   nullable: true,
                    metadata: nil,
                    data: [~N[2023-03-01 10:23:45.123456]]
                  },
                  %Adbc.Column{
                    name: "date",
                    type: :date32,
-                   nullable: false,
+                   nullable: true,
                    metadata: nil,
                    data: [~D[2023-03-01]]
                  },
                  %Adbc.Column{
                    name: "time",
                    type: :time64,
-                   nullable: false,
+                   nullable: true,
                    metadata: nil,
                    data: [~T[10:23:45.000000]]
                  },
                  %Adbc.Column{
                    name: "time_usec",
                    type: :time64,
-                   nullable: false,
+                   nullable: true,
                    metadata: nil,
                    data: [~T[10:23:45.123456]]
                  }

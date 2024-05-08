@@ -58,7 +58,7 @@ defmodule Adbc.Connection.Test do
            %Adbc.Column{
              name: "info_value",
              type: :dense_union,
-             nullable: false,
+             nullable: true,
              metadata: nil,
              data: [
                %{"string_value" => ["SQLite"]},
@@ -92,7 +92,7 @@ defmodule Adbc.Connection.Test do
                    %Adbc.Column{
                      name: "info_value",
                      type: :dense_union,
-                     nullable: false,
+                     nullable: true,
                      metadata: nil,
                      data: [%{"string_value" => ["SQLite"]}]
                    }
@@ -123,31 +123,32 @@ defmodule Adbc.Connection.Test do
 
       {:ok,
        %Adbc.Result{
+         num_rows: nil,
          data: [
            %Adbc.Column{
              name: "catalog_name",
              type: :string,
-             nullable: false,
+             nullable: true,
              metadata: nil,
              data: []
            },
            %Adbc.Column{
              name: "catalog_db_schemas",
              type: :list,
-             nullable: false,
+             nullable: true,
              metadata: nil,
              data: [
                %Adbc.Column{
                  name: "db_schema_name",
                  type: :string,
-                 nullable: false,
+                 nullable: true,
                  metadata: nil,
                  data: []
                },
                %Adbc.Column{
                  name: "db_schema_tables",
                  type: :list,
-                 nullable: false,
+                 nullable: true,
                  metadata: nil,
                  data: [
                    %Adbc.Column{
@@ -167,7 +168,7 @@ defmodule Adbc.Connection.Test do
                    %Adbc.Column{
                      name: "table_columns",
                      type: :list,
-                     nullable: false,
+                     nullable: true,
                      metadata: nil,
                      data: [
                        %Adbc.Column{
@@ -180,126 +181,126 @@ defmodule Adbc.Connection.Test do
                        %Adbc.Column{
                          name: "ordinal_position",
                          type: :i32,
-                         nullable: false,
+                         nullable: true,
                          metadata: nil,
                          data: []
                        },
                        %Adbc.Column{
                          name: "remarks",
                          type: :string,
-                         nullable: false,
+                         nullable: true,
                          metadata: nil,
                          data: []
                        },
                        %Adbc.Column{
                          name: "xdbc_data_type",
                          type: :i16,
-                         nullable: false,
+                         nullable: true,
                          metadata: nil,
                          data: []
                        },
                        %Adbc.Column{
                          name: "xdbc_type_name",
                          type: :string,
-                         nullable: false,
+                         nullable: true,
                          metadata: nil,
                          data: []
                        },
                        %Adbc.Column{
                          name: "xdbc_column_size",
                          type: :i32,
-                         nullable: false,
+                         nullable: true,
                          metadata: nil,
                          data: []
                        },
                        %Adbc.Column{
                          name: "xdbc_decimal_digits",
                          type: :i16,
-                         nullable: false,
+                         nullable: true,
                          metadata: nil,
                          data: []
                        },
                        %Adbc.Column{
                          name: "xdbc_num_prec_radix",
                          type: :i16,
-                         nullable: false,
+                         nullable: true,
                          metadata: nil,
                          data: []
                        },
                        %Adbc.Column{
                          name: "xdbc_nullable",
                          type: :i16,
-                         nullable: false,
+                         nullable: true,
                          metadata: nil,
                          data: []
                        },
                        %Adbc.Column{
                          name: "xdbc_column_def",
                          type: :string,
-                         nullable: false,
+                         nullable: true,
                          metadata: nil,
                          data: []
                        },
                        %Adbc.Column{
                          name: "xdbc_sql_data_type",
                          type: :i16,
-                         nullable: false,
+                         nullable: true,
                          metadata: nil,
                          data: []
                        },
                        %Adbc.Column{
                          name: "xdbc_datetime_sub",
                          type: :i16,
-                         nullable: false,
+                         nullable: true,
                          metadata: nil,
                          data: []
                        },
                        %Adbc.Column{
                          name: "xdbc_char_octet_length",
                          type: :i32,
-                         nullable: false,
+                         nullable: true,
                          metadata: nil,
                          data: []
                        },
                        %Adbc.Column{
                          name: "xdbc_is_nullable",
                          type: :string,
-                         nullable: false,
+                         nullable: true,
                          metadata: nil,
                          data: []
                        },
                        %Adbc.Column{
                          name: "xdbc_scope_catalog",
                          type: :string,
-                         nullable: false,
+                         nullable: true,
                          metadata: nil,
                          data: []
                        },
                        %Adbc.Column{
                          name: "xdbc_scope_schema",
                          type: :string,
-                         nullable: false,
+                         nullable: true,
                          metadata: nil,
                          data: []
                        },
                        %Adbc.Column{
                          name: "xdbc_scope_table",
                          type: :string,
-                         nullable: false,
+                         nullable: true,
                          metadata: nil,
                          data: []
                        },
                        %Adbc.Column{
                          name: "xdbc_is_autoincrement",
                          type: :boolean,
-                         nullable: false,
+                         nullable: true,
                          metadata: nil,
                          data: []
                        },
                        %Adbc.Column{
                          name: "xdbc_is_generatedcolumn",
                          type: :boolean,
-                         nullable: false,
+                         nullable: true,
                          metadata: nil,
                          data: []
                        }
@@ -308,13 +309,13 @@ defmodule Adbc.Connection.Test do
                    %Adbc.Column{
                      name: "table_constraints",
                      type: :list,
-                     nullable: false,
+                     nullable: true,
                      metadata: nil,
                      data: [
                        %Adbc.Column{
                          name: "constraint_name",
                          type: :string,
-                         nullable: false,
+                         nullable: true,
                          metadata: nil,
                          data: []
                        },
@@ -343,20 +344,20 @@ defmodule Adbc.Connection.Test do
                        %Adbc.Column{
                          name: "constraint_column_usage",
                          type: :list,
-                         nullable: false,
+                         nullable: true,
                          metadata: nil,
                          data: [
                            %Adbc.Column{
                              name: "fk_catalog",
                              type: :string,
-                             nullable: false,
+                             nullable: true,
                              metadata: nil,
                              data: []
                            },
                            %Adbc.Column{
                              name: "fk_db_schema",
                              type: :string,
-                             nullable: false,
+                             nullable: true,
                              metadata: nil,
                              data: []
                            },
@@ -417,7 +418,7 @@ defmodule Adbc.Connection.Test do
                   %Adbc.Column{
                     name: "num",
                     type: :i64,
-                    nullable: false,
+                    nullable: true,
                     metadata: nil,
                     data: [123]
                   }
@@ -431,14 +432,14 @@ defmodule Adbc.Connection.Test do
                   %Adbc.Column{
                     name: "num",
                     type: :i64,
-                    nullable: false,
+                    nullable: true,
                     metadata: nil,
                     data: [123]
                   },
                   %Adbc.Column{
                     name: "bool",
                     type: :i64,
-                    nullable: false,
+                    nullable: true,
                     metadata: nil,
                     data: [1]
                   }
@@ -455,7 +456,7 @@ defmodule Adbc.Connection.Test do
                   %Adbc.Column{
                     name: "num",
                     type: :i64,
-                    nullable: false,
+                    nullable: true,
                     metadata: nil,
                     data: [579]
                   }
@@ -480,7 +481,7 @@ defmodule Adbc.Connection.Test do
                   %Adbc.Column{
                     name: "num",
                     type: :i64,
-                    nullable: false,
+                    nullable: true,
                     metadata: nil,
                     data: [579]
                   }
@@ -500,7 +501,7 @@ defmodule Adbc.Connection.Test do
                   %Adbc.Column{
                     name: "num",
                     type: :i64,
-                    nullable: false,
+                    nullable: true,
                     metadata: nil,
                     data: [579]
                   }
@@ -514,7 +515,7 @@ defmodule Adbc.Connection.Test do
                   %Adbc.Column{
                     name: "num",
                     type: :i64,
-                    nullable: false,
+                    nullable: true,
                     metadata: nil,
                     data: [1456]
                   }
@@ -533,7 +534,7 @@ defmodule Adbc.Connection.Test do
                  %Adbc.Column{
                    name: "num",
                    type: :i64,
-                   nullable: false,
+                   nullable: true,
                    metadata: nil,
                    data: [123]
                  }
@@ -546,11 +547,11 @@ defmodule Adbc.Connection.Test do
                  %Adbc.Column{
                    name: "num",
                    type: :i64,
-                   nullable: false,
+                   nullable: true,
                    metadata: nil,
                    data: [123]
                  },
-                 %Adbc.Column{name: "bool", type: :i64, nullable: false, metadata: nil, data: [1]}
+                 %Adbc.Column{name: "bool", type: :i64, nullable: true, metadata: nil, data: [1]}
                ]
              } =
                Connection.query!(conn, "SELECT 123 as num, true as bool")
@@ -564,7 +565,7 @@ defmodule Adbc.Connection.Test do
                  %Adbc.Column{
                    name: "num",
                    type: :i64,
-                   nullable: false,
+                   nullable: true,
                    metadata: nil,
                    data: [579]
                  }
@@ -591,11 +592,11 @@ defmodule Adbc.Connection.Test do
                  %Adbc.Column{
                    name: "num",
                    type: :i64,
-                   nullable: false,
+                   nullable: true,
                    metadata: nil,
                    data: [123]
                  },
-                 %Adbc.Column{name: "bool", type: :i64, nullable: false, metadata: nil, data: [1]}
+                 %Adbc.Column{name: "bool", type: :i64, nullable: true, metadata: nil, data: [1]}
                ]
              } ==
                Connection.query!(conn, "SELECT 123 as num, true as bool", [],
@@ -611,7 +612,7 @@ defmodule Adbc.Connection.Test do
                  %Adbc.Column{
                    name: "num",
                    type: :i64,
-                   nullable: false,
+                   nullable: true,
                    metadata: nil,
                    data: [579]
                  }

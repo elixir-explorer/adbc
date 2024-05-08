@@ -247,7 +247,7 @@ int get_arrow_array_children_as_list(ErlNifEnv *env, struct ArrowSchema * schema
     const uint8_t * bitmap_buffer = (const uint8_t *)values->buffers[bitmap_buffer_index];
     children.resize(count);
     for (int64_t child_i = offset; child_i < offset + count; child_i++) {
-        if (bitmap_buffer && values->null_count > 0) {
+        if (bitmap_buffer && ((schema->flags & ARROW_FLAG_NULLABLE) || (values->null_count > 0))) {
             uint8_t vbyte = bitmap_buffer[child_i / 8];
             if (!(vbyte & (1 << (child_i % 8)))) {
                 children[child_i - offset] = kAtomNil;
@@ -266,7 +266,8 @@ int get_arrow_array_children_as_list(ErlNifEnv *env, struct ArrowSchema * schema
         if (childrens.size() == 1) {
             children[child_i - offset] = childrens[0];
         } else {
-            children[child_i - offset] = make_adbc_column(env, childrens[0], child_type, child_values->null_count > 0, child_metadata, childrens[1]);
+            bool nullable = (child_schema->flags & ARROW_FLAG_NULLABLE) || (child_values->null_count > 0);
+            children[child_i - offset] = make_adbc_column(env, childrens[0], child_type, nullable, child_metadata, childrens[1]);
         }
     }
 
@@ -508,8 +509,9 @@ ERL_NIF_TERM get_arrow_array_list_children(ErlNifEnv *env, struct ArrowSchema * 
             return erlang::nif::error(env, "invalid offset for ArrowArray (list), (offset + count) > items_values->n_children");
         }
         children.resize(count);
+        bool items_nullable = (items_schema->flags & ARROW_FLAG_NULLABLE) || (items_values->null_count > 0);
         for (int64_t child_i = offset; child_i < offset + count; child_i++) {
-            if (bitmap_buffer && values->null_count > 0) {
+            if (bitmap_buffer && items_nullable) {
                 uint8_t vbyte = bitmap_buffer[child_i / 8];
                 if (!(vbyte & (1 << (child_i % 8)))) {
                     children[child_i - offset] = kAtomNil;
@@ -529,7 +531,8 @@ ERL_NIF_TERM get_arrow_array_list_children(ErlNifEnv *env, struct ArrowSchema * 
             if (childrens.size() == 1) {
                 children[child_i - offset] = childrens[0];
             } else {
-                children[child_i - offset] = make_adbc_column(env, childrens[0], item_type, item_values->null_count > 0, item_metadata, childrens[1]);
+                bool children_nullable = (item_schema->flags & ARROW_FLAG_NULLABLE) || (item_values->null_count > 0);
+                children[child_i - offset] = make_adbc_column(env, childrens[0], item_type, children_nullable, item_metadata, childrens[1]);
             }
         }
         return enif_make_list_from_array(env, children.data(), (unsigned)children.size());
@@ -546,8 +549,9 @@ ERL_NIF_TERM get_arrow_array_list_children(ErlNifEnv *env, struct ArrowSchema * 
             children[0] = childrens[0];
             return enif_make_list_from_array(env, children.data(), (unsigned)children.size());
         } else {
+            bool children_nullable = (schema->flags & ARROW_FLAG_NULLABLE) || (values->null_count > 0);
             ERL_NIF_TERM column[1];
-            column[0] = make_adbc_column(env, childrens[0], children_type, values->null_count > 0, children_metadata, childrens[1]);
+            column[0] = make_adbc_column(env, childrens[0], children_type, children_nullable, children_metadata, childrens[1]);
             return enif_make_list_from_array(env, column, 1);
         }
     }

@@ -80,58 +80,57 @@ defmodule Adbc.SQLite.Test do
      %Adbc.Result{
        num_rows: nil,
        data: [
-         %Adbc.Column{name: "i1", type: :i64, nullable: false, metadata: nil, data: [1]},
-         %Adbc.Column{name: "i2", type: :i64, nullable: false, metadata: nil, data: [2]},
-         %Adbc.Column{name: "i3", type: :i64, nullable: false, metadata: nil, data: [3]},
-         %Adbc.Column{name: "i4", type: :i64, nullable: false, metadata: nil, data: [4]},
-         %Adbc.Column{name: "i5", type: :i64, nullable: false, metadata: nil, data: [5]},
-         %Adbc.Column{name: "i6", type: :i64, nullable: false, metadata: nil, data: [6]},
-         %Adbc.Column{name: "i7", type: :i64, nullable: false, metadata: nil, data: ~c"\a"},
-         %Adbc.Column{name: "i8", type: :i64, nullable: false, metadata: nil, data: ~c"\b"},
-         %Adbc.Column{name: "i9", type: :i64, nullable: false, metadata: nil, data: ~c"\t"},
-         %Adbc.Column{name: "t1", type: :string, nullable: false, metadata: nil, data: ["hello"]},
-         %Adbc.Column{name: "t2", type: :string, nullable: false, metadata: nil, data: ["world"]},
+         %Adbc.Column{name: "i1", type: :i64, nullable: true, metadata: nil, data: [1]},
+         %Adbc.Column{name: "i2", type: :i64, nullable: true, metadata: nil, data: [2]},
+         %Adbc.Column{name: "i3", type: :i64, nullable: true, metadata: nil, data: [3]},
+         %Adbc.Column{name: "i4", type: :i64, nullable: true, metadata: nil, data: [4]},
+         %Adbc.Column{name: "i5", type: :i64, nullable: true, metadata: nil, data: [5]},
+         %Adbc.Column{name: "i6", type: :i64, nullable: true, metadata: nil, data: [6]},
+         %Adbc.Column{name: "i7", type: :i64, nullable: true, metadata: nil, data: ~c"\a"},
+         %Adbc.Column{name: "i8", type: :i64, nullable: true, metadata: nil, data: ~c"\b"},
+         %Adbc.Column{name: "i9", type: :i64, nullable: true, metadata: nil, data: ~c"\t"},
+         %Adbc.Column{name: "t1", type: :string, nullable: true, metadata: nil, data: ["hello"]},
+         %Adbc.Column{name: "t2", type: :string, nullable: true, metadata: nil, data: ["world"]},
          %Adbc.Column{
            name: "t3",
            type: :string,
-           nullable: false,
+           nullable: true,
            metadata: nil,
            data: ["goodbye"]
          },
-         %Adbc.Column{name: "t4", type: :string, nullable: false, metadata: nil, data: ["world"]},
-         %Adbc.Column{name: "t5", type: :string, nullable: false, metadata: nil, data: ["foo"]},
-         %Adbc.Column{name: "t6", type: :string, nullable: false, metadata: nil, data: ["bar"]},
+         %Adbc.Column{name: "t4", type: :string, nullable: true, metadata: nil, data: ["world"]},
+         %Adbc.Column{name: "t5", type: :string, nullable: true, metadata: nil, data: ["foo"]},
+         %Adbc.Column{name: "t6", type: :string, nullable: true, metadata: nil, data: ["bar"]},
          %Adbc.Column{
            name: "b1",
            type: :string,
-           nullable: false,
+           nullable: true,
            metadata: nil,
            data: [<<100, 97, 116, 97, 1, 2>>]
          },
-         %Adbc.Column{name: "r1", type: :f64, nullable: false, metadata: nil, data: [1.1]},
-         %Adbc.Column{name: "r2", type: :f64, nullable: false, metadata: nil, data: [2.2]},
-         %Adbc.Column{name: "r3", type: :f64, nullable: false, metadata: nil, data: [3.3]},
-         %Adbc.Column{name: "r4", type: :f64, nullable: false, metadata: nil, data: [4.4]},
-         %Adbc.Column{name: "n1", type: :f64, nullable: false, metadata: nil, data: [1.1]},
-         %Adbc.Column{name: "n2", type: :f64, nullable: false, metadata: nil, data: [2.2]},
-         %Adbc.Column{name: "n3", type: :i64, nullable: false, metadata: nil, data: [1]},
+         %Adbc.Column{name: "r1", type: :f64, nullable: true, metadata: nil, data: [1.1]},
+         %Adbc.Column{name: "r2", type: :f64, nullable: true, metadata: nil, data: [2.2]},
+         %Adbc.Column{name: "r3", type: :f64, nullable: true, metadata: nil, data: [3.3]},
+         %Adbc.Column{name: "r4", type: :f64, nullable: true, metadata: nil, data: [4.4]},
+         %Adbc.Column{name: "n1", type: :f64, nullable: true, metadata: nil, data: [1.1]},
+         %Adbc.Column{name: "n2", type: :f64, nullable: true, metadata: nil, data: [2.2]},
+         %Adbc.Column{name: "n3", type: :i64, nullable: true, metadata: nil, data: [1]},
          %Adbc.Column{
            name: "n4",
            type: :string,
-           nullable: false,
+           nullable: true,
            metadata: nil,
            data: ["2021-01-01"]
          },
          %Adbc.Column{
            name: "n5",
            type: :string,
-           nullable: false,
+           nullable: true,
            metadata: nil,
            data: ["2021-01-01 00:00:00"]
          }
        ]
-     }} =
-      Adbc.Connection.query(conn, "SELECT * FROM test")
+     }} = Adbc.Connection.query(conn, "SELECT * FROM test")
   end
 
   test "insert with Adbc.Buffer", %{db: _, conn: conn} do
@@ -174,64 +173,64 @@ defmodule Adbc.SQLite.Test do
      %Adbc.Result{
        num_rows: nil,
        data: [
-         %Adbc.Column{name: "i1", type: :i64, nullable: false, metadata: nil, data: [1]},
-         %Adbc.Column{name: "i2", type: :i64, nullable: false, metadata: nil, data: [2]},
-         %Adbc.Column{name: "i3", type: :i64, nullable: false, metadata: nil, data: [3]},
-         %Adbc.Column{name: "i4", type: :i64, nullable: false, metadata: nil, data: [4]},
-         %Adbc.Column{name: "i5", type: :i64, nullable: false, metadata: nil, data: [5]},
-         %Adbc.Column{name: "i6", type: :i64, nullable: false, metadata: nil, data: [6]},
-         %Adbc.Column{name: "i7", type: :i64, nullable: false, metadata: nil, data: ~c"\a"},
-         %Adbc.Column{name: "i8", type: :i64, nullable: false, metadata: nil, data: ~c"\b"},
-         %Adbc.Column{name: "i9", type: :i64, nullable: false, metadata: nil, data: ~c"\t"},
-         %Adbc.Column{name: "t1", type: :string, nullable: false, metadata: nil, data: ["hello"]},
-         %Adbc.Column{name: "t2", type: :string, nullable: false, metadata: nil, data: ["world"]},
+         %Adbc.Column{name: "i1", type: :i64, nullable: true, metadata: nil, data: [1]},
+         %Adbc.Column{name: "i2", type: :i64, nullable: true, metadata: nil, data: [2]},
+         %Adbc.Column{name: "i3", type: :i64, nullable: true, metadata: nil, data: [3]},
+         %Adbc.Column{name: "i4", type: :i64, nullable: true, metadata: nil, data: [4]},
+         %Adbc.Column{name: "i5", type: :i64, nullable: true, metadata: nil, data: [5]},
+         %Adbc.Column{name: "i6", type: :i64, nullable: true, metadata: nil, data: [6]},
+         %Adbc.Column{name: "i7", type: :i64, nullable: true, metadata: nil, data: ~c"\a"},
+         %Adbc.Column{name: "i8", type: :i64, nullable: true, metadata: nil, data: ~c"\b"},
+         %Adbc.Column{name: "i9", type: :i64, nullable: true, metadata: nil, data: ~c"\t"},
+         %Adbc.Column{name: "t1", type: :string, nullable: true, metadata: nil, data: ["hello"]},
+         %Adbc.Column{name: "t2", type: :string, nullable: true, metadata: nil, data: ["world"]},
          %Adbc.Column{
            name: "t3",
            type: :string,
-           nullable: false,
+           nullable: true,
            metadata: nil,
            data: ["goodbye"]
          },
-         %Adbc.Column{name: "t4", type: :string, nullable: false, metadata: nil, data: ["world"]},
-         %Adbc.Column{name: "t5", type: :string, nullable: false, metadata: nil, data: ["foo"]},
-         %Adbc.Column{name: "t6", type: :string, nullable: false, metadata: nil, data: ["bar"]},
+         %Adbc.Column{name: "t4", type: :string, nullable: true, metadata: nil, data: ["world"]},
+         %Adbc.Column{name: "t5", type: :string, nullable: true, metadata: nil, data: ["foo"]},
+         %Adbc.Column{name: "t6", type: :string, nullable: true, metadata: nil, data: ["bar"]},
          %Adbc.Column{
            name: "b1",
            type: :binary,
-           nullable: false,
+           nullable: true,
            metadata: nil,
            data: [<<100, 97, 116, 97, 1, 2>>]
          },
          %Adbc.Column{
            name: "r1",
            type: :f64,
-           nullable: false,
+           nullable: true,
            metadata: nil,
            data: [r1]
          },
-         %Adbc.Column{name: "r2", type: :f64, nullable: false, metadata: nil, data: [2.2]},
+         %Adbc.Column{name: "r2", type: :f64, nullable: true, metadata: nil, data: [2.2]},
          %Adbc.Column{
            name: "r3",
            type: :f64,
-           nullable: false,
+           nullable: true,
            metadata: nil,
            data: [r3]
          },
-         %Adbc.Column{name: "r4", type: :f64, nullable: false, metadata: nil, data: [4.4]},
-         %Adbc.Column{name: "n1", type: :f64, nullable: false, metadata: nil, data: [1.1]},
-         %Adbc.Column{name: "n2", type: :f64, nullable: false, metadata: nil, data: [2.2]},
-         %Adbc.Column{name: "n3", type: :i64, nullable: false, metadata: nil, data: [1]},
+         %Adbc.Column{name: "r4", type: :f64, nullable: true, metadata: nil, data: [4.4]},
+         %Adbc.Column{name: "n1", type: :f64, nullable: true, metadata: nil, data: [1.1]},
+         %Adbc.Column{name: "n2", type: :f64, nullable: true, metadata: nil, data: [2.2]},
+         %Adbc.Column{name: "n3", type: :i64, nullable: true, metadata: nil, data: [1]},
          %Adbc.Column{
            name: "n4",
            type: :string,
-           nullable: false,
+           nullable: true,
            metadata: nil,
            data: ["2021-01-01"]
          },
          %Adbc.Column{
            name: "n5",
            type: :string,
-           nullable: false,
+           nullable: true,
            metadata: nil,
            data: ["2021-01-01 00:00:00"]
          }

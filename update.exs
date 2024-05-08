@@ -2,21 +2,23 @@ Mix.install([{:req, "~> 0.4"}])
 
 defmodule Update do
   # To update duckdb driver, just bump this version
-  @duckdb_version "0.10.1"
+  # https://github.com/duckdb/duckdb/releases/
+  @duckdb_version "0.10.2"
 
   # To update ADBC drivers, bump the tag and version accordingly
-  @adbc_version "0.11.0"
-  @adbc_tag "apache-arrow-adbc-0.11.0"
+  # https://github.com/apache/arrow-adbc/releases
+  @adbc_driver_version "1.0.0"
+  @adbc_tag "apache-arrow-adbc-12-rc0"
   @adbc_drivers ~w(sqlite postgresql flightsql snowflake)a
 
   def versions do
-    Map.new(@adbc_drivers, &{&1, @adbc_version})
+    Map.new(@adbc_drivers, &{&1, @adbc_driver_version})
     |> Map.merge(%{duckdb: @duckdb_version})
   end
 
   def mappings do
     %{}
-    |> Map.merge(adbc_mappings(@adbc_version, @adbc_tag))
+    |> Map.merge(adbc_mappings(@adbc_driver_version, @adbc_tag))
     |> Map.merge(duckdb_mappings(@duckdb_version))
   end
 
@@ -68,7 +70,7 @@ defmodule Update do
 
       {aarch64_apple_darwin, wheels} = data_for(wheels, ["macosx", "arm64"])
       {x86_64_apple_darwin, wheels} = data_for(wheels, ["macosx", "x86_64"])
-      {aarch64_linux_gnu, wheels} = data_for(wheels, ["manylinux", "aarch64"])
+      # {aarch64_linux_gnu, wheels} = data_for(wheels, ["manylinux", "aarch64"])
       {x86_64_linux_gnu, wheels} = data_for(wheels, ["manylinux", "x86_64"])
       {x86_64_windows_msvc, wheels} = data_for(wheels, ["win_amd64"])
 
@@ -80,7 +82,7 @@ defmodule Update do
         %{
           "aarch64-apple-darwin" => aarch64_apple_darwin,
           "x86_64-apple-darwin" => x86_64_apple_darwin,
-          "aarch64-linux-gnu" => aarch64_linux_gnu,
+          # "aarch64-linux-gnu" => aarch64_linux_gnu,
           "x86_64-linux-gnu" => x86_64_linux_gnu,
           "x86_64-windows-msvc" => x86_64_windows_msvc
         }

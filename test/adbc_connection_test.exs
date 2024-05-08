@@ -137,47 +137,241 @@ defmodule Adbc.Connection.Test do
              nullable: false,
              metadata: nil,
              data: [
-               {"db_schema_name", []},
-               {"db_schema_tables",
-                [
-                  {"table_name", []},
-                  {"table_type", []},
-                  {"table_columns",
-                   [
-                     {"column_name", []},
-                     {"ordinal_position", []},
-                     {"remarks", []},
-                     {"xdbc_data_type", []},
-                     {"xdbc_type_name", []},
-                     {"xdbc_column_size", []},
-                     {"xdbc_decimal_digits", []},
-                     {"xdbc_num_prec_radix", []},
-                     {"xdbc_nullable", []},
-                     {"xdbc_column_def", []},
-                     {"xdbc_sql_data_type", []},
-                     {"xdbc_datetime_sub", []},
-                     {"xdbc_char_octet_length", []},
-                     {"xdbc_is_nullable", []},
-                     {"xdbc_scope_catalog", []},
-                     {"xdbc_scope_schema", []},
-                     {"xdbc_scope_table", []},
-                     {"xdbc_is_autoincrement", []},
-                     {"xdbc_is_generatedcolumn", []}
-                   ]},
-                  {"table_constraints",
-                   [
-                     {"constraint_name", []},
-                     {"constraint_type", []},
-                     {"constraint_column_names", [[]]},
-                     {"constraint_column_usage",
-                      [
-                        {"fk_catalog", []},
-                        {"fk_db_schema", []},
-                        {"fk_table", []},
-                        {"fk_column_name", []}
-                      ]}
-                   ]}
-                ]}
+               %Adbc.Column{
+                 name: "db_schema_name",
+                 type: :string,
+                 nullable: false,
+                 metadata: nil,
+                 data: []
+               },
+               %Adbc.Column{
+                 name: "db_schema_tables",
+                 type: :list,
+                 nullable: false,
+                 metadata: nil,
+                 data: [
+                   %Adbc.Column{
+                     name: "table_name",
+                     type: :string,
+                     nullable: false,
+                     metadata: nil,
+                     data: []
+                   },
+                   %Adbc.Column{
+                     name: "table_type",
+                     type: :string,
+                     nullable: false,
+                     metadata: nil,
+                     data: []
+                   },
+                   %Adbc.Column{
+                     name: "table_columns",
+                     type: :list,
+                     nullable: false,
+                     metadata: nil,
+                     data: [
+                       %Adbc.Column{
+                         name: "column_name",
+                         type: :string,
+                         nullable: false,
+                         metadata: nil,
+                         data: []
+                       },
+                       %Adbc.Column{
+                         name: "ordinal_position",
+                         type: :i32,
+                         nullable: false,
+                         metadata: nil,
+                         data: []
+                       },
+                       %Adbc.Column{
+                         name: "remarks",
+                         type: :string,
+                         nullable: false,
+                         metadata: nil,
+                         data: []
+                       },
+                       %Adbc.Column{
+                         name: "xdbc_data_type",
+                         type: :i16,
+                         nullable: false,
+                         metadata: nil,
+                         data: []
+                       },
+                       %Adbc.Column{
+                         name: "xdbc_type_name",
+                         type: :string,
+                         nullable: false,
+                         metadata: nil,
+                         data: []
+                       },
+                       %Adbc.Column{
+                         name: "xdbc_column_size",
+                         type: :i32,
+                         nullable: false,
+                         metadata: nil,
+                         data: []
+                       },
+                       %Adbc.Column{
+                         name: "xdbc_decimal_digits",
+                         type: :i16,
+                         nullable: false,
+                         metadata: nil,
+                         data: []
+                       },
+                       %Adbc.Column{
+                         name: "xdbc_num_prec_radix",
+                         type: :i16,
+                         nullable: false,
+                         metadata: nil,
+                         data: []
+                       },
+                       %Adbc.Column{
+                         name: "xdbc_nullable",
+                         type: :i16,
+                         nullable: false,
+                         metadata: nil,
+                         data: []
+                       },
+                       %Adbc.Column{
+                         name: "xdbc_column_def",
+                         type: :string,
+                         nullable: false,
+                         metadata: nil,
+                         data: []
+                       },
+                       %Adbc.Column{
+                         name: "xdbc_sql_data_type",
+                         type: :i16,
+                         nullable: false,
+                         metadata: nil,
+                         data: []
+                       },
+                       %Adbc.Column{
+                         name: "xdbc_datetime_sub",
+                         type: :i16,
+                         nullable: false,
+                         metadata: nil,
+                         data: []
+                       },
+                       %Adbc.Column{
+                         name: "xdbc_char_octet_length",
+                         type: :i32,
+                         nullable: false,
+                         metadata: nil,
+                         data: []
+                       },
+                       %Adbc.Column{
+                         name: "xdbc_is_nullable",
+                         type: :string,
+                         nullable: false,
+                         metadata: nil,
+                         data: []
+                       },
+                       %Adbc.Column{
+                         name: "xdbc_scope_catalog",
+                         type: :string,
+                         nullable: false,
+                         metadata: nil,
+                         data: []
+                       },
+                       %Adbc.Column{
+                         name: "xdbc_scope_schema",
+                         type: :string,
+                         nullable: false,
+                         metadata: nil,
+                         data: []
+                       },
+                       %Adbc.Column{
+                         name: "xdbc_scope_table",
+                         type: :string,
+                         nullable: false,
+                         metadata: nil,
+                         data: []
+                       },
+                       %Adbc.Column{
+                         name: "xdbc_is_autoincrement",
+                         type: :boolean,
+                         nullable: false,
+                         metadata: nil,
+                         data: []
+                       },
+                       %Adbc.Column{
+                         name: "xdbc_is_generatedcolumn",
+                         type: :boolean,
+                         nullable: false,
+                         metadata: nil,
+                         data: []
+                       }
+                     ]
+                   },
+                   %Adbc.Column{
+                     name: "table_constraints",
+                     type: :list,
+                     nullable: false,
+                     metadata: nil,
+                     data: [
+                       %Adbc.Column{
+                         name: "constraint_name",
+                         type: :string,
+                         nullable: false,
+                         metadata: nil,
+                         data: []
+                       },
+                       %Adbc.Column{
+                         name: "constraint_type",
+                         type: :string,
+                         nullable: false,
+                         metadata: nil,
+                         data: []
+                       },
+                       %Adbc.Column{
+                         name: "constraint_column_names",
+                         type: :list,
+                         nullable: false,
+                         metadata: nil,
+                         data: [[]]
+                       },
+                       %Adbc.Column{
+                         name: "constraint_column_usage",
+                         type: :list,
+                         nullable: false,
+                         metadata: nil,
+                         data: [
+                           %Adbc.Column{
+                             name: "fk_catalog",
+                             type: :string,
+                             nullable: false,
+                             metadata: nil,
+                             data: []
+                           },
+                           %Adbc.Column{
+                             name: "fk_db_schema",
+                             type: :string,
+                             nullable: false,
+                             metadata: nil,
+                             data: []
+                           },
+                           %Adbc.Column{
+                             name: "fk_table",
+                             type: :string,
+                             nullable: false,
+                             metadata: nil,
+                             data: []
+                           },
+                           %Adbc.Column{
+                             name: "fk_column_name",
+                             type: :string,
+                             nullable: false,
+                             metadata: nil,
+                             data: []
+                           }
+                         ]
+                       }
+                     ]
+                   }
+                 ]
+               }
              ]
            }
          ]
@@ -189,7 +383,18 @@ defmodule Adbc.Connection.Test do
     test "get table types from a connection", %{db: db} do
       conn = start_supervised!({Connection, database: db})
 
-      assert {:ok, %Adbc.Result{data: %{"table_type" => ["table", "view"]}}} =
+      assert {:ok,
+              %Adbc.Result{
+                data: [
+                  %Adbc.Column{
+                    name: "table_type",
+                    type: :string,
+                    nullable: false,
+                    metadata: nil,
+                    data: ["table", "view"]
+                  }
+                ]
+              }} =
                Connection.get_table_types(conn)
     end
   end

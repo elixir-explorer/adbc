@@ -72,11 +72,62 @@ defmodule AdbcTest do
                     type: :list,
                     nullable: false,
                     metadata: nil,
-                    data: [[1, 2, 3, nil, 5]]
+                    data: [
+                      %Adbc.Column{
+                        name: "item",
+                        type: :i32,
+                        nullable: false,
+                        metadata: nil,
+                        data: [1, 2, 3, nil, 5]
+                      }
+                    ]
                   }
                 ]
               }} =
                Connection.query(conn, "SELECT ARRAY[1, 2, 3, null, 5] as num")
+    end
+
+    test "nested list responses with null", %{conn: conn} do
+      # import adbc_driver_postgresql
+      # import adbc_driver_manager
+      # import pyarrow
+      # db = adbc_driver_postgresql.connect(uri="postgres://postgres:postgres@localhost"):
+      # conn = adbc_driver_manager.AdbcConnection(db)
+      # stmt = adbc_driver_manager.AdbcStatement(conn)
+      # stmt.set_sql_query("SELECT ARRAY[ARRAY[1, 2, 3, null, 5], ARRAY[6, null, 7, null, 9]] as num")
+      # stream, _ = stmt.execute_query()
+      # reader = pyarrow.RecordBatchReader._import_from_c(stream.address)
+      # print(reader.read_all())
+      #
+      # pyarrow.Table
+      # num: list<item: int32>
+      #   child 0, item: int32
+      # ----
+      # num: [[[1,2,3,null,5,6,null,7,null,9]]]
+      assert {:ok,
+              %Adbc.Result{
+                data: [
+                  %Adbc.Column{
+                    name: "num",
+                    type: :list,
+                    nullable: false,
+                    metadata: nil,
+                    data: [
+                      %Adbc.Column{
+                        name: "item",
+                        type: :i32,
+                        nullable: false,
+                        metadata: nil,
+                        data: [1, 2, 3, nil, 5, 6, nil, 7, nil, 9]
+                      }
+                    ]
+                  }
+                ]
+              }} =
+               Connection.query(
+                 conn,
+                 "SELECT ARRAY[ARRAY[1, 2, 3, null, 5], ARRAY[6, null, 7, null, 9]] as num"
+               )
     end
 
     test "getting all chunks", %{conn: conn} do

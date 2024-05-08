@@ -145,7 +145,7 @@ template <typename T, typename M> static ERL_NIF_TERM values_from_buffer(ErlNifE
     } else {
         for (int64_t i = offset; i < offset + count; i++) {
             uint8_t vbyte = validity_bitmap[i/8];
-            if (vbyte & (1 << (i & 0b11111111))) {
+            if (vbyte & (1 << (i % 8))) {
                 values[i - offset] = value_to_nif(env, value_buffer[i]);
             } else {
                 values[i - offset] = kAtomNil;
@@ -186,7 +186,7 @@ template <typename M, typename OffsetT> static ERL_NIF_TERM strings_from_buffer(
             uint8_t vbyte = validity_bitmap[i / 8];
             OffsetT end_index = offsets_buffer[i + 1];
             size_t nbytes = end_index - offset;
-            if (nbytes > 0 && vbyte & (1 << (i & 0b11111111))) {
+            if (nbytes > 0 && vbyte & (1 << (i % 8))) {
                 values[i - element_offset] = value_to_nif(env, value_buffer, offset, nbytes);
             } else {
                 values[i - element_offset] = kAtomNil;
@@ -249,7 +249,7 @@ int get_arrow_array_children_as_list(ErlNifEnv *env, struct ArrowSchema * schema
     for (int64_t child_i = offset; child_i < offset + count; child_i++) {
         if (bitmap_buffer && values->null_count > 0) {
             uint8_t vbyte = bitmap_buffer[child_i / 8];
-            if (!(vbyte & (1 << (child_i & 0b11111111)))) {
+            if (!(vbyte & (1 << (child_i % 8)))) {
                 children[child_i - offset] = kAtomNil;
                 continue;
             }
@@ -503,12 +503,11 @@ ERL_NIF_TERM get_arrow_array_list_children(ErlNifEnv *env, struct ArrowSchema * 
         if ((offset + count) > items_values->n_children) {
             return erlang::nif::error(env, "invalid offset for ArrowArray (list), (offset + count) > items_values->n_children");
         }
-        printf("quq list\r\n");
         children.resize(count);
         for (int64_t child_i = offset; child_i < offset + count; child_i++) {
             if (bitmap_buffer && values->null_count > 0) {
                 uint8_t vbyte = bitmap_buffer[child_i / 8];
-                if (!(vbyte & (1 << (child_i & 0b11111111)))) {
+                if (!(vbyte & (1 << (child_i % 8)))) {
                     children[child_i - offset] = kAtomNil;
                     continue;
                 }
@@ -522,17 +521,15 @@ ERL_NIF_TERM get_arrow_array_list_children(ErlNifEnv *env, struct ArrowSchema * 
                 return error;
             }
 
-            // todo: convert to Adbc.Column
             if (childrens.size() == 1) {
                 children[child_i - offset] = childrens[0];
             } else {
-                children[child_i - offset] = enif_make_tuple2(env, childrens[0], childrens[1]);
+                children[child_i - offset] = make_adbc_column(env, childrens[0], item_type, item_values->null_count > 0, kAtomNil, childrens[1]);
             }
         }
         return enif_make_list_from_array(env, children.data(), (unsigned)children.size());
     } else {
         children.resize(1);
-        printf("simple list\r\n");
         std::vector<ERL_NIF_TERM> childrens;
         ERL_NIF_TERM children_type;
         if (arrow_array_to_nif_term(env, items_schema, items_values, offset, count, level + 1, childrens, children_type, error) == 1) {
@@ -541,10 +538,12 @@ ERL_NIF_TERM get_arrow_array_list_children(ErlNifEnv *env, struct ArrowSchema * 
 
         if (childrens.size() == 1) {
             children[0] = childrens[0];
+            return enif_make_list_from_array(env, children.data(), (unsigned)children.size());
         } else {
-            children[0] = childrens[1];
+            ERL_NIF_TERM column[1];
+            column[0] = make_adbc_column(env, childrens[0], children_type, values->null_count > 0, kAtomNil, childrens[1]);
+            return enif_make_list_from_array(env, column, 1);
         }
-        return enif_make_list_from_array(env, children.data(), (unsigned)children.size());
     }
 }
 
@@ -566,7 +565,7 @@ int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct 
     const char* name = schema->name ? schema->name : "";
     term_type = kAtomNil;
 
-    // printf("arrow_array_to_nif_term: level=%ld, name=%s, format=%s, offset=%ld, count=%ld\n", level, name, format, offset, count);
+    printf("arrow_array_to_nif_term: level=%lld, name=%s, format=%s, offset=%lld, count=%lld, length=%lld\n", level, name, format, offset, count, values->length);
 
     ERL_NIF_TERM current_term{}, children_term{};
     std::vector<ERL_NIF_TERM> children;

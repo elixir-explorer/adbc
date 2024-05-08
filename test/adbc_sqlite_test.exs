@@ -77,8 +77,7 @@ defmodule Adbc.SQLite.Test do
     )
 
     {:ok,
-     %Adbc.Result{
-       num_rows: nil,
+     list_result = %Adbc.Result{
        data: [
          %Adbc.Column{name: "i1", type: :i64, nullable: true, metadata: nil, data: [1]},
          %Adbc.Column{name: "i2", type: :i64, nullable: true, metadata: nil, data: [2]},
@@ -131,6 +130,36 @@ defmodule Adbc.SQLite.Test do
          }
        ]
      }} = Adbc.Connection.query(conn, "SELECT * FROM test")
+
+    %Adbc.Result{
+      data: %{
+        "b1" => [<<100, 97, 116, 97, 1, 2>>],
+        "i1" => [1],
+        "i2" => [2],
+        "i3" => [3],
+        "i4" => [4],
+        "i5" => [5],
+        "i6" => [6],
+        "i7" => ~c"\a",
+        "i8" => ~c"\b",
+        "i9" => ~c"\t",
+        "n1" => [1.1],
+        "n2" => [2.2],
+        "n3" => [1],
+        "n4" => ["2021-01-01"],
+        "n5" => ["2021-01-01 00:00:00"],
+        "r1" => [1.1],
+        "r2" => [2.2],
+        "r3" => [3.3],
+        "r4" => [4.4],
+        "t1" => ["hello"],
+        "t2" => ["world"],
+        "t3" => ["goodbye"],
+        "t4" => ["world"],
+        "t5" => ["foo"],
+        "t6" => ["bar"]
+      }
+    } = Adbc.Result.to_map(list_result)
   end
 
   test "insert with Adbc.Buffer", %{db: _, conn: conn} do

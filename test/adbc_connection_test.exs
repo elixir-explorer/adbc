@@ -122,7 +122,7 @@ defmodule Adbc.Connection.Test do
       conn = start_supervised!({Connection, database: db})
 
       {:ok,
-       %Adbc.Result{
+       results = %Adbc.Result{
          num_rows: nil,
          data: [
            %Adbc.Column{
@@ -385,6 +385,56 @@ defmodule Adbc.Connection.Test do
            }
          ]
        }} = Connection.get_objects(conn, 0)
+
+      assert %Adbc.Result{
+        num_rows: nil,
+        data: %{
+          "catalog_db_schemas" => [
+            {"db_schema_name", []},
+            {"db_schema_tables",
+             [
+               {"table_name", []},
+               {"table_type", []},
+               {"table_columns",
+                [
+                  {"column_name", []},
+                  {"ordinal_position", []},
+                  {"remarks", []},
+                  {"xdbc_data_type", []},
+                  {"xdbc_type_name", []},
+                  {"xdbc_column_size", []},
+                  {"xdbc_decimal_digits", []},
+                  {"xdbc_num_prec_radix", []},
+                  {"xdbc_nullable", []},
+                  {"xdbc_column_def", []},
+                  {"xdbc_sql_data_type", []},
+                  {"xdbc_datetime_sub", []},
+                  {"xdbc_char_octet_length", []},
+                  {"xdbc_is_nullable", []},
+                  {"xdbc_scope_catalog", []},
+                  {"xdbc_scope_schema", []},
+                  {"xdbc_scope_table", []},
+                  {"xdbc_is_autoincrement", []},
+                  {"xdbc_is_generatedcolumn", []}
+                ]},
+               {"table_constraints",
+                [
+                  {"constraint_name", []},
+                  {"constraint_type", []},
+                  {"constraint_column_names", [[]]},
+                  {"constraint_column_usage",
+                   [
+                     {"fk_catalog", []},
+                     {"fk_db_schema", []},
+                     {"fk_table", []},
+                     {"fk_column_name", []}
+                   ]}
+                ]}
+             ]}
+          ],
+          "catalog_name" => []
+        }
+      } = Adbc.Result.to_map(results)
     end
   end
 
@@ -393,7 +443,7 @@ defmodule Adbc.Connection.Test do
       conn = start_supervised!({Connection, database: db})
 
       assert {:ok,
-              %Adbc.Result{
+              result = %Adbc.Result{
                 data: [
                   %Adbc.Column{
                     name: "table_type",
@@ -405,6 +455,9 @@ defmodule Adbc.Connection.Test do
                 ]
               }} =
                Connection.get_table_types(conn)
+
+      assert %Adbc.Result{num_rows: nil, data: %{"table_type" => ["table", "view"]}} =
+               Adbc.Result.to_map(result)
     end
   end
 

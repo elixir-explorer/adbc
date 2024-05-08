@@ -56,7 +56,15 @@ defmodule AdbcTest do
                     type: :list,
                     nullable: false,
                     metadata: nil,
-                    data: [[1, 2, 3]]
+                    data: [
+                      %Adbc.Column{
+                        name: "item",
+                        type: :i32,
+                        nullable: false,
+                        metadata: nil,
+                        data: [1, 2, 3]
+                      }
+                    ]
                   }
                 ]
               }} =

@@ -1169,12 +1169,6 @@ int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct 
     out_terms.clear();
 
     if (is_struct) {
-        // if (level == 0) {
-        //     ERL_NIF_TERM adbc_column = make_adbc_column(env, name, schema->format, values->null_count > 0, kAtomNil, children_term);
-        //     out_terms.emplace_back(adbc_column);
-        // } else {
-        //     out_terms.emplace_back(children_term);
-        // }
         out_terms.emplace_back(children_term);
     } else {
         if (schema->children) {
@@ -1184,17 +1178,6 @@ int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct 
             out_terms.emplace_back(erlang::nif::make_binary(env, name));
             out_terms.emplace_back(current_term);
         }
-        // if (level == 0) {
-        //     if (schema->children) {
-        //         ERL_NIF_TERM adbc_column = make_adbc_column(env, name, schema->format, values->null_count > 0, kAtomNil, children_term);
-        //         out_terms.emplace_back(adbc_column);
-        //     } else {
-        //         ERL_NIF_TERM adbc_column = make_adbc_column(env, name, schema->format, values->null_count > 0, kAtomNil, current_term);
-        //         out_terms.emplace_back(adbc_column);
-        //     }
-        // } else {
-            
-        // }
     }
 
     return 0;

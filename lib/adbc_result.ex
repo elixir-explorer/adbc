@@ -15,22 +15,16 @@ defmodule Adbc.Result do
           num_rows: non_neg_integer() | nil,
           data: [%Adbc.Column{}]
         }
-  def to_map(r = %Adbc.Result{data: data}) do
-    %Adbc.Result{
-      r
-      | data:
-          Map.new(
-            Enum.map(data, fn %Adbc.Column{name: name, type: type, data: data} ->
-              case type do
-                :list ->
-                  {name, Enum.map(data, &list_to_map/1)}
-
-                _ ->
-                  {name, data}
-              end
-            end)
-          )
-    }
+  @doc """
+  Returns a map of columns as a result.
+  """
+  def to_map(%Adbc.Result{data: data}) do
+    Map.new(data, fn %Adbc.Column{name: name, type: type, data: data} ->
+      case type do
+        :list -> {name, Enum.map(data, &list_to_map/1)}
+        _ -> {name, data}
+      end
+    end)
   end
 
   defp list_to_map(%Adbc.Column{name: name, type: type, data: data}) do

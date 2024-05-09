@@ -407,17 +407,14 @@ defmodule Adbc.Connection do
     end
   end
 
-  defp merge_columns(chucked_results) do
-    if Enum.count(chucked_results) == 1 do
-      [chucked_results] = chucked_results
-      chucked_results
-    else
-      Enum.zip_with(chucked_results, fn columns ->
-        Enum.reduce(columns, fn column, merged_column ->
-          %{merged_column | data: merged_column.data ++ column.data}
-        end)
+  defp merge_columns([result]), do: result
+
+  defp merge_columns(chucked_results) do  
+    Enum.zip_with(chucked_results, fn columns ->
+      Enum.reduce(columns, fn column, merged_column ->
+        %{merged_column | data: merged_column.data ++ column.data}
       end)
-    end
+    end)
   end
 
   ## Callbacks

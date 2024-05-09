@@ -32,18 +32,110 @@ defmodule AdbcTest do
     end
 
     test "runs queries", %{conn: conn} do
-      assert {:ok, %Adbc.Result{data: %{"num" => [123]}}} =
+      assert {:ok,
+              %Adbc.Result{
+                data: [
+                  %Adbc.Column{
+                    name: "num",
+                    type: :i32,
+                    nullable: true,
+                    metadata: nil,
+                    data: [123]
+                  }
+                ]
+              }} =
                Connection.query(conn, "SELECT 123 as num")
     end
 
     test "list responses", %{conn: conn} do
-      assert {:ok, %Adbc.Result{data: %{"num" => [[1, 2, 3]]}}} =
+      assert {:ok,
+              %Adbc.Result{
+                data: [
+                  %Adbc.Column{
+                    name: "num",
+                    type: :list,
+                    nullable: true,
+                    metadata: nil,
+                    data: [
+                      %Adbc.Column{
+                        name: "item",
+                        type: :i32,
+                        nullable: true,
+                        metadata: nil,
+                        data: [1, 2, 3]
+                      }
+                    ]
+                  }
+                ]
+              }} =
                Connection.query(conn, "SELECT ARRAY[1, 2, 3] as num")
     end
 
     test "list responses with null", %{conn: conn} do
-      assert {:ok, %Adbc.Result{data: %{"num" => [[1, 2, 3, nil, 5]]}}} =
+      assert {:ok,
+              %Adbc.Result{
+                data: [
+                  %Adbc.Column{
+                    name: "num",
+                    type: :list,
+                    nullable: true,
+                    metadata: nil,
+                    data: [
+                      %Adbc.Column{
+                        name: "item",
+                        type: :i32,
+                        nullable: true,
+                        metadata: nil,
+                        data: [1, 2, 3, nil, 5]
+                      }
+                    ]
+                  }
+                ]
+              }} =
                Connection.query(conn, "SELECT ARRAY[1, 2, 3, null, 5] as num")
+    end
+
+    test "nested list responses with null", %{conn: conn} do
+      # import adbc_driver_postgresql
+      # import adbc_driver_manager
+      # import pyarrow
+      # db = adbc_driver_postgresql.connect(uri="postgres://postgres:postgres@localhost"):
+      # conn = adbc_driver_manager.AdbcConnection(db)
+      # stmt = adbc_driver_manager.AdbcStatement(conn)
+      # stmt.set_sql_query("SELECT ARRAY[ARRAY[1, 2, 3, null, 5], ARRAY[6, null, 7, null, 9]] as num")
+      # stream, _ = stmt.execute_query()
+      # reader = pyarrow.RecordBatchReader._import_from_c(stream.address)
+      # print(reader.read_all())
+      #
+      # pyarrow.Table
+      # num: list<item: int32>
+      #   child 0, item: int32
+      # ----
+      # num: [[[1,2,3,null,5,6,null,7,null,9]]]
+      assert {:ok,
+              %Adbc.Result{
+                data: [
+                  %Adbc.Column{
+                    name: "num",
+                    type: :list,
+                    nullable: true,
+                    metadata: nil,
+                    data: [
+                      %Adbc.Column{
+                        name: "item",
+                        type: :i32,
+                        nullable: true,
+                        metadata: nil,
+                        data: [1, 2, 3, nil, 5, 6, nil, 7, nil, 9]
+                      }
+                    ]
+                  }
+                ]
+              }} =
+               Connection.query(
+                 conn,
+                 "SELECT ARRAY[ARRAY[1, 2, 3, null, 5], ARRAY[6, null, 7, null, 9]] as num"
+               )
     end
 
     test "getting all chunks", %{conn: conn} do
@@ -52,9 +144,15 @@ defmodule AdbcTest do
       """
 
       %Adbc.Result{
-        data: %{
-          "generate_series" => generate_series
-        }
+        data: [
+          %Adbc.Column{
+            name: "generate_series",
+            type: :timestamp,
+            nullable: true,
+            metadata: nil,
+            data: generate_series
+          }
+        ]
       } = Connection.query!(conn, query)
 
       assert Enum.count(generate_series) == 3_506_641
@@ -73,13 +171,43 @@ defmodule AdbcTest do
       """
 
       assert %Adbc.Result{
-               data: %{
-                 "date" => [~D[2023-03-01]],
-                 "datetime" => [~N[2023-03-01 10:23:45.000000]],
-                 "datetime_usec" => [~N[2023-03-01 10:23:45.123456]],
-                 "time" => [~T[10:23:45.000000]],
-                 "time_usec" => [~T[10:23:45.123456]]
-               }
+               data: [
+                 %Adbc.Column{
+                   name: "datetime",
+                   type: :timestamp,
+                   nullable: true,
+                   metadata: nil,
+                   data: [~N[2023-03-01 10:23:45.000000]]
+                 },
+                 %Adbc.Column{
+                   name: "datetime_usec",
+                   type: :timestamp,
+                   nullable: true,
+                   metadata: nil,
+                   data: [~N[2023-03-01 10:23:45.123456]]
+                 },
+                 %Adbc.Column{
+                   name: "date",
+                   type: :date32,
+                   nullable: true,
+                   metadata: nil,
+                   data: [~D[2023-03-01]]
+                 },
+                 %Adbc.Column{
+                   name: "time",
+                   type: :time64,
+                   nullable: true,
+                   metadata: nil,
+                   data: [~T[10:23:45.000000]]
+                 },
+                 %Adbc.Column{
+                   name: "time_usec",
+                   type: :time64,
+                   nullable: true,
+                   metadata: nil,
+                   data: [~T[10:23:45.123456]]
+                 }
+               ]
              } = Connection.query!(conn, query)
     end
   end

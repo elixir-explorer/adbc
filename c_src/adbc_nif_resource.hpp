@@ -6,6 +6,7 @@
 #include <erl_nif.h>
 #include <memory>
 #include <type_traits>
+#include "nif_utils.hpp"
 
 // Only for debugging:
 #include <cstdio>

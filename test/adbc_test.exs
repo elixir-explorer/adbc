@@ -163,8 +163,7 @@ defmodule AdbcTest do
       select
         '2023-03-01T10:23:45'::timestamp as datetime,
         '2023-03-01T10:23:45.123456'::timestamp as datetime_usec,
-        -- timestamp support is not yet implemented
-        -- '2023-03-01T10:23:45 PST'::timestamptz as datetime_tz,
+        '2023-03-01T10:23:45 PST'::timestamptz as datetime_tz,
         '2023-03-01'::date as date,
         '10:23:45'::time as time,
         '10:23:45.123456'::time as time_usec
@@ -174,17 +173,24 @@ defmodule AdbcTest do
                data: [
                  %Adbc.Column{
                    name: "datetime",
-                   type: :timestamp,
+                   type: {:timestamp, :microseconds, nil},
                    nullable: true,
                    metadata: nil,
                    data: [~N[2023-03-01 10:23:45.000000]]
                  },
                  %Adbc.Column{
                    name: "datetime_usec",
-                   type: :timestamp,
+                   type: {:timestamp, :microseconds, nil},
                    nullable: true,
                    metadata: nil,
                    data: [~N[2023-03-01 10:23:45.123456]]
+                 },
+                 %Adbc.Column{
+                   name: "datetime_tz",
+                   type: {:timestamp, :microseconds, "UTC"},
+                   nullable: true,
+                   metadata: nil,
+                   data: [~N[2023-03-01 18:23:45.000000]]
                  },
                  %Adbc.Column{
                    name: "date",

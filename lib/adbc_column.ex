@@ -35,6 +35,11 @@ defmodule Adbc.Column do
   @type time64_t ::
           {:time64, :microseconds}
           | {:time64, :nanoseconds}
+  @type timestamp_t ::
+          {:timestamp, :seconds, String.t()}
+          | {:timestamp, :milliseconds, String.t()}
+          | {:timestamp, :microseconds, String.t()}
+          | {:timestamp, :nanoseconds, String.t()}
   @type data_type ::
           :boolean
           | signed_integer
@@ -49,6 +54,7 @@ defmodule Adbc.Column do
           | :date64
           | time32_t
           | time64_t
+          | timestamp_t
 
   @spec column(data_type(), list, Keyword.t()) :: %Adbc.Column{}
   def column(type, data, opts \\ [])
@@ -676,5 +682,59 @@ defmodule Adbc.Column do
 
   def time(data, :nanoseconds, opts) when is_list(data) and is_list(opts) do
     column({:time64, :nanoseconds}, data, opts)
+  end
+
+  @doc """
+  A column that contains timestamps represented as integers in the given timezone.
+
+  ## Arguments
+
+  * `data`:
+    * a list of `NaiveDateTime.t()` value
+    * a list of integer values representing the time in the specified unit
+
+      Note that when using `:seconds` or `:milliseconds` as the unit,
+      the time value is limited to the range of 32-bit integers.
+
+      For `:microseconds` and `:nanoseconds`, the time value is limited to the range of 64-bit integers.
+
+  * `unit`: specify the unit of the time value, one of the following:
+    * `:seconds`
+    * `:milliseconds`
+    * `:microseconds`
+    * `:nanoseconds`
+
+  * `timezone`: the timezone of the timestamp
+
+  * `opts`: A keyword list of options
+
+  ## Options
+
+  * `:name` - The name of the column
+  * `:nullable` - A boolean value indicating whether the column is nullable
+  * `:metadata` - A map of metadata
+  """
+  @spec timestamp([NaiveDateTime.t()] | [integer()], time_unit(), String.t(), Keyword.t()) ::
+          %Adbc.Column{}
+  def timestamp(data, unit, timezone, opts \\ [])
+
+  def timestamp(data, :seconds, timezone, opts)
+      when is_list(data) and is_binary(timezone) and is_list(opts) do
+    column({:timestamp, :seconds, timezone}, data, opts)
+  end
+
+  def timestamp(data, :milliseconds, timezone, opts)
+      when is_list(data) and is_binary(timezone) and is_list(opts) do
+    column({:timestamp, :milliseconds, timezone}, data, opts)
+  end
+
+  def timestamp(data, :microseconds, timezone, opts)
+      when is_list(data) and is_binary(timezone) and is_list(opts) do
+    column({:timestamp, :microseconds, timezone}, data, opts)
+  end
+
+  def timestamp(data, :nanoseconds, timezone, opts)
+      when is_list(data) and is_binary(timezone) and is_list(opts) do
+    column({:timestamp, :nanoseconds, timezone}, data, opts)
   end
 end

@@ -28,6 +28,7 @@ static ERL_NIF_TERM kAtomSeconds;
 static ERL_NIF_TERM kAtomMilliseconds;
 static ERL_NIF_TERM kAtomMicroseconds;
 static ERL_NIF_TERM kAtomNanoseconds;
+static ERL_NIF_TERM kAtomTimestamp;
 
 static ERL_NIF_TERM kAtomCalendarKey;
 static ERL_NIF_TERM kAtomCalendarISO;
@@ -76,7 +77,6 @@ static ERL_NIF_TERM kAdbcColumnTypeDenseUnion;
 static ERL_NIF_TERM kAdbcColumnTypeSparseUnion;
 static ERL_NIF_TERM kAdbcColumnTypeDate32;
 static ERL_NIF_TERM kAdbcColumnTypeDate64;
-static ERL_NIF_TERM kAdbcColumnTypeTimestamp;
 static ERL_NIF_TERM kAdbcColumnTypeBool;
 
 // tuples cannot be made in advance
@@ -1071,37 +1071,42 @@ int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct 
         // timestamp
         } else if (strncmp("ts", format, 2) == 0) {
             // NANOARROW_TYPE_TIMESTAMP
-            term_type = kAdbcColumnTypeTimestamp;
             uint64_t unit;
             uint8_t us_precision;
+            ERL_NIF_TERM term_unit;
+            ERL_NIF_TERM term_timezone = kAtomNil;
             switch (format[2]) {
                 case 's': // seconds
                     unit = 1000000000;
                     us_precision = 0;
+                    term_unit = kAtomSeconds;
                     break;
                 case 'm': // milliseconds
                     unit = 1000000;
                     us_precision = 3;
+                    term_unit = kAtomMilliseconds;
                     break;
                 case 'u': // microseconds
                     unit = 1000;
                     us_precision = 6;
+                    term_unit = kAtomMicroseconds;
                     break;
                 case 'n': // nanoseconds
                     unit = 1;
                     us_precision = 6;
+                    term_unit = kAtomNanoseconds;
                     break;
                 default:
                     format_processed = false;
             }
 
-            if (format_len > 4) {
-                // TODO: handle timezones (Snowflake always returns naive datetimes)
-                // std::string timezone (&format[4]);
-                format_processed = false;
-            }
-
             if (format_processed) {
+                if (format_len > 4) {
+                    std::string timezone(&format[4]);
+                    term_timezone = erlang::nif::make_binary(env, timezone);
+                }
+                term_type = enif_make_tuple3(env, kAtomTimestamp, term_unit, term_timezone);
+                
                 using value_type = uint64_t;
                 if (count == -1) count = values->length;
                 if (values->n_buffers != 2) {
@@ -2246,6 +2251,114 @@ int do_get_list_time(ErlNifEnv *env, ERL_NIF_TERM list, bool nullable, ArrowType
     }
 }
 
+int get_list_timestamp(ErlNifEnv *env, ERL_NIF_TERM list, bool nullable, const std::function<int64_t(int64_t, uint64_t)> &normalize_ex_value, const std::function<void(int64_t val, bool is_nil)> &callback) {
+    ERL_NIF_TERM head, tail;
+    tail = list;
+    while (enif_get_list_cell(env, tail, &head, &tail)) {
+        if (enif_is_identical(head, kAtomNil)) {
+            callback(0, true);
+        } else {
+            int64_t val;
+            if (erlang::nif::get(env, head, &val)) {
+                callback(val, false);
+            } else if (enif_is_map(env, head)) {
+                ERL_NIF_TERM struct_name_term, calendar_term, year_term, month_term, day_term, hour_term, minute_term, second_term, microsecond_term;
+                if (!enif_get_map_value(env, head, kAtomStructKey, &struct_name_term)) {
+                    return kErrorBufferGetMapValue;
+                }
+                if (!enif_is_identical(struct_name_term, kAtomNaiveDateTimeModule)) {
+                    return kErrorBufferWrongStruct;
+                }
+
+                if (!enif_get_map_value(env, head, kAtomCalendarKey, &calendar_term)) {
+                    return kErrorBufferGetMapValue;
+                }
+                if (!enif_is_identical(calendar_term, kAtomCalendarISO)) {
+                    return kErrorExpectedCalendarISO;
+                }
+
+                if (!enif_get_map_value(env, head, kAtomYearKey, &year_term)) {
+                    return kErrorBufferGetMapValue;
+                }
+                if (!enif_get_map_value(env, head, kAtomMonthKey, &month_term)) {
+                    return kErrorBufferGetMapValue;
+                }
+                if (!enif_get_map_value(env, head, kAtomDayKey, &day_term)) {
+                    return kErrorBufferGetMapValue;
+                }
+                if (!enif_get_map_value(env, head, kAtomHourKey, &hour_term)) {
+                    return kErrorBufferGetMapValue;
+                }
+                if (!enif_get_map_value(env, head, kAtomMinuteKey, &minute_term)) {
+                    return kErrorBufferGetMapValue;
+                }
+                if (!enif_get_map_value(env, head, kAtomSecondKey, &second_term)) {
+                    return kErrorBufferGetMapValue;
+                }
+                if (!enif_get_map_value(env, head, kAtomMicrosecondKey, &microsecond_term)) {
+                    return kErrorBufferGetMapValue;
+                }
+
+                tm time{};
+                if (!erlang::nif::get(env, year_term, &time.tm_year) ||
+                    !erlang::nif::get(env, month_term, &time.tm_mon) ||
+                    !erlang::nif::get(env, day_term, &time.tm_mday) ||
+                    !erlang::nif::get(env, hour_term, &time.tm_hour) ||
+                    !erlang::nif::get(env, minute_term, &time.tm_min) ||
+                    !erlang::nif::get(env, second_term, &time.tm_sec)) {
+                    return kErrorBufferGetMapValue;
+                }
+
+                const ERL_NIF_TERM *us_tuple = nullptr;
+                int us_arity;
+                uint64_t us;
+                int us_precision;
+                if (!enif_get_tuple(env, microsecond_term, &us_arity, &us_tuple) || us_arity != 2) {
+                    return kErrorBufferGetMapValue;
+                }
+                if (!erlang::nif::get(env, us_tuple[0], &us) || !erlang::nif::get(env, us_tuple[1], &us_precision)) {
+                    return kErrorBufferGetMapValue;
+                }
+
+                time.tm_year -= 1900;
+                time.tm_mon -= 1;
+                // mktime always gives local time
+                // so we need to adjust it to UTC
+                val = mktime(&time) + get_utc_offset() * 3600;
+                callback(normalize_ex_value(val, us), false);
+            } else {
+                return 1;
+            }
+        }
+    }
+    return 0;
+}
+
+int do_get_list_timestamp(ErlNifEnv *env, ERL_NIF_TERM list, bool nullable, ArrowType nanoarrow_type, enum ArrowTimeUnit time_unit, uint64_t unit, const char * timezone, struct ArrowArray* array_out, struct ArrowSchema* schema_out, struct ArrowError* error_out) {
+    NANOARROW_RETURN_NOT_OK(ArrowSchemaSetTypeDateTime(schema_out, nanoarrow_type, time_unit, timezone));
+    NANOARROW_RETURN_NOT_OK(ArrowArrayInitFromSchema(array_out, schema_out, error_out));
+    NANOARROW_RETURN_NOT_OK(ArrowArrayStartAppending(array_out));
+    auto normalize_ex_value = [=](int64_t val, uint64_t us) -> int64_t {
+        if (time_unit == NANOARROW_TIME_UNIT_SECOND) {
+            return val;
+        }
+        val = (val * 1000000 + us) * 1000 / unit;
+        return val;
+    };
+    if (nullable) {
+        return get_list_timestamp(env, list, nullable, normalize_ex_value, [&array_out](int64_t val, bool is_nil) -> void {
+            ArrowArrayAppendInt(array_out, val);
+            if (is_nil) {
+                ArrowArrayAppendNull(array_out, 1);
+            }
+        });
+    } else {
+        return get_list_timestamp(env, list, nullable, normalize_ex_value, [&array_out](int64_t val, bool) -> void {
+            ArrowArrayAppendInt(array_out, val);
+        });
+    }
+}
+
 // non-zero return value indicating errors
 int adbc_buffer_to_adbc_field(ErlNifEnv *env, ERL_NIF_TERM adbc_buffer, struct ArrowArray* array_out, struct ArrowSchema* schema_out, struct ArrowError* error_out) {
     array_out->release = NULL;
@@ -2336,62 +2449,96 @@ int adbc_buffer_to_adbc_field(ErlNifEnv *env, ERL_NIF_TERM adbc_buffer, struct A
     ArrowBufferReset(&metadata_buffer);
 
     bool type_processed = true;
+    int ret = -1;
     if (enif_is_identical(type_term, kAdbcColumnTypeI8)) {
-        do_get_list_integer<int8_t>(env, data_term, nullable, NANOARROW_TYPE_INT8, array_out, schema_out, error_out);
+        ret = do_get_list_integer<int8_t>(env, data_term, nullable, NANOARROW_TYPE_INT8, array_out, schema_out, error_out);
     } else if (enif_is_identical(type_term, kAdbcColumnTypeI16)) {
-        do_get_list_integer<int16_t>(env, data_term, nullable, NANOARROW_TYPE_INT16, array_out, schema_out, error_out);
+        ret = do_get_list_integer<int16_t>(env, data_term, nullable, NANOARROW_TYPE_INT16, array_out, schema_out, error_out);
     } else if (enif_is_identical(type_term, kAdbcColumnTypeI32)) {
-        do_get_list_integer<int32_t>(env, data_term, nullable, NANOARROW_TYPE_INT32, array_out, schema_out, error_out);
+        ret = do_get_list_integer<int32_t>(env, data_term, nullable, NANOARROW_TYPE_INT32, array_out, schema_out, error_out);
     } else if (enif_is_identical(type_term, kAdbcColumnTypeI64)) {
-        do_get_list_integer<int64_t>(env, data_term, nullable, NANOARROW_TYPE_INT64, array_out, schema_out, error_out);
+        ret = do_get_list_integer<int64_t>(env, data_term, nullable, NANOARROW_TYPE_INT64, array_out, schema_out, error_out);
     } else if (enif_is_identical(type_term, kAdbcColumnTypeU8)) {
-        do_get_list_integer<uint8_t>(env, data_term, nullable, NANOARROW_TYPE_UINT8, array_out, schema_out, error_out);
+        ret = do_get_list_integer<uint8_t>(env, data_term, nullable, NANOARROW_TYPE_UINT8, array_out, schema_out, error_out);
     } else if (enif_is_identical(type_term, kAdbcColumnTypeU16)) {
-        do_get_list_integer<uint16_t>(env, data_term, nullable, NANOARROW_TYPE_UINT16, array_out, schema_out, error_out);
+        ret = do_get_list_integer<uint16_t>(env, data_term, nullable, NANOARROW_TYPE_UINT16, array_out, schema_out, error_out);
     } else if (enif_is_identical(type_term, kAdbcColumnTypeU32)) {
-        do_get_list_integer<uint32_t>(env, data_term, nullable, NANOARROW_TYPE_UINT32, array_out, schema_out, error_out);
+        ret = do_get_list_integer<uint32_t>(env, data_term, nullable, NANOARROW_TYPE_UINT32, array_out, schema_out, error_out);
     } else if (enif_is_identical(type_term, kAdbcColumnTypeU64)) {
-        do_get_list_integer<uint64_t>(env, data_term, nullable, NANOARROW_TYPE_UINT64, array_out, schema_out, error_out);
+        ret = do_get_list_integer<uint64_t>(env, data_term, nullable, NANOARROW_TYPE_UINT64, array_out, schema_out, error_out);
     } else if (enif_is_identical(type_term, kAdbcColumnTypeF32)) {
-        do_get_list_float(env, data_term, nullable, NANOARROW_TYPE_FLOAT, array_out, schema_out, error_out);
+        ret = do_get_list_float(env, data_term, nullable, NANOARROW_TYPE_FLOAT, array_out, schema_out, error_out);
     } else if (enif_is_identical(type_term, kAdbcColumnTypeF64)) {
-        do_get_list_float(env, data_term, nullable, NANOARROW_TYPE_DOUBLE, array_out, schema_out, error_out);
+        ret = do_get_list_float(env, data_term, nullable, NANOARROW_TYPE_DOUBLE, array_out, schema_out, error_out);
     } else if (enif_is_identical(type_term, kAdbcColumnTypeString)) {
-        do_get_list_string(env, data_term, nullable, NANOARROW_TYPE_STRING, array_out, schema_out, error_out);
+        ret = do_get_list_string(env, data_term, nullable, NANOARROW_TYPE_STRING, array_out, schema_out, error_out);
     } else if (enif_is_identical(type_term, kAdbcColumnTypeLargeString)) {
-        do_get_list_string(env, data_term, nullable, NANOARROW_TYPE_LARGE_STRING, array_out, schema_out, error_out);
+        ret = do_get_list_string(env, data_term, nullable, NANOARROW_TYPE_LARGE_STRING, array_out, schema_out, error_out);
     } else if (enif_is_identical(type_term, kAdbcColumnTypeBinary)) {
-        do_get_list_string(env, data_term, nullable, NANOARROW_TYPE_BINARY, array_out, schema_out, error_out);
+        ret = do_get_list_string(env, data_term, nullable, NANOARROW_TYPE_BINARY, array_out, schema_out, error_out);
     } else if (enif_is_identical(type_term, kAdbcColumnTypeLargeBinary)) {
-        do_get_list_string(env, data_term, nullable, NANOARROW_TYPE_LARGE_BINARY, array_out, schema_out, error_out);
+        ret = do_get_list_string(env, data_term, nullable, NANOARROW_TYPE_LARGE_BINARY, array_out, schema_out, error_out);
     } else if (enif_is_identical(type_term, kAdbcColumnTypeFixedSizeBinary)) {
-        do_get_list_fixed_size_binary(env, data_term, nullable, NANOARROW_TYPE_FIXED_SIZE_BINARY, array_out, schema_out, error_out);
+        ret = do_get_list_fixed_size_binary(env, data_term, nullable, NANOARROW_TYPE_FIXED_SIZE_BINARY, array_out, schema_out, error_out);
     } else if (enif_is_identical(type_term, kAdbcColumnTypeDate32)) {
-        do_get_list_date32(env, data_term, nullable, NANOARROW_TYPE_DATE32, array_out, schema_out, error_out);
+        ret = do_get_list_date32(env, data_term, nullable, NANOARROW_TYPE_DATE32, array_out, schema_out, error_out);
     } else if (enif_is_identical(type_term, kAdbcColumnTypeDate64)) {
-        do_get_list_date64(env, data_term, nullable, NANOARROW_TYPE_DATE64, array_out, schema_out, error_out);
+        ret = do_get_list_date64(env, data_term, nullable, NANOARROW_TYPE_DATE64, array_out, schema_out, error_out);
     } else if (enif_is_identical(type_term, kAdbcColumnTypeBool)) {
-        do_get_list_boolean(env, data_term, nullable, NANOARROW_TYPE_BOOL, array_out, schema_out, error_out);
+        ret = do_get_list_boolean(env, data_term, nullable, NANOARROW_TYPE_BOOL, array_out, schema_out, error_out);
     } else if (enif_is_tuple(env, type_term)) {
+        // NANOARROW_TYPE_TIME32
+        // NANOARROW_TYPE_TIME64
         if (enif_is_identical(type_term, kAdbcColumnTypeTime32Seconds)) {
-            do_get_list_time(env, data_term, nullable, NANOARROW_TYPE_TIME32, NANOARROW_TIME_UNIT_SECOND, 1000000000, array_out, schema_out, error_out);
+            ret = do_get_list_time(env, data_term, nullable, NANOARROW_TYPE_TIME32, NANOARROW_TIME_UNIT_SECOND, 1000000000, array_out, schema_out, error_out);
         } else if (enif_is_identical(type_term, kAdbcColumnTypeTime32Milliseconds)) {
-            do_get_list_time(env, data_term, nullable, NANOARROW_TYPE_TIME32, NANOARROW_TIME_UNIT_MILLI, 1000000, array_out, schema_out, error_out);
+            ret = do_get_list_time(env, data_term, nullable, NANOARROW_TYPE_TIME32, NANOARROW_TIME_UNIT_MILLI, 1000000, array_out, schema_out, error_out);
         } else if (enif_is_identical(type_term, kAdbcColumnTypeTime64Microseconds)) {
-            do_get_list_time(env, data_term, nullable, NANOARROW_TYPE_TIME64, NANOARROW_TIME_UNIT_MICRO, 1000, array_out, schema_out, error_out);
+            ret = do_get_list_time(env, data_term, nullable, NANOARROW_TYPE_TIME64, NANOARROW_TIME_UNIT_MICRO, 1000, array_out, schema_out, error_out);
         } else if (enif_is_identical(type_term, kAdbcColumnTypeTime64Nanoseconds)) {
-            do_get_list_time(env, data_term, nullable, NANOARROW_TYPE_TIME64, NANOARROW_TIME_UNIT_NANO, 1, array_out, schema_out, error_out);
+            ret = do_get_list_time(env, data_term, nullable, NANOARROW_TYPE_TIME64, NANOARROW_TIME_UNIT_NANO, 1, array_out, schema_out, error_out);
         } else {
-            type_processed = false;
+            const ERL_NIF_TERM *tuple = nullptr;
+            int arity;
+            if (enif_get_tuple(env, type_term, &arity, &tuple)) {
+                if (arity == 3) {
+                    // NANOARROW_TYPE_TIMESTAMP
+                    if (enif_is_identical(tuple[0], kAtomTimestamp)) {
+                        std::string timezone;
+                        if (erlang::nif::get(env, tuple[2], timezone) && !timezone.empty()) {
+                            if (enif_is_identical(tuple[1], kAtomSeconds)) {
+                                ret = do_get_list_timestamp(env, data_term, nullable, NANOARROW_TYPE_TIMESTAMP, NANOARROW_TIME_UNIT_SECOND, 1000000000, timezone.c_str(), array_out, schema_out, error_out);
+                            } else if (enif_is_identical(tuple[1], kAtomMilliseconds)) {
+                                ret = do_get_list_timestamp(env, data_term, nullable, NANOARROW_TYPE_TIMESTAMP, NANOARROW_TIME_UNIT_MILLI, 1000000, timezone.c_str(), array_out, schema_out, error_out);
+                            } else if (enif_is_identical(tuple[1], kAtomMicroseconds)) {
+                                ret = do_get_list_timestamp(env, data_term, nullable, NANOARROW_TYPE_TIMESTAMP, NANOARROW_TIME_UNIT_MICRO, 1000, timezone.c_str(), array_out, schema_out, error_out);
+                            } else if (enif_is_identical(tuple[1], kAtomNanoseconds)) {
+                                ret = do_get_list_timestamp(env, data_term, nullable, NANOARROW_TYPE_TIMESTAMP, NANOARROW_TIME_UNIT_NANO, 1, timezone.c_str(), array_out, schema_out, error_out);
+                            } else {
+                                type_processed = false;
+                            }
+                        } else {
+                            type_processed = false;
+                        }
+                    }         
+                } else {
+                    type_processed = false;
+                }
+            } else {
+                type_processed = false;
+            }
         }
-    } else {
-        type_processed = false;
     }
 
-    if (!type_processed) {
+    if (!type_processed || ret != 0) {
         if (schema_out->release) schema_out->release(schema_out);
-        enif_snprintf(error_out->message, sizeof(error_out->message), "type `%T` not supported yet.", type_term);
-        return kErrorBufferUnknownType;
+        if (array_out->release) array_out->release(array_out);
+
+        if (!type_processed) {
+            enif_snprintf(error_out->message, sizeof(error_out->message), "type `%T` not supported yet.", type_term);
+            return kErrorBufferUnknownType;
+        }
+        return ret;
     }
 
     NANOARROW_RETURN_NOT_OK(ArrowArrayFinishBuildingDefault(array_out, error_out));
@@ -2626,6 +2773,7 @@ static int on_load(ErlNifEnv *env, void **, ERL_NIF_TERM) {
     kAtomMilliseconds = erlang::nif::atom(env, "milliseconds");
     kAtomMicroseconds = erlang::nif::atom(env, "microseconds");
     kAtomNanoseconds = erlang::nif::atom(env, "nanoseconds");
+    kAtomTimestamp = erlang::nif::atom(env, "timestamp");
 
     kAtomCalendarKey = erlang::nif::atom(env, "calendar");
     kAtomCalendarISO = erlang::nif::atom(env, "Elixir.Calendar.ISO");
@@ -2674,7 +2822,6 @@ static int on_load(ErlNifEnv *env, void **, ERL_NIF_TERM) {
     kAdbcColumnTypeSparseUnion = erlang::nif::atom(env, "sparse_union");
     kAdbcColumnTypeDate32 = erlang::nif::atom(env, "date32");
     kAdbcColumnTypeDate64 = erlang::nif::atom(env, "date64");
-    kAdbcColumnTypeTimestamp = erlang::nif::atom(env, "timestamp");
     kAdbcColumnTypeBool = erlang::nif::atom(env, "boolean");
 
     return 0;

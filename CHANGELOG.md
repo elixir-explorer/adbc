@@ -1,5 +1,13 @@
 # CHANGELOG
 
+## v0.4.0-dev
+
+* Add ADBC.Column which can be used as buffer inputs and returned as part of result sets
+
+## v0.3.1
+
+* Fix erroneous ADBC driver URLs
+
 ## v0.3.0
 
 * Update to ADBC 0.11.0-rc0

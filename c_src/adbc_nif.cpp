@@ -2054,15 +2054,15 @@ int do_get_list_fixed_size_binary(ErlNifEnv *env, ERL_NIF_TERM list, bool nullab
 }
 
 int get_utc_offset() {
-  time_t zero = 24*60*60L;
-  struct tm * timeptr;
-  int gmtime_hours;
-  timeptr = localtime( &zero );
-  gmtime_hours = timeptr->tm_hour;
-  if( timeptr->tm_mday < 2 ) {
-    gmtime_hours -= 24;
-  }
-  return gmtime_hours;
+    time_t zero = 24 * 60 * 60L;
+    struct tm * timeptr;
+    int gmtime_hours;
+    timeptr = localtime(&zero);
+    gmtime_hours = timeptr->tm_hour;
+    if (timeptr->tm_mday < 2) {
+        gmtime_hours -= 24;
+    }
+    return gmtime_hours;
 }
 
 int get_list_date(ErlNifEnv *env, ERL_NIF_TERM list, bool nullable, const std::function<int64_t(int64_t)> &normalize_ex_value, const std::function<void(int64_t val, bool is_nil)> &callback) {

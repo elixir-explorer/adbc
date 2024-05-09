@@ -2119,43 +2119,29 @@ int get_list_date(ErlNifEnv *env, ERL_NIF_TERM list, bool nullable, const std::f
     return 0;
 }
 
-int do_get_list_date32(ErlNifEnv *env, ERL_NIF_TERM list, bool nullable, ArrowType nanoarrow_type, struct ArrowArray* array_out, struct ArrowSchema* schema_out, struct ArrowError* error_out) {
+int do_get_list_date(ErlNifEnv *env, ERL_NIF_TERM list, bool nullable, ArrowType nanoarrow_type, struct ArrowArray* array_out, struct ArrowSchema* schema_out, struct ArrowError* error_out) {
     NANOARROW_RETURN_NOT_OK(ArrowSchemaSetType(schema_out, nanoarrow_type));
     NANOARROW_RETURN_NOT_OK(ArrowArrayInitFromSchema(array_out, schema_out, error_out));
     NANOARROW_RETURN_NOT_OK(ArrowArrayStartAppending(array_out));
-    auto second_to_day = [](int64_t val) -> int64_t {
-        return val / (24 * 60 * 60);
-    };
-    if (nullable) {
-        return get_list_date(env, list, nullable, second_to_day, [&array_out](int64_t val, bool is_nil) -> void {
-            ArrowArrayAppendInt(array_out, (int32_t)val);
-            if (is_nil) {
-                ArrowArrayAppendNull(array_out, 1);
-            }
-        });
+    std::function<int64_t(int64_t)> normalize_ex_value;
+    if (nanoarrow_type == NANOARROW_TYPE_DATE32) {
+        normalize_ex_value = [](int64_t val) -> int64_t {
+            return val / (24 * 60 * 60);
+        };
     } else {
-        return get_list_date(env, list, nullable, second_to_day, [&array_out](int64_t val, bool) -> void {
-            ArrowArrayAppendInt(array_out, (int32_t)val);
-        });
+        normalize_ex_value = [](int64_t val) -> int64_t {
+            return val * 1000;
+        };
     }
-}
-
-int do_get_list_date64(ErlNifEnv *env, ERL_NIF_TERM list, bool nullable, ArrowType nanoarrow_type, struct ArrowArray* array_out, struct ArrowSchema* schema_out, struct ArrowError* error_out) {
-    NANOARROW_RETURN_NOT_OK(ArrowSchemaSetType(schema_out, nanoarrow_type));
-    NANOARROW_RETURN_NOT_OK(ArrowArrayInitFromSchema(array_out, schema_out, error_out));
-    NANOARROW_RETURN_NOT_OK(ArrowArrayStartAppending(array_out));
-    auto second_to_millisecond = [](int64_t val) -> int64_t {
-        return val * 1000;
-    };
     if (nullable) {
-        return get_list_date(env, list, nullable, second_to_millisecond, [&array_out](int64_t val, bool is_nil) -> void {
+        return get_list_date(env, list, nullable, normalize_ex_value, [&array_out](int64_t val, bool is_nil) -> void {
             ArrowArrayAppendInt(array_out, val);
             if (is_nil) {
                 ArrowArrayAppendNull(array_out, 1);
             }
         });
     } else {
-        return get_list_date(env, list, nullable, second_to_millisecond, [&array_out](int64_t val, bool) -> void {
+        return get_list_date(env, list, nullable, normalize_ex_value, [&array_out](int64_t val, bool) -> void {
             ArrowArrayAppendInt(array_out, val);
         });
     }
@@ -2448,8 +2434,7 @@ int adbc_buffer_to_adbc_field(ErlNifEnv *env, ERL_NIF_TERM adbc_buffer, struct A
     NANOARROW_RETURN_NOT_OK(ArrowSchemaSetMetadata(schema_out, (const char*)metadata_buffer.data));
     ArrowBufferReset(&metadata_buffer);
 
-    bool type_processed = true;
-    int ret = -1;
+    int ret = kErrorBufferUnknownType;
     if (enif_is_identical(type_term, kAdbcColumnTypeI8)) {
         ret = do_get_list_integer<int8_t>(env, data_term, nullable, NANOARROW_TYPE_INT8, array_out, schema_out, error_out);
     } else if (enif_is_identical(type_term, kAdbcColumnTypeI16)) {
@@ -2481,9 +2466,9 @@ int adbc_buffer_to_adbc_field(ErlNifEnv *env, ERL_NIF_TERM adbc_buffer, struct A
     } else if (enif_is_identical(type_term, kAdbcColumnTypeFixedSizeBinary)) {
         ret = do_get_list_fixed_size_binary(env, data_term, nullable, NANOARROW_TYPE_FIXED_SIZE_BINARY, array_out, schema_out, error_out);
     } else if (enif_is_identical(type_term, kAdbcColumnTypeDate32)) {
-        ret = do_get_list_date32(env, data_term, nullable, NANOARROW_TYPE_DATE32, array_out, schema_out, error_out);
+        ret = do_get_list_date(env, data_term, nullable, NANOARROW_TYPE_DATE32, array_out, schema_out, error_out);
     } else if (enif_is_identical(type_term, kAdbcColumnTypeDate64)) {
-        ret = do_get_list_date64(env, data_term, nullable, NANOARROW_TYPE_DATE64, array_out, schema_out, error_out);
+        ret = do_get_list_date(env, data_term, nullable, NANOARROW_TYPE_DATE64, array_out, schema_out, error_out);
     } else if (enif_is_identical(type_term, kAdbcColumnTypeBool)) {
         ret = do_get_list_boolean(env, data_term, nullable, NANOARROW_TYPE_BOOL, array_out, schema_out, error_out);
     } else if (enif_is_tuple(env, type_term)) {
@@ -2514,29 +2499,20 @@ int adbc_buffer_to_adbc_field(ErlNifEnv *env, ERL_NIF_TERM adbc_buffer, struct A
                                 ret = do_get_list_timestamp(env, data_term, nullable, NANOARROW_TYPE_TIMESTAMP, NANOARROW_TIME_UNIT_MICRO, 1000, timezone.c_str(), array_out, schema_out, error_out);
                             } else if (enif_is_identical(tuple[1], kAtomNanoseconds)) {
                                 ret = do_get_list_timestamp(env, data_term, nullable, NANOARROW_TYPE_TIMESTAMP, NANOARROW_TIME_UNIT_NANO, 1, timezone.c_str(), array_out, schema_out, error_out);
-                            } else {
-                                type_processed = false;
                             }
-                        } else {
-                            type_processed = false;
                         }
                     }         
-                } else {
-                    type_processed = false;
                 }
-            } else {
-                type_processed = false;
             }
         }
     }
 
-    if (!type_processed || ret != 0) {
+    if (ret != 0) {
         if (schema_out->release) schema_out->release(schema_out);
         if (array_out->release) array_out->release(array_out);
 
-        if (!type_processed) {
+        if (ret == kErrorBufferUnknownType) {
             enif_snprintf(error_out->message, sizeof(error_out->message), "type `%T` not supported yet.", type_term);
-            return kErrorBufferUnknownType;
         }
         return ret;
     }

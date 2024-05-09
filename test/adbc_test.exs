@@ -147,7 +147,7 @@ defmodule AdbcTest do
         data: [
           %Adbc.Column{
             name: "generate_series",
-            type: :timestamp,
+            type: {:timestamp, :microseconds, nil},
             nullable: true,
             metadata: nil,
             data: generate_series

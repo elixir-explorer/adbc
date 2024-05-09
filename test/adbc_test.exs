@@ -195,14 +195,14 @@ defmodule AdbcTest do
                  },
                  %Adbc.Column{
                    name: "time",
-                   type: :time64,
+                   type: {:time64, :microseconds},
                    nullable: true,
                    metadata: nil,
                    data: [~T[10:23:45.000000]]
                  },
                  %Adbc.Column{
                    name: "time_usec",
-                   type: :time64,
+                   type: {:time64, :microseconds},
                    nullable: true,
                    metadata: nil,
                    data: [~T[10:23:45.123456]]

@@ -3,26 +3,7 @@ defmodule Adbc.Column do
   Documentation for `Adbc.Column`.
 
   `Adbc.Column` corresponds to a column in the table. It contains the column's name, type, and
-  data. The data is a list of values of the column's type. The type can be one of the following:
-
-  * `:boolean`
-  * `:u8`
-  * `:u16`
-  * `:u32`
-  * `:u64`
-  * `:i8`
-  * `:i16`
-  * `:i32`
-  * `:i64`
-  * `:f32`
-  * `:f64`
-  * `:string`
-  * `:large_string`, when the size of the string is larger than 4GB
-  * `:binary`
-  * `:large_binary`, when the size of the binary is larger than 4GB
-  * `:fixed_size_binary`
-  * `:date32`
-  * `:date64`
+  data. The data is a list of values of the column's data type.
   """
   defstruct name: nil,
             type: nil,
@@ -30,8 +11,48 @@ defmodule Adbc.Column do
             metadata: %{},
             data: nil
 
-  @spec column(atom, list, Keyword.t()) :: %Adbc.Column{}
-  def column(type, data, opts \\ []) when is_atom(type) and is_list(data) and is_list(opts) do
+  @type signed_integer ::
+          :i8
+          | :i16
+          | :i32
+          | :i64
+  @type unsigned_integer ::
+          :u8
+          | :u16
+          | :u32
+          | :u64
+  @type floating ::
+          :f32
+          | :f64
+  @type time_unit ::
+          :seconds
+          | :milliseconds
+          | :microseconds
+          | :nanoseconds
+  @type time32_t ::
+          {:time32, :seconds}
+          | {:time32, :milliseconds}
+  @type time64_t ::
+          {:time64, :microseconds}
+          | {:time64, :nanoseconds}
+  @type data_type ::
+          :boolean
+          | signed_integer
+          | unsigned_integer
+          | floating
+          | :string
+          | :large_string
+          | :binary
+          | :large_binary
+          | :fixed_size_binary
+          | :date32
+          | :date64
+          | time32_t
+          | time64_t
+
+  @spec column(data_type(), list, Keyword.t()) :: %Adbc.Column{}
+  def column(type, data, opts \\ [])
+      when (is_atom(type) or is_tuple(type)) and is_list(data) and is_list(opts) do
     name = opts[:name]
     nullable = opts[:nullable] || false
     metadata = opts[:metadata]
@@ -125,7 +146,7 @@ defmodule Adbc.Column do
       }
 
   """
-  @spec u8([0..255] | binary(), Keyword.t()) :: %Adbc.Column{}
+  @spec u8([0..255], Keyword.t()) :: %Adbc.Column{}
   def u8(data, opts \\ []) when is_list(data) and is_list(opts) do
     column(:u8, data, opts)
   end
@@ -609,5 +630,51 @@ defmodule Adbc.Column do
   @spec date64([Date.t() | integer()], Keyword.t()) :: %Adbc.Column{}
   def date64(data, opts \\ []) when is_list(data) and is_list(opts) do
     column(:date64, data, opts)
+  end
+
+  @doc """
+  A column that contains time represented as integers in UTC.
+  ## Arguments
+
+  * `data`:
+    * a list of `Time.t()` value
+    * a list of integer values representing the time in the specified unit
+
+      Note that when using `:seconds` or `:milliseconds` as the unit,
+      the time value is limited to the range of 32-bit integers.
+
+      For `:microseconds` and `:nanoseconds`, the time value is limited to the range of 64-bit integers.
+
+  * `unit`: specify the unit of the time value, one of the following:
+    * `:seconds`
+    * `:milliseconds`
+    * `:microseconds`
+    * `:nanoseconds`
+
+  * `opts`: A keyword list of options
+
+  ## Options
+
+  * `:name` - The name of the column
+  * `:nullable` - A boolean value indicating whether the column is nullable
+  * `:metadata` - A map of metadata
+  """
+  @spec time([Time.t()] | [integer()], time_unit(), Keyword.t()) :: %Adbc.Column{}
+  def time(data, unit, opts \\ [])
+
+  def time(data, :seconds, opts) when is_list(data) and is_list(opts) do
+    column({:time32, :seconds}, data, opts)
+  end
+
+  def time(data, :milliseconds, opts) when is_list(data) and is_list(opts) do
+    column({:time32, :milliseconds}, data, opts)
+  end
+
+  def time(data, :microseconds, opts) when is_list(data) and is_list(opts) do
+    column({:time64, :microseconds}, data, opts)
+  end
+
+  def time(data, :nanoseconds, opts) when is_list(data) and is_list(opts) do
+    column({:time64, :nanoseconds}, data, opts)
   end
 end

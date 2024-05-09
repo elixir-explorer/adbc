@@ -22,6 +22,12 @@ static ERL_NIF_TERM kAtomTrue;
 static ERL_NIF_TERM kAtomFalse;
 static ERL_NIF_TERM kAtomEndOfSeries;
 static ERL_NIF_TERM kAtomStructKey;
+static ERL_NIF_TERM kAtomTime32;
+static ERL_NIF_TERM kAtomTime64;
+static ERL_NIF_TERM kAtomSeconds;
+static ERL_NIF_TERM kAtomMilliseconds;
+static ERL_NIF_TERM kAtomMicroseconds;
+static ERL_NIF_TERM kAtomNanoseconds;
 
 static ERL_NIF_TERM kAtomCalendarKey;
 static ERL_NIF_TERM kAtomCalendarISO;
@@ -70,10 +76,14 @@ static ERL_NIF_TERM kAdbcColumnTypeDenseUnion;
 static ERL_NIF_TERM kAdbcColumnTypeSparseUnion;
 static ERL_NIF_TERM kAdbcColumnTypeDate32;
 static ERL_NIF_TERM kAdbcColumnTypeDate64;
-static ERL_NIF_TERM kAdbcColumnTypeTime32;
-static ERL_NIF_TERM kAdbcColumnTypeTime64;
 static ERL_NIF_TERM kAdbcColumnTypeTimestamp;
 static ERL_NIF_TERM kAdbcColumnTypeBool;
+
+// tuples cannot be made in advance
+#define kAdbcColumnTypeTime32Seconds enif_make_tuple2(env, kAtomTime32, kAtomSeconds)
+#define kAdbcColumnTypeTime32Milliseconds enif_make_tuple2(env, kAtomTime32, kAtomMilliseconds)
+#define kAdbcColumnTypeTime64Microseconds enif_make_tuple2(env, kAtomTime64, kAtomMicroseconds)
+#define kAdbcColumnTypeTime64Nanoseconds enif_make_tuple2(env, kAtomTime64, kAtomNanoseconds)
 
 constexpr int kErrorBufferIsNotAMap = 1;
 constexpr int kErrorBufferGetDataListLength = 2;
@@ -987,25 +997,25 @@ int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct 
                     // NANOARROW_TYPE_TIME32
                     unit = 1000000000;
                     us_precision = 0;
-                    term_type = kAdbcColumnTypeTime32;
+                    term_type = kAdbcColumnTypeTime32Seconds;
                     break;
                 case 'm': // milliseconds
                     // NANOARROW_TYPE_TIME32
                     unit = 1000000;
                     us_precision = 3;
-                    term_type = kAdbcColumnTypeTime32;
+                    term_type = kAdbcColumnTypeTime32Milliseconds;
                     break;
                 case 'u': // microseconds
                     // NANOARROW_TYPE_TIME64
                     unit = 1000;
                     us_precision = 6;
-                    term_type = kAdbcColumnTypeTime64;
+                    term_type = kAdbcColumnTypeTime64Microseconds;
                     break;
                 case 'n': // nanoseconds
                     // NANOARROW_TYPE_TIME64
                     unit = 1;
                     us_precision = 6;
-                    term_type = kAdbcColumnTypeTime64;
+                    term_type = kAdbcColumnTypeTime64Nanoseconds;
                     break;
                 default:
                     format_processed = false;
@@ -2146,6 +2156,96 @@ int do_get_list_date64(ErlNifEnv *env, ERL_NIF_TERM list, bool nullable, ArrowTy
     }
 }
 
+int get_list_time(ErlNifEnv *env, ERL_NIF_TERM list, bool nullable, const std::function<int64_t(int64_t, uint64_t)> &normalize_ex_value, const std::function<void(int64_t val, bool is_nil)> &callback) {
+    ERL_NIF_TERM head, tail;
+    tail = list;
+    while (enif_get_list_cell(env, tail, &head, &tail)) {
+        if (enif_is_identical(head, kAtomNil)) {
+            callback(0, true);
+        } else {
+            int64_t val;
+            if (erlang::nif::get(env, head, &val)) {
+                callback(val, false);
+            } else if (enif_is_map(env, head)) {
+                ERL_NIF_TERM struct_name_term, calendar_term, hour_term, minute_term, second_term, microsecond_term;
+                if (!enif_get_map_value(env, head, kAtomStructKey, &struct_name_term)) {
+                    return kErrorBufferGetMapValue;
+                }
+                if (!enif_is_identical(struct_name_term, kAtomTimeModule)) {
+                    return kErrorBufferWrongStruct;
+                }
+
+                if (!enif_get_map_value(env, head, kAtomCalendarKey, &calendar_term)) {
+                    return kErrorBufferGetMapValue;
+                }
+                if (!enif_is_identical(calendar_term, kAtomCalendarISO)) {
+                    return kErrorExpectedCalendarISO;
+                }
+
+                if (!enif_get_map_value(env, head, kAtomHourKey, &hour_term)) {
+                    return kErrorBufferGetMapValue;
+                }
+                if (!enif_get_map_value(env, head, kAtomMinuteKey, &minute_term)) {
+                    return kErrorBufferGetMapValue;
+                }
+                if (!enif_get_map_value(env, head, kAtomSecondKey, &second_term)) {
+                    return kErrorBufferGetMapValue;
+                }
+                if (!enif_get_map_value(env, head, kAtomMicrosecondKey, &microsecond_term)) {
+                    return kErrorBufferGetMapValue;
+                }
+
+                tm time{};
+                if (!erlang::nif::get(env, hour_term, &time.tm_hour) || !erlang::nif::get(env, minute_term, &time.tm_min) || !erlang::nif::get(env, second_term, &time.tm_sec)) {
+                    return kErrorBufferGetMapValue;
+                }
+
+                const ERL_NIF_TERM *us_tuple = nullptr;
+                int us_arity;
+                uint64_t us;
+                int us_precision;
+                if (!enif_get_tuple(env, microsecond_term, &us_arity, &us_tuple) || us_arity != 2) {
+                    return kErrorBufferGetMapValue;
+                }
+                if (!erlang::nif::get(env, us_tuple[0], &us) || !erlang::nif::get(env, us_tuple[1], &us_precision)) {
+                    return kErrorBufferGetMapValue;
+                }
+
+                val = time.tm_hour * 3600 + time.tm_min * 60 + time.tm_sec;
+                callback(normalize_ex_value(val, us), false);
+            } else {
+                return 1;
+            }
+        }
+    }
+    return 0;
+}
+
+int do_get_list_time(ErlNifEnv *env, ERL_NIF_TERM list, bool nullable, ArrowType nanoarrow_type, enum ArrowTimeUnit time_unit, uint64_t unit, struct ArrowArray* array_out, struct ArrowSchema* schema_out, struct ArrowError* error_out) {
+    NANOARROW_RETURN_NOT_OK(ArrowSchemaSetTypeDateTime(schema_out, nanoarrow_type, time_unit, NULL));
+    NANOARROW_RETURN_NOT_OK(ArrowArrayInitFromSchema(array_out, schema_out, error_out));
+    NANOARROW_RETURN_NOT_OK(ArrowArrayStartAppending(array_out));
+    auto normalize_ex_value = [=](int64_t val, uint64_t us) -> int64_t {
+        if (time_unit == NANOARROW_TIME_UNIT_SECOND) {
+            return val;
+        }
+        val = (val * 1000000 + us) * 1000 / unit;
+        return val;
+    };
+    if (nullable) {
+        return get_list_time(env, list, nullable, normalize_ex_value, [&array_out](int64_t val, bool is_nil) -> void {
+            ArrowArrayAppendInt(array_out, val);
+            if (is_nil) {
+                ArrowArrayAppendNull(array_out, 1);
+            }
+        });
+    } else {
+        return get_list_time(env, list, nullable, normalize_ex_value, [&array_out](int64_t val, bool) -> void {
+            ArrowArrayAppendInt(array_out, val);
+        });
+    }
+}
+
 // non-zero return value indicating errors
 int adbc_buffer_to_adbc_field(ErlNifEnv *env, ERL_NIF_TERM adbc_buffer, struct ArrowArray* array_out, struct ArrowSchema* schema_out, struct ArrowError* error_out) {
     array_out->release = NULL;
@@ -2187,7 +2287,7 @@ int adbc_buffer_to_adbc_field(ErlNifEnv *env, ERL_NIF_TERM adbc_buffer, struct A
     }
 
     std::string name;
-    if (!enif_is_identical(struct_name_term, kAtomNil)) {
+    if (!enif_is_identical(name_term, kAtomNil)) {
         if (!erlang::nif::get(env, name_term, name)) {
             erlang::nif::get_atom(env, name_term, name);
         }
@@ -2235,6 +2335,7 @@ int adbc_buffer_to_adbc_field(ErlNifEnv *env, ERL_NIF_TERM adbc_buffer, struct A
     NANOARROW_RETURN_NOT_OK(ArrowSchemaSetMetadata(schema_out, (const char*)metadata_buffer.data));
     ArrowBufferReset(&metadata_buffer);
 
+    bool type_processed = true;
     if (enif_is_identical(type_term, kAdbcColumnTypeI8)) {
         do_get_list_integer<int8_t>(env, data_term, nullable, NANOARROW_TYPE_INT8, array_out, schema_out, error_out);
     } else if (enif_is_identical(type_term, kAdbcColumnTypeI16)) {
@@ -2271,7 +2372,23 @@ int adbc_buffer_to_adbc_field(ErlNifEnv *env, ERL_NIF_TERM adbc_buffer, struct A
         do_get_list_date64(env, data_term, nullable, NANOARROW_TYPE_DATE64, array_out, schema_out, error_out);
     } else if (enif_is_identical(type_term, kAdbcColumnTypeBool)) {
         do_get_list_boolean(env, data_term, nullable, NANOARROW_TYPE_BOOL, array_out, schema_out, error_out);
+    } else if (enif_is_tuple(env, type_term)) {
+        if (enif_is_identical(type_term, kAdbcColumnTypeTime32Seconds)) {
+            do_get_list_time(env, data_term, nullable, NANOARROW_TYPE_TIME32, NANOARROW_TIME_UNIT_SECOND, 1000000000, array_out, schema_out, error_out);
+        } else if (enif_is_identical(type_term, kAdbcColumnTypeTime32Milliseconds)) {
+            do_get_list_time(env, data_term, nullable, NANOARROW_TYPE_TIME32, NANOARROW_TIME_UNIT_MILLI, 1000000, array_out, schema_out, error_out);
+        } else if (enif_is_identical(type_term, kAdbcColumnTypeTime64Microseconds)) {
+            do_get_list_time(env, data_term, nullable, NANOARROW_TYPE_TIME64, NANOARROW_TIME_UNIT_MICRO, 1000, array_out, schema_out, error_out);
+        } else if (enif_is_identical(type_term, kAdbcColumnTypeTime64Nanoseconds)) {
+            do_get_list_time(env, data_term, nullable, NANOARROW_TYPE_TIME64, NANOARROW_TIME_UNIT_NANO, 1, array_out, schema_out, error_out);
+        } else {
+            type_processed = false;
+        }
     } else {
+        type_processed = false;
+    }
+
+    if (!type_processed) {
         if (schema_out->release) schema_out->release(schema_out);
         enif_snprintf(error_out->message, sizeof(error_out->message), "type `%T` not supported yet.", type_term);
         return kErrorBufferUnknownType;
@@ -2502,16 +2619,24 @@ static int on_load(ErlNifEnv *env, void **, ERL_NIF_TERM) {
     kAtomTrue = erlang::nif::atom(env, "true");
     kAtomFalse = erlang::nif::atom(env, "false");
     kAtomEndOfSeries = erlang::nif::atom(env, "end_of_series");
-    kAtomDateModule = erlang::nif::atom(env, "Elixir.Date");
-    kAtomCalendarISO = erlang::nif::atom(env, "Elixir.Calendar.ISO");
-    kAtomTimeModule = erlang::nif::atom(env, "Elixir.Time");
-    kAtomNaiveDateTimeModule = erlang::nif::atom(env, "Elixir.NaiveDateTime");
-    kAtomAdbcColumnModule = erlang::nif::atom(env, "Elixir.Adbc.Column");
     kAtomStructKey = erlang::nif::atom(env, "__struct__");
+    kAtomTime32 = erlang::nif::atom(env, "time32");
+    kAtomTime64 = erlang::nif::atom(env, "time64");
+    kAtomSeconds = erlang::nif::atom(env, "seconds");
+    kAtomMilliseconds = erlang::nif::atom(env, "milliseconds");
+    kAtomMicroseconds = erlang::nif::atom(env, "microseconds");
+    kAtomNanoseconds = erlang::nif::atom(env, "nanoseconds");
+
     kAtomCalendarKey = erlang::nif::atom(env, "calendar");
+    kAtomCalendarISO = erlang::nif::atom(env, "Elixir.Calendar.ISO");
+
+    kAtomDateModule = erlang::nif::atom(env, "Elixir.Date");
     kAtomYearKey = erlang::nif::atom(env, "year");
     kAtomMonthKey = erlang::nif::atom(env, "month");
     kAtomDayKey = erlang::nif::atom(env, "day");
+
+    kAtomNaiveDateTimeModule = erlang::nif::atom(env, "Elixir.NaiveDateTime");
+    kAtomTimeModule = erlang::nif::atom(env, "Elixir.Time");
     kAtomHourKey = erlang::nif::atom(env, "hour");
     kAtomMinuteKey = erlang::nif::atom(env, "minute");
     kAtomSecondKey = erlang::nif::atom(env, "second");
@@ -2549,8 +2674,6 @@ static int on_load(ErlNifEnv *env, void **, ERL_NIF_TERM) {
     kAdbcColumnTypeSparseUnion = erlang::nif::atom(env, "sparse_union");
     kAdbcColumnTypeDate32 = erlang::nif::atom(env, "date32");
     kAdbcColumnTypeDate64 = erlang::nif::atom(env, "date64");
-    kAdbcColumnTypeTime32 = erlang::nif::atom(env, "time32");
-    kAdbcColumnTypeTime64 = erlang::nif::atom(env, "time64");
     kAdbcColumnTypeTimestamp = erlang::nif::atom(env, "timestamp");
     kAdbcColumnTypeBool = erlang::nif::atom(env, "boolean");
 

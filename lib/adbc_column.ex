@@ -21,6 +21,8 @@ defmodule Adbc.Column do
   * `:binary`
   * `:large_binary`, when the size of the binary is larger than 4GB
   * `:fixed_size_binary`
+  * `:date32`
+  * `:date64`
   """
   defstruct name: nil,
             type: nil,
@@ -567,5 +569,15 @@ defmodule Adbc.Column do
   @spec fixed_size_binary([binary()], Keyword.t()) :: %Adbc.Column{}
   def fixed_size_binary(data, opts \\ []) when is_list(data) and is_list(opts) do
     column(:fixed_size_binary, data, opts)
+  end
+
+  @spec date32([Date.t()], Keyword.t()) :: %Adbc.Column{}
+  def date32(data, opts \\ []) when is_list(data) and is_list(opts) do
+    column(:date32, data, opts)
+  end
+
+  @spec date64([Date.t()], Keyword.t()) :: %Adbc.Column{}
+  def date64(data, opts \\ []) when is_list(data) and is_list(opts) do
+    column(:date64, data, opts)
   end
 end

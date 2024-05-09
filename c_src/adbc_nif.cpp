@@ -83,6 +83,7 @@ constexpr int kErrorBufferDataIsNotAList = 5;
 constexpr int kErrorBufferUnknownType = 6;
 constexpr int kErrorBufferGetMetadataKey = 7;
 constexpr int kErrorBufferGetMetadataValue = 8;
+constexpr int kErrorExpectedCalendarISO = 9;
 
 static ERL_NIF_TERM nif_error_from_adbc_error(ErlNifEnv *env, struct AdbcError * adbc_error) {
     char const* message = (adbc_error->message == nullptr) ? "unknown error" : adbc_error->message;
@@ -1699,9 +1700,7 @@ static ERL_NIF_TERM adbc_arrow_array_stream_next(ErlNifEnv *env, int argc, const
             }
             return kAtomEndOfSeries;
         }
-        // ret = make_adbc_column(env, schema->name == nullptr ? "" : schema->name, out_type, out.null_count > 0, kAtomNil, out_terms[0]);
     } else {
-        // ret = make_adbc_column(env, out_terms[0], out_type, out.null_count > 0, kAtomNil, out_terms[1]);
         ret = enif_make_tuple2(env, out_terms[0], out_terms[1]);
     }
 
@@ -2056,6 +2055,112 @@ int do_get_list_fixed_size_binary(ErlNifEnv *env, ERL_NIF_TERM list, bool nullab
     }
 }
 
+int get_utc_offset() {
+  time_t zero = 24*60*60L;
+  struct tm * timeptr;
+  int gmtime_hours;
+  timeptr = localtime( &zero );
+  gmtime_hours = timeptr->tm_hour;
+  if( timeptr->tm_mday < 2 ) {
+    gmtime_hours -= 24;
+  }
+  return gmtime_hours;
+}
+
+int get_list_date(ErlNifEnv *env, ERL_NIF_TERM list, bool nullable, const std::function<void(int64_t val, bool is_nil)> &callback) {
+    ERL_NIF_TERM head, tail;
+    tail = list;
+    while (enif_get_list_cell(env, tail, &head, &tail)) {
+        if (enif_is_identical(head, kAtomNil)) {
+            callback(0, true);
+        } else {
+            int64_t val;
+            if (erlang::nif::get(env, head, &val)) {
+                callback(val, false);
+            } else if (enif_is_map(env, head)) {
+                ERL_NIF_TERM struct_name_term, calendar_term, year_term, month_term, day_term;
+                if (!enif_get_map_value(env, head, kAtomStructKey, &struct_name_term)) {
+                    return kErrorBufferGetMapValue;
+                }
+                if (!enif_is_identical(struct_name_term, kAtomDateModule)) {
+                    return kErrorBufferWrongStruct;
+                }
+
+                if (!enif_get_map_value(env, head, kAtomCalendarKey, &calendar_term)) {
+                    return kErrorBufferGetMapValue;
+                }
+                if (!enif_is_identical(calendar_term, kAtomCalendarISO)) {
+                    return kErrorExpectedCalendarISO;
+                }
+
+                if (!enif_get_map_value(env, head, kAtomYearKey, &year_term)) {
+                    return kErrorBufferGetMapValue;
+                }
+                if (!enif_get_map_value(env, head, kAtomMonthKey, &month_term)) {
+                    return kErrorBufferGetMapValue;
+                }
+                if (!enif_get_map_value(env, head, kAtomDayKey, &day_term)) {
+                    return kErrorBufferGetMapValue;
+                }
+
+                tm time{};
+                if (!erlang::nif::get(env, year_term, &time.tm_year) || !erlang::nif::get(env, month_term, &time.tm_mon) || !erlang::nif::get(env, day_term, &time.tm_mday)) {
+                    return kErrorBufferGetMapValue;
+                }
+                time.tm_year -= 1900;
+                time.tm_mon -= 1;
+                // mktime always gives local time
+                // so we need to adjust it to UTC
+                val = mktime(&time) + get_utc_offset() * 3600;
+                callback(val, false);
+            } else {
+                return 1;
+            }
+        }
+    }
+    return 0;
+}
+
+int do_get_list_date32(ErlNifEnv *env, ERL_NIF_TERM list, bool nullable, ArrowType nanoarrow_type, struct ArrowArray* array_out, struct ArrowSchema* schema_out, struct ArrowError* error_out) {
+    NANOARROW_RETURN_NOT_OK(ArrowSchemaSetType(schema_out, nanoarrow_type));
+    NANOARROW_RETURN_NOT_OK(ArrowArrayInitFromSchema(array_out, schema_out, error_out));
+    NANOARROW_RETURN_NOT_OK(ArrowArrayStartAppending(array_out));
+    if (nullable) {
+        return get_list_date(env, list, nullable, [&array_out](int64_t val, bool is_nil) -> void {
+            val /= 24 * 60 * 60;
+            ArrowArrayAppendInt(array_out, (int32_t)val);
+            if (is_nil) {
+                ArrowArrayAppendNull(array_out, 1);
+            }
+        });
+    } else {
+        return get_list_date(env, list, nullable, [&array_out](int64_t val, bool) -> void {
+            val /= 24 * 60 * 60;
+            ArrowArrayAppendInt(array_out, (int32_t)val);
+        });
+    }
+}
+
+int do_get_list_date64(ErlNifEnv *env, ERL_NIF_TERM list, bool nullable, ArrowType nanoarrow_type, struct ArrowArray* array_out, struct ArrowSchema* schema_out, struct ArrowError* error_out) {
+    NANOARROW_RETURN_NOT_OK(ArrowSchemaSetType(schema_out, nanoarrow_type));
+    NANOARROW_RETURN_NOT_OK(ArrowArrayInitFromSchema(array_out, schema_out, error_out));
+    NANOARROW_RETURN_NOT_OK(ArrowArrayStartAppending(array_out));
+    if (nullable) {
+        return get_list_date(env, list, nullable, [&array_out](int64_t val, bool is_nil) -> void {
+            val *= 1000;
+            ArrowArrayAppendInt(array_out, val);
+            if (is_nil) {
+                ArrowArrayAppendNull(array_out, 1);
+            }
+        });
+    } else {
+        return get_list_date(env, list, nullable, [&array_out](int64_t val, bool) -> void {
+            val *= 1000;
+            ArrowArrayAppendInt(array_out, val);
+        });
+    }
+}
+
 // non-zero return value indicating errors
 int adbc_buffer_to_adbc_field(ErlNifEnv *env, ERL_NIF_TERM adbc_buffer, struct ArrowArray* array_out, struct ArrowSchema* schema_out, struct ArrowError* error_out) {
     array_out->release = NULL;
@@ -2175,6 +2280,10 @@ int adbc_buffer_to_adbc_field(ErlNifEnv *env, ERL_NIF_TERM adbc_buffer, struct A
         do_get_list_string(env, data_term, nullable, NANOARROW_TYPE_LARGE_BINARY, array_out, schema_out, error_out);
     } else if (enif_is_identical(type_term, kAdbcColumnTypeFixedSizeBinary)) {
         do_get_list_fixed_size_binary(env, data_term, nullable, NANOARROW_TYPE_FIXED_SIZE_BINARY, array_out, schema_out, error_out);
+    } else if (enif_is_identical(type_term, kAdbcColumnTypeDate32)) {
+        do_get_list_date32(env, data_term, nullable, NANOARROW_TYPE_DATE32, array_out, schema_out, error_out);
+    } else if (enif_is_identical(type_term, kAdbcColumnTypeDate64)) {
+        do_get_list_date64(env, data_term, nullable, NANOARROW_TYPE_DATE64, array_out, schema_out, error_out);
     } else if (enif_is_identical(type_term, kAdbcColumnTypeBool)) {
         do_get_list_boolean(env, data_term, nullable, NANOARROW_TYPE_BOOL, array_out, schema_out, error_out);
     } else {
@@ -2285,6 +2394,9 @@ int adbc_buffer_to_arrow_type_struct(ErlNifEnv *env, ERL_NIF_TERM values, struct
             case kErrorBufferGetMetadataKey:
             case kErrorBufferGetMetadataValue:
                 // error message is already set
+                return 1;
+            case kErrorExpectedCalendarISO:
+                snprintf(error_out->message, sizeof(error_out->message), "Expected `Calendar.ISO`.");
                 return 1;
             default:
                 break;

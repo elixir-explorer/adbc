@@ -2050,7 +2050,7 @@ int get_utc_offset() {
   return gmtime_hours;
 }
 
-int get_list_date(ErlNifEnv *env, ERL_NIF_TERM list, bool nullable, const std::function<void(int64_t val, bool is_nil)> &callback) {
+int get_list_date(ErlNifEnv *env, ERL_NIF_TERM list, bool nullable, const std::function<int64_t(int64_t)> &normalize_ex_value, const std::function<void(int64_t val, bool is_nil)> &callback) {
     ERL_NIF_TERM head, tail;
     tail = list;
     while (enif_get_list_cell(env, tail, &head, &tail)) {
@@ -2095,7 +2095,7 @@ int get_list_date(ErlNifEnv *env, ERL_NIF_TERM list, bool nullable, const std::f
                 // mktime always gives local time
                 // so we need to adjust it to UTC
                 val = mktime(&time) + get_utc_offset() * 3600;
-                callback(val, false);
+                callback(normalize_ex_value(val), false);
             } else {
                 return 1;
             }
@@ -2108,17 +2108,18 @@ int do_get_list_date32(ErlNifEnv *env, ERL_NIF_TERM list, bool nullable, ArrowTy
     NANOARROW_RETURN_NOT_OK(ArrowSchemaSetType(schema_out, nanoarrow_type));
     NANOARROW_RETURN_NOT_OK(ArrowArrayInitFromSchema(array_out, schema_out, error_out));
     NANOARROW_RETURN_NOT_OK(ArrowArrayStartAppending(array_out));
+    auto second_to_day = [](int64_t val) -> int64_t {
+        return val / (24 * 60 * 60);
+    };
     if (nullable) {
-        return get_list_date(env, list, nullable, [&array_out](int64_t val, bool is_nil) -> void {
-            val /= 24 * 60 * 60;
+        return get_list_date(env, list, nullable, second_to_day, [&array_out](int64_t val, bool is_nil) -> void {
             ArrowArrayAppendInt(array_out, (int32_t)val);
             if (is_nil) {
                 ArrowArrayAppendNull(array_out, 1);
             }
         });
     } else {
-        return get_list_date(env, list, nullable, [&array_out](int64_t val, bool) -> void {
-            val /= 24 * 60 * 60;
+        return get_list_date(env, list, nullable, second_to_day, [&array_out](int64_t val, bool) -> void {
             ArrowArrayAppendInt(array_out, (int32_t)val);
         });
     }
@@ -2128,17 +2129,18 @@ int do_get_list_date64(ErlNifEnv *env, ERL_NIF_TERM list, bool nullable, ArrowTy
     NANOARROW_RETURN_NOT_OK(ArrowSchemaSetType(schema_out, nanoarrow_type));
     NANOARROW_RETURN_NOT_OK(ArrowArrayInitFromSchema(array_out, schema_out, error_out));
     NANOARROW_RETURN_NOT_OK(ArrowArrayStartAppending(array_out));
+    auto second_to_millisecond = [](int64_t val) -> int64_t {
+        return val * 1000;
+    };
     if (nullable) {
-        return get_list_date(env, list, nullable, [&array_out](int64_t val, bool is_nil) -> void {
-            val *= 1000;
+        return get_list_date(env, list, nullable, second_to_millisecond, [&array_out](int64_t val, bool is_nil) -> void {
             ArrowArrayAppendInt(array_out, val);
             if (is_nil) {
                 ArrowArrayAppendNull(array_out, 1);
             }
         });
     } else {
-        return get_list_date(env, list, nullable, [&array_out](int64_t val, bool) -> void {
-            val *= 1000;
+        return get_list_date(env, list, nullable, second_to_millisecond, [&array_out](int64_t val, bool) -> void {
             ArrowArrayAppendInt(array_out, val);
         });
     }

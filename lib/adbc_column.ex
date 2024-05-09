@@ -571,12 +571,42 @@ defmodule Adbc.Column do
     column(:fixed_size_binary, data, opts)
   end
 
-  @spec date32([Date.t()], Keyword.t()) :: %Adbc.Column{}
+  @doc """
+  A column that contains date represented as 32-bit integers in UTC.
+  ## Arguments
+
+  * `data`: a list, each element of which can be one of the following:
+    * a `Date.t()`
+    * a 32-bit integer representing the number of days since the Unix epoch.
+  * `opts`: A keyword list of options
+
+  ## Options
+
+  * `:name` - The name of the column
+  * `:nullable` - A boolean value indicating whether the column is nullable
+  * `:metadata` - A map of metadata
+  """
+  @spec date32([Date.t() | integer()], Keyword.t()) :: %Adbc.Column{}
   def date32(data, opts \\ []) when is_list(data) and is_list(opts) do
     column(:date32, data, opts)
   end
 
-  @spec date64([Date.t()], Keyword.t()) :: %Adbc.Column{}
+  @doc """
+  A column that contains date represented as 64-bit integers in UTC.
+  ## Arguments
+
+  * `data`: a list, each element of which can be one of the following:
+    * a `Date.t()`
+    * a 64-bit integer representing the number of milliseconds since the Unix epoch.
+  * `opts`: A keyword list of options
+
+  ## Options
+
+  * `:name` - The name of the column
+  * `:nullable` - A boolean value indicating whether the column is nullable
+  * `:metadata` - A map of metadata
+  """
+  @spec date64([Date.t() | integer()], Keyword.t()) :: %Adbc.Column{}
   def date64(data, opts \\ []) when is_list(data) and is_list(opts) do
     column(:date64, data, opts)
   end

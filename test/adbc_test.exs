@@ -163,7 +163,8 @@ defmodule AdbcTest do
       select
         '2023-03-01T10:23:45'::timestamp as datetime,
         '2023-03-01T10:23:45.123456'::timestamp as datetime_usec,
-        '2023-03-01T10:23:45 PST'::timestamptz as datetime_tz,
+        '2023-03-01T10:23:45 PST'::timestamptz as datetime_tz_8601,
+        '2023-03-01T10:23:45+02'::timestamptz as datetime_tz_offset,
         '2023-03-01'::date as date,
         '10:23:45'::time as time,
         '10:23:45.123456'::time as time_usec
@@ -186,12 +187,19 @@ defmodule AdbcTest do
                    data: [~N[2023-03-01 10:23:45.123456]]
                  },
                  %Adbc.Column{
-                   name: "datetime_tz",
+                   name: "datetime_tz_8601",
                    type: {:timestamp, :microseconds, "UTC"},
                    nullable: true,
                    metadata: nil,
                    data: [~N[2023-03-01 18:23:45.000000]]
                  },
+                 %Adbc.Column{
+                  name: "datetime_tz_offset",
+                  type: {:timestamp, :microseconds, "UTC"},
+                  nullable: true,
+                  metadata: nil,
+                  data: [~N[2023-03-01 08:23:45.000000]]
+                },
                  %Adbc.Column{
                    name: "date",
                    type: :date32,

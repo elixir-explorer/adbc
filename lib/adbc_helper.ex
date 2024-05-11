@@ -91,6 +91,9 @@ defmodule Adbc.Helper do
 
   defp cacerts_options do
     cond do
+      custom_certs = System.get_env("ADBC_CACERTS_PATH") ->
+        [cacertfile: custom_certs]
+
       certs = otp_cacerts() ->
         [cacerts: certs]
 

@@ -40,6 +40,11 @@ defmodule Adbc.Column do
           | {:timestamp, :milliseconds, String.t()}
           | {:timestamp, :microseconds, String.t()}
           | {:timestamp, :nanoseconds, String.t()}
+  @type duration_t ::
+          {:duration, :seconds}
+          | {:duration, :milliseconds}
+          | {:duration, :microseconds}
+          | {:duration, :nanoseconds}
   @type data_type ::
           :boolean
           | signed_integer
@@ -55,6 +60,7 @@ defmodule Adbc.Column do
           | time32_t
           | time64_t
           | timestamp_t
+          | duration_t
 
   @spec column(data_type(), list, Keyword.t()) :: %Adbc.Column{}
   def column(type, data, opts \\ [])
@@ -736,5 +742,45 @@ defmodule Adbc.Column do
   def timestamp(data, :nanoseconds, timezone, opts)
       when is_list(data) and is_binary(timezone) and is_list(opts) do
     column({:timestamp, :nanoseconds, timezone}, data, opts)
+  end
+
+  @doc """
+  A column that contains durations represented as signed 64-bit integers.
+
+  ## Arguments
+
+  * `data`: a list of integer values representing the time in the specified unit
+
+  * `unit`: specify the unit of the time value, one of the following:
+    * `:seconds`
+    * `:milliseconds`
+    * `:microseconds`
+    * `:nanoseconds`
+
+  * `opts`: A keyword list of options
+
+  ## Options
+
+  * `:name` - The name of the column
+  * `:nullable` - A boolean value indicating whether the column is nullable
+  * `:metadata` - A map of metadata
+  """
+  @spec duration([integer()], time_unit(), Keyword.t()) :: %Adbc.Column{}
+  def duration(data, unit, opts \\ [])
+
+  def duration(data, :seconds, opts) when is_list(data) and is_list(opts) do
+    column({:duration, :seconds}, data, opts)
+  end
+
+  def duration(data, :milliseconds, opts) when is_list(data) and is_list(opts) do
+    column({:duration, :milliseconds}, data, opts)
+  end
+
+  def duration(data, :microseconds, opts) when is_list(data) and is_list(opts) do
+    column({:duration, :microseconds}, data, opts)
+  end
+
+  def duration(data, :nanoseconds, opts) when is_list(data) and is_list(opts) do
+    column({:duration, :nanoseconds}, data, opts)
   end
 end

@@ -790,6 +790,7 @@ static int on_load(ErlNifEnv *env, void **, ERL_NIF_TERM) {
     kAtomStructKey = erlang::nif::atom(env, "__struct__");
     kAtomTime32 = erlang::nif::atom(env, "time32");
     kAtomTime64 = erlang::nif::atom(env, "time64");
+    kAtomDuration = erlang::nif::atom(env, "duration");
     kAtomSeconds = erlang::nif::atom(env, "seconds");
     kAtomMilliseconds = erlang::nif::atom(env, "milliseconds");
     kAtomMicroseconds = erlang::nif::atom(env, "microseconds");

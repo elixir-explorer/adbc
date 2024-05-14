@@ -12,6 +12,7 @@ static ERL_NIF_TERM kAtomEndOfSeries;
 static ERL_NIF_TERM kAtomStructKey;
 static ERL_NIF_TERM kAtomTime32;
 static ERL_NIF_TERM kAtomTime64;
+static ERL_NIF_TERM kAtomDuration;
 static ERL_NIF_TERM kAtomSeconds;
 static ERL_NIF_TERM kAtomMilliseconds;
 static ERL_NIF_TERM kAtomMicroseconds;
@@ -72,6 +73,10 @@ static ERL_NIF_TERM kAdbcColumnTypeBool;
 #define kAdbcColumnTypeTime32Milliseconds enif_make_tuple2(env, kAtomTime32, kAtomMilliseconds)
 #define kAdbcColumnTypeTime64Microseconds enif_make_tuple2(env, kAtomTime64, kAtomMicroseconds)
 #define kAdbcColumnTypeTime64Nanoseconds enif_make_tuple2(env, kAtomTime64, kAtomNanoseconds)
+#define kAdbcColumnTypeDurationSeconds enif_make_tuple2(env, kAtomDuration, kAtomSeconds)
+#define kAdbcColumnTypeDurationMilliseconds enif_make_tuple2(env, kAtomDuration, kAtomMilliseconds)
+#define kAdbcColumnTypeDurationMicroseconds enif_make_tuple2(env, kAtomDuration, kAtomMicroseconds)
+#define kAdbcColumnTypeDurationNanoseconds enif_make_tuple2(env, kAtomDuration, kAtomNanoseconds)
 
 // error codes
 constexpr int kErrorBufferIsNotAMap = 1;

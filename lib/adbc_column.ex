@@ -24,6 +24,11 @@ defmodule Adbc.Column do
   @type floating ::
           :f32
           | :f64
+  @type decimal128 :: {:decimal, 128, integer(), integer()}
+  @type decimal256 :: {:decimal, 256, integer(), integer()}
+  @type decimal_t ::
+          decimal128
+          | decimal256
   @type time_unit ::
           :seconds
           | :milliseconds
@@ -50,6 +55,7 @@ defmodule Adbc.Column do
           | signed_integer
           | unsigned_integer
           | floating
+          | decimal_t
           | :string
           | :large_string
           | :binary
@@ -441,6 +447,48 @@ defmodule Adbc.Column do
   @spec f64([float], Keyword.t()) :: %Adbc.Column{}
   def f64(data, opts \\ []) when is_list(data) and is_list(opts) do
     column(:f64, data, opts)
+  end
+
+  @doc """
+  A column that contains 128-bit decimals.
+
+  ## Arguments
+
+  * `data`: a list of `Decimal.t()`
+  * `precision`: The precision of the decimal values
+  * `scale`: The scale of the decimal values
+  * `opts`: A keyword list of options
+
+  ## Options
+
+  * `:name` - The name of the column
+  * `:nullable` - A boolean value indicating whether the column is nullable
+  * `:metadata` - A map of metadata
+  """
+  @spec decimal128([Decimal.t()], integer(), integer(), Keyword.t()) :: %Adbc.Column{}
+  def decimal128(data, precision, scale, opts \\ []) do
+    column({:decimal, 128, precision, scale}, data, opts)
+  end
+
+  @doc """
+  A column that contains 256-bit decimals.
+
+  ## Arguments
+
+  * `data`: a list of `Decimal.t()`
+  * `precision`: The precision of the decimal values
+  * `scale`: The scale of the decimal values
+  * `opts`: A keyword list of options
+
+  ## Options
+
+  * `:name` - The name of the column
+  * `:nullable` - A boolean value indicating whether the column is nullable
+  * `:metadata` - A map of metadata
+  """
+  @spec decimal256([Decimal.t()], integer(), integer(), Keyword.t()) :: %Adbc.Column{}
+  def decimal256(data, precision, scale, opts \\ []) do
+    column({:decimal, 256, precision, scale}, data, opts)
   end
 
   @doc """

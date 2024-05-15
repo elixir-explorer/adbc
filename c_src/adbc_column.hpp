@@ -138,6 +138,67 @@ int do_get_list_float(ErlNifEnv *env, ERL_NIF_TERM list, bool nullable, ArrowTyp
     }
 }
 
+int get_list_decimal(ErlNifEnv *env, ERL_NIF_TERM list, bool nullable, ArrowType nanoarrow_type, int32_t bitwidth, int32_t precision, int32_t scale, const std::function<void(struct ArrowDecimal * val, bool is_nil)> &callback) {
+    ERL_NIF_TERM head, tail;
+    tail = list;
+    while (enif_get_list_cell(env, tail, &head, &tail)) {
+        struct ArrowDecimal val{};
+        ArrowDecimalInit(&val, bitwidth, precision, scale);
+        if (enif_is_identical(head, kAtomNil)) {
+            callback(&val, true);
+        } else if (enif_is_map(env, head)) {
+            ERL_NIF_TERM struct_name_term, coef_term, exp_term, sign_term;
+            if (!enif_get_map_value(env, head, kAtomStructKey, &struct_name_term)) {
+                return kErrorBufferGetMapValue;
+            }
+            if (!enif_is_identical(struct_name_term, kAtomDecimalModule)) {
+                return kErrorBufferWrongStruct;
+            }
+
+            if (!enif_get_map_value(env, head, kAtomCoefKey, &coef_term)) {
+                return kErrorBufferGetMapValue;
+            }
+            if (!enif_get_map_value(env, head, kAtomExpKey, &exp_term)) {
+                return kErrorBufferGetMapValue;
+            }
+            if (!enif_get_map_value(env, head, kAtomSignKey, &sign_term)) {
+                return kErrorBufferGetMapValue;
+            }
+
+            int64_t coef;
+            int64_t exp;
+            int sign;
+            if (!erlang::nif::get(env, coef_term, &coef) || !erlang::nif::get(env, exp_term, &exp) || !erlang::nif::get(env, sign_term, &sign)) {
+                return kErrorBufferGetMapValue;
+            }
+            
+            // todo: translate to ArrowDecimal
+            callback(&val, false);
+        } else {
+            return 1;
+        }
+    }
+    return 0;
+}
+
+int do_get_list_decimal(ErlNifEnv *env, ERL_NIF_TERM list, bool nullable, ArrowType nanoarrow_type, int32_t bitwidth, int32_t precision, int32_t scale, struct ArrowArray* array_out, struct ArrowSchema* schema_out, struct ArrowError* error_out) {
+    NANOARROW_RETURN_NOT_OK(ArrowSchemaSetTypeDecimal(schema_out, nanoarrow_type, precision, scale));
+    NANOARROW_RETURN_NOT_OK(ArrowArrayInitFromSchema(array_out, schema_out, error_out));
+    NANOARROW_RETURN_NOT_OK(ArrowArrayStartAppending(array_out));
+    if (nullable) {
+        return get_list_decimal(env, list, nullable, nanoarrow_type, bitwidth, precision, scale, [&array_out](struct ArrowDecimal * val, bool is_nil) -> void {
+            ArrowArrayAppendDecimal(array_out, val);
+            if (is_nil) {
+                ArrowArrayAppendNull(array_out, 1);
+            }
+        });
+    } else {
+        return get_list_decimal(env, list, nullable, nanoarrow_type,  bitwidth, precision, scale, [&array_out](struct ArrowDecimal * val, bool) -> void {
+            ArrowArrayAppendDecimal(array_out, val);
+        });
+    }
+}
+
 int get_list_string(ErlNifEnv *env, ERL_NIF_TERM list, bool nullable, const std::function<void(struct ArrowStringView val, bool is_nil)> &callback) {
     ERL_NIF_TERM head, tail;
     tail = list;
@@ -745,7 +806,22 @@ int adbc_column_to_adbc_field(ErlNifEnv *env, ERL_NIF_TERM adbc_buffer, struct A
                                 ret = do_get_list_timestamp(env, data_term, nullable, NANOARROW_TYPE_TIMESTAMP, NANOARROW_TIME_UNIT_NANO, 1, timezone.c_str(), array_out, schema_out, error_out);
                             }
                         }
-                    }         
+                    }
+                } else if (arity == 4) {
+                    // NANOARROW_TYPE_DECIMAL128
+                    // NANOARROW_TYPE_DECIMAL256
+                    if (enif_is_identical(tuple[0], kAtomDecimal)) {
+                        int bits = 0;
+                        int precision = 0;
+                        int scale = 0;
+                        if (erlang::nif::get(env, tuple[1], &bits) && erlang::nif::get(env, tuple[2], &precision) && erlang::nif::get(env, tuple[3], &scale)) {
+                            if (bits == 128) {
+                                ret = do_get_list_decimal(env, data_term, nullable, NANOARROW_TYPE_DECIMAL128, bits, precision, scale, array_out, schema_out, error_out);
+                            } else if (bits == 256) {
+                                ret = do_get_list_decimal(env, data_term, nullable, NANOARROW_TYPE_DECIMAL256, bits, precision, scale, array_out, schema_out, error_out);
+                            }
+                        }
+                    }
                 }
             }
         }

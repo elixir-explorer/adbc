@@ -35,13 +35,17 @@ static ERL_NIF_TERM kAtomMinuteKey;
 static ERL_NIF_TERM kAtomSecondKey;
 static ERL_NIF_TERM kAtomMicrosecondKey;
 
+static ERL_NIF_TERM kAtomDecimalModule;
+static ERL_NIF_TERM kAtomCoefKey;
+static ERL_NIF_TERM kAtomExpKey;
+static ERL_NIF_TERM kAtomSignKey;
+
 static ERL_NIF_TERM kAtomAdbcColumnModule;
 static ERL_NIF_TERM kAtomNameKey;
 static ERL_NIF_TERM kAtomTypeKey;
 static ERL_NIF_TERM kAtomNullableKey;
 static ERL_NIF_TERM kAtomMetadataKey;
 static ERL_NIF_TERM kAtomDataKey;
-// static ERL_NIF_TERM kAtomPrivateKey;
 
 static ERL_NIF_TERM kAdbcColumnTypeU8;
 static ERL_NIF_TERM kAdbcColumnTypeU16;

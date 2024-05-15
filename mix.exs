@@ -54,6 +54,7 @@ defmodule Adbc.MixProject do
       # runtime
       {:dll_loader_helper_beam, "~> 1.0"},
       {:castore, "~> 1.0", optional: true},
+      {:decimal, "~> 2.1"},
 
       # docs
       {:ex_doc, "~> 0.29", only: :docs, runtime: false}

@@ -968,7 +968,7 @@ int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct 
                 }
                 term_type = enif_make_tuple3(env, kAtomTimestamp, term_unit, term_timezone);
                 
-                using value_type = uint64_t;
+                using value_type = int64_t;
                 if (count == -1) count = values->length;
                 if (values->n_buffers != 2) {
                     error = erlang::nif::error(env, "invalid n_buffers value for ArrowArray (format=ts), values->n_buffers != 2");
@@ -996,9 +996,9 @@ int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct 
                     count,
                     (const uint8_t *)values->buffers[bitmap_buffer_index],
                     (const value_type *)values->buffers[data_buffer_index],
-                    [unit, us_precision, naive_dt_module, calendar_iso, &keys](ErlNifEnv *env, uint64_t val) -> ERL_NIF_TERM {
+                    [unit, us_precision, naive_dt_module, calendar_iso, &keys](ErlNifEnv *env, int64_t val) -> ERL_NIF_TERM {
                         // Elixir only supports microsecond precision
-                        uint64_t us = val * unit / 1000;
+                        int64_t us = val * unit / 1000;
                         time_t t = (time_t)(us / 1000000);
                         tm* time = gmtime(&t);
                         us = us % 1000000;
@@ -1019,6 +1019,42 @@ int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct 
                         enif_make_map_from_arrays(env, keys, values, 9, &ex_dt);
                         return ex_dt;
                     }
+                );
+            }
+        } else if (strncmp("tD", format, 2) == 0) {
+            // NANOARROW_TYPE_DURATION
+            switch (format[2]) {
+                case 's': // seconds
+                    term_type = kAdbcColumnTypeDurationSeconds;
+                    break;
+                case 'm': // milliseconds
+                    term_type = kAdbcColumnTypeDurationMilliseconds;
+                    break;
+                case 'u': // microseconds
+                    term_type = kAdbcColumnTypeDurationMicroseconds;
+                    break;
+                case 'n': // nanoseconds
+                    term_type = kAdbcColumnTypeDurationNanoseconds;
+                    break;
+                default:
+                    format_processed = false;
+            }
+
+            if (format_processed) {
+                using value_type = int64_t;
+                if (count == -1) count = values->length;
+                if (values->n_buffers != 2) {
+                    error = erlang::nif::error(env, "invalid n_buffers value for ArrowArray (format=tD), values->n_buffers != 2");
+                    return 1;
+                }
+
+                current_term = values_from_buffer(
+                    env,
+                    offset,
+                    count,
+                    (const uint8_t *)values->buffers[bitmap_buffer_index],
+                    (const value_type *)values->buffers[data_buffer_index],
+                    enif_make_int64
                 );
             }
         } else {

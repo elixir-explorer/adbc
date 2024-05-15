@@ -539,6 +539,42 @@ int do_get_list_timestamp(ErlNifEnv *env, ERL_NIF_TERM list, bool nullable, Arro
     }
 }
 
+int get_list_duration(ErlNifEnv *env, ERL_NIF_TERM list, bool nullable, const std::function<void(int64_t val, bool is_nil)> &callback) {
+    ERL_NIF_TERM head, tail;
+    tail = list;
+    while (enif_get_list_cell(env, tail, &head, &tail)) {
+        if (enif_is_identical(head, kAtomNil)) {
+            callback(0, true);
+        } else {
+            int64_t val;
+            if (erlang::nif::get(env, head, &val)) {
+                callback(val, false);
+            } else {
+                return 1;
+            }
+        }
+    }
+    return 0;
+}
+
+int do_get_list_duration(ErlNifEnv *env, ERL_NIF_TERM list, bool nullable, ArrowType nanoarrow_type, enum ArrowTimeUnit time_unit, struct ArrowArray* array_out, struct ArrowSchema* schema_out, struct ArrowError* error_out) {
+    NANOARROW_RETURN_NOT_OK(ArrowSchemaSetTypeDateTime(schema_out, nanoarrow_type, time_unit, NULL));
+    NANOARROW_RETURN_NOT_OK(ArrowArrayInitFromSchema(array_out, schema_out, error_out));
+    NANOARROW_RETURN_NOT_OK(ArrowArrayStartAppending(array_out));
+    if (nullable) {
+        return get_list_duration(env, list, nullable, [&array_out](int64_t val, bool is_nil) -> void {
+            ArrowArrayAppendInt(array_out, val);
+            if (is_nil) {
+                ArrowArrayAppendNull(array_out, 1);
+            }
+        });
+    } else {
+        return get_list_duration(env, list, nullable, [&array_out](int64_t val, bool) -> void {
+            ArrowArrayAppendInt(array_out, val);
+        });
+    }
+}
+
 // non-zero return value indicating errors
 int adbc_column_to_adbc_field(ErlNifEnv *env, ERL_NIF_TERM adbc_buffer, struct ArrowArray* array_out, struct ArrowSchema* schema_out, struct ArrowError* error_out) {
     array_out->release = NULL;
@@ -665,17 +701,31 @@ int adbc_column_to_adbc_field(ErlNifEnv *env, ERL_NIF_TERM adbc_buffer, struct A
         ret = do_get_list_date(env, data_term, nullable, NANOARROW_TYPE_DATE64, array_out, schema_out, error_out);
     } else if (enif_is_identical(type_term, kAdbcColumnTypeBool)) {
         ret = do_get_list_boolean(env, data_term, nullable, NANOARROW_TYPE_BOOL, array_out, schema_out, error_out);
-    } else if (enif_is_tuple(env, type_term)) {
-        // NANOARROW_TYPE_TIME32
-        // NANOARROW_TYPE_TIME64
+    } else if (enif_is_tuple(env, type_term)) {        
         if (enif_is_identical(type_term, kAdbcColumnTypeTime32Seconds)) {
+            // NANOARROW_TYPE_TIME32
             ret = do_get_list_time(env, data_term, nullable, NANOARROW_TYPE_TIME32, NANOARROW_TIME_UNIT_SECOND, 1000000000, array_out, schema_out, error_out);
         } else if (enif_is_identical(type_term, kAdbcColumnTypeTime32Milliseconds)) {
+            // NANOARROW_TYPE_TIME32
             ret = do_get_list_time(env, data_term, nullable, NANOARROW_TYPE_TIME32, NANOARROW_TIME_UNIT_MILLI, 1000000, array_out, schema_out, error_out);
         } else if (enif_is_identical(type_term, kAdbcColumnTypeTime64Microseconds)) {
+            // NANOARROW_TYPE_TIME64
             ret = do_get_list_time(env, data_term, nullable, NANOARROW_TYPE_TIME64, NANOARROW_TIME_UNIT_MICRO, 1000, array_out, schema_out, error_out);
         } else if (enif_is_identical(type_term, kAdbcColumnTypeTime64Nanoseconds)) {
+            // NANOARROW_TYPE_TIME64
             ret = do_get_list_time(env, data_term, nullable, NANOARROW_TYPE_TIME64, NANOARROW_TIME_UNIT_NANO, 1, array_out, schema_out, error_out);
+        } else if (enif_is_identical(type_term, kAdbcColumnTypeDurationSeconds)) {
+            // NANOARROW_TYPE_DURATION
+            ret = do_get_list_duration(env, data_term, nullable, NANOARROW_TYPE_DURATION, NANOARROW_TIME_UNIT_SECOND, array_out, schema_out, error_out);
+        } else if (enif_is_identical(type_term, kAdbcColumnTypeDurationMilliseconds)) {
+            // NANOARROW_TYPE_DURATION
+            ret = do_get_list_duration(env, data_term, nullable, NANOARROW_TYPE_DURATION, NANOARROW_TIME_UNIT_MILLI, array_out, schema_out, error_out);
+        } else if (enif_is_identical(type_term, kAdbcColumnTypeDurationMicroseconds)) {
+            // NANOARROW_TYPE_DURATION
+            ret = do_get_list_duration(env, data_term, nullable, NANOARROW_TYPE_DURATION, NANOARROW_TIME_UNIT_MICRO, array_out, schema_out, error_out);
+        } else if (enif_is_identical(type_term, kAdbcColumnTypeDurationNanoseconds)) {
+            // NANOARROW_TYPE_DURATION
+            ret = do_get_list_duration(env, data_term, nullable, NANOARROW_TYPE_DURATION, NANOARROW_TIME_UNIT_NANO, array_out, schema_out, error_out);
         } else {
             const ERL_NIF_TERM *tuple = nullptr;
             int arity;

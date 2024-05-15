@@ -796,6 +796,7 @@ static int on_load(ErlNifEnv *env, void **, ERL_NIF_TERM) {
     kAtomMicroseconds = erlang::nif::atom(env, "microseconds");
     kAtomNanoseconds = erlang::nif::atom(env, "nanoseconds");
     kAtomTimestamp = erlang::nif::atom(env, "timestamp");
+    kAtomDecimal = erlang::nif::atom(env, "decimal");
 
     kAtomCalendarKey = erlang::nif::atom(env, "calendar");
     kAtomCalendarISO = erlang::nif::atom(env, "Elixir.Calendar.ISO");

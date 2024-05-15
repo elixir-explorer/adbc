@@ -93,6 +93,46 @@ template <typename M, typename OffsetT> static ERL_NIF_TERM strings_from_buffer(
     return strings_from_buffer(env, 0, length, validity_bitmap, offsets_buffer, value_buffer, value_to_nif);
 }
 
+template <typename M>
+static ERL_NIF_TERM fixed_size_binary_from_buffer(
+    ErlNifEnv *env,
+    int64_t element_offset,
+    int64_t element_count,
+    size_t element_bytes,
+    const uint8_t * validity_bitmap,
+    const uint8_t* value_buffer,
+    const M& value_to_nif) {
+    std::vector<ERL_NIF_TERM> values(element_count);
+    if (validity_bitmap == nullptr) {
+        for (int64_t i = element_offset; i < element_offset + element_count; i++) {
+            values[i - element_offset] = value_to_nif(env, &value_buffer[element_bytes * i]);
+        }
+    } else {
+        int64_t index = 0;
+        for (int64_t i = element_offset; i < element_offset + element_count; i++) {
+            uint8_t vbyte = validity_bitmap[i / 8];
+            if (vbyte & (1 << (i % 8))) {
+                values[i - element_offset] = value_to_nif(env, &value_buffer[element_bytes * index]);
+                index++;
+            } else {
+                values[i - element_offset] = kAtomNil;
+            }
+        }
+    }
+
+    return enif_make_list_from_array(env, values.data(), (unsigned)values.size());
+}
+
+template <typename M> static ERL_NIF_TERM fixed_size_binary_from_buffer(
+    ErlNifEnv *env,
+    int64_t length,
+    size_t element_bytes,
+    const uint8_t * validity_bitmap,
+    const uint8_t* value_buffer,
+    const M& value_to_nif) {
+    return fixed_size_binary_from_buffer(env, 0, length, element_bytes, validity_bitmap, value_buffer, value_to_nif);
+}
+
 int get_arrow_array_children_as_list(ErlNifEnv *env, struct ArrowSchema * schema, struct ArrowArray * values, int64_t offset, int64_t count, uint64_t level, std::vector<ERL_NIF_TERM> &children, ERL_NIF_TERM &error) {
     if (schema->n_children > 0 && schema->children == nullptr) {
         error = erlang::nif::error(env, "invalid ArrowSchema, schema->children == nullptr, however, schema->n_children > 0");
@@ -777,6 +817,53 @@ int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct 
             // NANOARROW_TYPE_SPARSE_UNION
             term_type = kAdbcColumnTypeSparseUnion;
             children_term = get_arrow_array_sparse_union_children(env, schema, values, offset, count, level);
+        } else if (strncmp("d:", format, 2) == 0) {
+            // NANOARROW_TYPE_DECIMAL128
+            // NANOARROW_TYPE_DECIMAL256
+            //
+            // format should match `d:P,S[,N]`
+            // where P is precision, S is scale, N is bits
+            // N is optional and defaults to 128
+            int precision = 0;
+            int scale = 0;
+            int bits = 128;
+            int * d[3] = {&precision, &scale, &bits};
+            int index = 0;
+            for (size_t i = 2; i < format_len; i++) {
+                if (format[i] == ',') {
+                    if (index < 2) {
+                        index++;
+                    } else {
+                        format_processed = false;
+                        break;
+                    }
+                    continue;
+                }
+
+                *d[index] = *d[index] * 10 + (format[i] - '0');
+            }
+
+            if (format_processed) {
+                term_type = kAdbcColumnTypeDecimal(bits, precision, scale);
+                if (count == -1) count = values->length;
+                if (values->n_buffers != 2) {
+                    char buf[256] = { '\0' };
+                    snprintf(buf, 255, "invalid n_buffers value for ArrowArray (format=%s), values->n_buffers != 2", schema->format);
+                    error = erlang::nif::error(env, erlang::nif::make_binary(env, buf));
+                    return 1;
+                }
+                current_term = fixed_size_binary_from_buffer(
+                    env,
+                    offset,
+                    count,
+                    bits / 8,
+                    (const uint8_t *)values->buffers[bitmap_buffer_index],
+                    (const uint8_t *)values->buffers[data_buffer_index],
+                    [&](ErlNifEnv *env, const uint8_t * val) -> ERL_NIF_TERM {
+                        return erlang::nif::make_binary(env, (const char *)val, bits / 8);
+                    }
+                );
+            }
         } else if (strncmp("td", format, 2) == 0) {
             char unit = format[2];
 

@@ -194,12 +194,12 @@ defmodule AdbcTest do
                    data: [~N[2023-03-01 18:23:45.000000]]
                  },
                  %Adbc.Column{
-                  name: "datetime_tz_offset",
-                  type: {:timestamp, :microseconds, "UTC"},
-                  nullable: true,
-                  metadata: nil,
-                  data: [~N[2023-03-01 08:23:45.000000]]
-                },
+                   name: "datetime_tz_offset",
+                   type: {:timestamp, :microseconds, "UTC"},
+                   nullable: true,
+                   metadata: nil,
+                   data: [~N[2023-03-01 08:23:45.000000]]
+                 },
                  %Adbc.Column{
                    name: "date",
                    type: :date32,
@@ -227,8 +227,86 @@ defmodule AdbcTest do
   end
 
   describe "duckdb smoke tests" do
-    test "starts a database" do
-      assert {:ok, _} = Database.start_link(driver: :duckdb)
+    @describetag :duckdb
+
+    setup do
+      db = start_supervised!({Database, driver: :duckdb})
+      conn = start_supervised!({Connection, database: db})
+
+      %{db: db, conn: conn}
+    end
+
+    test "decimal128", %{conn: conn} do
+      assert {
+               :ok,
+               %Adbc.Result{
+                 data: [
+                   %Adbc.Column{
+                     name: "d1",
+                     type: {:decimal, 128, 38, 37},
+                     nullable: true,
+                     metadata: nil,
+                     data: [Decimal.new("1.2345678912345678912345678912345678912")]
+                   },
+                   %Adbc.Column{
+                     name: "d2",
+                     type: {:decimal, 128, 38, 37},
+                     nullable: true,
+                     metadata: nil,
+                     data: [Decimal.new("-1.2345678912345678912345678912345678912")]
+                   },
+                   %Adbc.Column{
+                     name: "d3",
+                     type: :f64,
+                     nullable: true,
+                     metadata: nil,
+                     data: [1.234567891234568]
+                   },
+                   %Adbc.Column{
+                     name: "d4",
+                     type: :f64,
+                     nullable: true,
+                     metadata: nil,
+                     data: [-1.234567891234568]
+                   },
+                   %Adbc.Column{
+                     name: "d5",
+                     type: {:decimal, 128, 38, 1},
+                     nullable: true,
+                     metadata: nil,
+                     data: [Decimal.new("9876543210987654321098765432109876543.2")]
+                   },
+                   %Adbc.Column{
+                     name: "d6",
+                     type: {:decimal, 128, 38, 1},
+                     nullable: true,
+                     metadata: nil,
+                     data: [Decimal.new("-9876543210987654321098765432109876543.2")]
+                   },
+                   %Adbc.Column{
+                    name: "d7",
+                    type: {:decimal, 128, 38, 37},
+                    nullable: true,
+                    metadata: nil,
+                    data: [Decimal.new("1E-37")]
+                  }
+                 ],
+                 num_rows: 0
+               }
+             } ==
+               Adbc.Connection.query(
+                 conn,
+                 """
+                 SELECT
+                 1.2345678912345678912345678912345678912 as d1,
+                 -1.2345678912345678912345678912345678912 as d2,
+                 1.23456789123456789123456789123456789123 as d3,
+                 -1.23456789123456789123456789123456789123 as d4,
+                 9876543210987654321098765432109876543.2 as d5,
+                 -9876543210987654321098765432109876543.2 as d6,
+                 0.0000000000000000000000000000000000001 as d7,
+                 """
+               )
     end
   end
 end

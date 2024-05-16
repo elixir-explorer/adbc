@@ -483,6 +483,7 @@ int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct 
         return 1;
     }
 
+    char err_msg_buf[256] = { '\0' };
     const char* format = schema->format ? schema->format : "";
     const char* name = schema->name ? schema->name : "";
     term_type = kAtomNil;
@@ -847,9 +848,8 @@ int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct 
                 term_type = kAdbcColumnTypeDecimal(bits, precision, scale);
                 if (count == -1) count = values->length;
                 if (values->n_buffers != 2) {
-                    char buf[256] = { '\0' };
-                    snprintf(buf, 255, "invalid n_buffers value for ArrowArray (format=%s), values->n_buffers != 2", schema->format);
-                    error = erlang::nif::error(env, erlang::nif::make_binary(env, buf));
+                    snprintf(err_msg_buf, 255, "invalid n_buffers value for ArrowArray (format=%s), values->n_buffers != 2", schema->format);
+                    error = erlang::nif::error(env, erlang::nif::make_binary(env, err_msg_buf));
                     return 1;
                 }
                 current_term = fixed_size_binary_from_buffer(
@@ -1152,9 +1152,8 @@ int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct 
     }
 
     if (!format_processed) {
-        char buf[256] = { '\0' };
-        snprintf(buf, 255, "not yet implemented for format: `%s`", schema->format);
-        error = erlang::nif::error(env, erlang::nif::make_binary(env, buf));
+        snprintf(err_msg_buf, 255, "not yet implemented for format: `%s`", schema->format);
+        error = erlang::nif::error(env, erlang::nif::make_binary(env, err_msg_buf));
         return 1;
         // printf("not implemented for format: `%s`\r\n", schema->format);
         // printf("length: %lld\r\n", values->length);

@@ -144,36 +144,24 @@ int get_list_decimal(ErlNifEnv *env, ERL_NIF_TERM list, bool nullable, ArrowType
     while (enif_get_list_cell(env, tail, &head, &tail)) {
         struct ArrowDecimal val{};
         ArrowDecimalInit(&val, bitwidth, precision, scale);
-        if (enif_is_identical(head, kAtomNil)) {
-            callback(&val, true);
-        } else if (enif_is_map(env, head)) {
-            ERL_NIF_TERM struct_name_term, coef_term, exp_term, sign_term;
-            if (!enif_get_map_value(env, head, kAtomStructKey, &struct_name_term)) {
-                return kErrorBufferGetMapValue;
+        ErlNifBinary bytes;
+        if (enif_is_binary(env, head) && enif_inspect_binary(env, head, &bytes)) {
+            if (nanoarrow_type == NANOARROW_TYPE_DECIMAL128) {
+                if (bytes.size != 16) {
+                    return 1;
+                }
+                ArrowDecimalSetBytes(&val, (const uint8_t *)bytes.data);
+            } else if (nanoarrow_type == NANOARROW_TYPE_DECIMAL256) {
+                if (bytes.size != 32) {
+                    return 1;
+                }
+                ArrowDecimalSetBytes(&val, (const uint8_t *)bytes.data);
+            } else {
+                return 1;
             }
-            if (!enif_is_identical(struct_name_term, kAtomDecimalModule)) {
-                return kErrorBufferWrongStruct;
-            }
-
-            if (!enif_get_map_value(env, head, kAtomCoefKey, &coef_term)) {
-                return kErrorBufferGetMapValue;
-            }
-            if (!enif_get_map_value(env, head, kAtomExpKey, &exp_term)) {
-                return kErrorBufferGetMapValue;
-            }
-            if (!enif_get_map_value(env, head, kAtomSignKey, &sign_term)) {
-                return kErrorBufferGetMapValue;
-            }
-
-            int64_t coef;
-            int64_t exp;
-            int sign;
-            if (!erlang::nif::get(env, coef_term, &coef) || !erlang::nif::get(env, exp_term, &exp) || !erlang::nif::get(env, sign_term, &sign)) {
-                return kErrorBufferGetMapValue;
-            }
-            
-            // todo: translate to ArrowDecimal
             callback(&val, false);
+        } else if (nullable && enif_is_identical(head, kAtomNil)) {
+            callback(&val, true);
         } else {
             return 1;
         }

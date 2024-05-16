@@ -813,11 +813,6 @@ static int on_load(ErlNifEnv *env, void **, ERL_NIF_TERM) {
     kAtomSecondKey = erlang::nif::atom(env, "second");
     kAtomMicrosecondKey = erlang::nif::atom(env, "microsecond");
 
-    kAtomDecimalModule = erlang::nif::atom(env, "Elixir.Decimal");
-    kAtomCoefKey = erlang::nif::atom(env, "coef");
-    kAtomExpKey = erlang::nif::atom(env, "exp");
-    kAtomSignKey = erlang::nif::atom(env, "sign");
-
     kAtomAdbcColumnModule = erlang::nif::atom(env, "Elixir.Adbc.Column");
     kAtomNameKey = erlang::nif::atom(env, "name");
     kAtomTypeKey = erlang::nif::atom(env, "type");

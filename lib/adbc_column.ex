@@ -467,7 +467,13 @@ defmodule Adbc.Column do
   """
   @spec decimal128([Decimal.t()], integer(), integer(), Keyword.t()) :: %Adbc.Column{}
   def decimal128(data, precision, scale, opts \\ []) do
-    column({:decimal, 128, precision, scale}, data, opts)
+    bitwidth = 128
+
+    column(
+      {:decimal, bitwidth, precision, scale},
+      preprocess_decimal(bitwidth, precision, scale, data, []),
+      opts
+    )
   end
 
   @doc """
@@ -488,7 +494,48 @@ defmodule Adbc.Column do
   """
   @spec decimal256([Decimal.t()], integer(), integer(), Keyword.t()) :: %Adbc.Column{}
   def decimal256(data, precision, scale, opts \\ []) do
-    column({:decimal, 256, precision, scale}, data, opts)
+    bitwidth = 256
+
+    column(
+      {:decimal, bitwidth, precision, scale},
+      preprocess_decimal(bitwidth, precision, scale, data, []),
+      opts
+    )
+  end
+
+  defp preprocess_decimal(_bitwidth, _precision, _scale, [], acc), do: Enum.reverse(acc)
+
+  defp preprocess_decimal(bitwidth, precision, scale, [nil | rest], acc) do
+    preprocess_decimal(bitwidth, precision, scale, rest, [nil | acc])
+  end
+
+  defp preprocess_decimal(
+         bitwidth,
+         _precision,
+         scale,
+         [%Decimal{exp: exp} = decimal | _rest],
+         _acc
+       )
+       when -exp > scale do
+    raise Adbc.Error,
+          "`#{Decimal.to_string(decimal)}` with exponent `#{exp}` cannot be represented as a valid decimal#{Integer.to_string(bitwidth)} number with scale value `#{scale}`"
+  end
+
+  defp preprocess_decimal(bitwidth, precision, scale, [%Decimal{exp: exp} = decimal | rest], acc)
+       when -exp <= scale do
+    if Decimal.inf?(decimal) or Decimal.nan?(decimal) do
+      raise Adbc.Error,
+            "`#{Decimal.to_string(decimal)}` cannot be represented as a valid decimal#{Integer.to_string(bitwidth)} number"
+    else
+      if Decimal.coef_length(decimal.coef) > precision do
+        raise Adbc.Error,
+              "`#{Decimal.to_string(decimal)}` cannot be fitted into a decimal#{Integer.to_string(bitwidth)} with the specified precision #{Integer.to_string(precision)}"
+      else
+        coef = trunc(decimal.coef * decimal.sign * :math.pow(10, exp + scale))
+        acc = [<<coef::signed-integer-little-size(bitwidth)>> | acc]
+        preprocess_decimal(bitwidth, precision, scale, rest, acc)
+      end
+    end
   end
 
   @doc """

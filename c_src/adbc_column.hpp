@@ -128,19 +128,23 @@ int do_get_list_half_float(ErlNifEnv *env, ERL_NIF_TERM list, bool nullable, Arr
     auto storage_type = private_data->storage_type;
     private_data->storage_type = NANOARROW_TYPE_UINT16;
     NANOARROW_RETURN_NOT_OK(ArrowArrayStartAppending(array_out));
+    int ret;
     if (nullable) {
-        return get_list_float(env, list, nullable, [&array_out](double val, bool is_nil) -> void {
+        ret = get_list_float(env, list, nullable, [&array_out](double val, bool is_nil) -> void {
             ArrowArrayAppendUInt(array_out, float_to_float16(val));
             if (is_nil) {
                 ArrowArrayAppendNull(array_out, 1);
             }
         });
+        private_data->storage_type = storage_type;
+        return ret;
     } else {
-        return get_list_float(env, list, nullable, [&array_out](double val, bool) -> void {
+        ret = get_list_float(env, list, nullable, [&array_out](double val, bool) -> void {
             ArrowArrayAppendUInt(array_out, float_to_float16(val));
         });
+        private_data->storage_type = storage_type;
+        return ret;
     }
-    private_data->storage_type = storage_type;
 }
 
 int do_get_list_float(ErlNifEnv *env, ERL_NIF_TERM list, bool nullable, ArrowType nanoarrow_type, struct ArrowArray* array_out, struct ArrowSchema* schema_out, struct ArrowError* error_out) {

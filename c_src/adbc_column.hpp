@@ -112,11 +112,18 @@ int get_list_float(ErlNifEnv *env, ERL_NIF_TERM list, bool nullable, const std::
         if (!erlang::nif::get(env, head, &val)) {
             if (nullable && enif_is_identical(head, kAtomNil)) {
                 callback(0, true);
+            } else if (enif_is_identical(head, kAtomInfinity)) {
+                callback(std::numeric_limits<double>::infinity(), false);
+            } else if (enif_is_identical(head, kAtomNegInfinity)) {
+                callback(-std::numeric_limits<double>::infinity(), false);
+            } else if (enif_is_identical(head, kAtomNaN)) {
+                callback(std::numeric_limits<double>::quiet_NaN(), false);
             } else {
                 return 1;
             }
+        } else {
+            callback(val, false);
         }
-        callback(val, false);
     }
     return 0;
 }

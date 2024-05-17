@@ -7,6 +7,8 @@
 
 // Function to convert float16 (IEEE 754 half-precision) to float
 float float16_to_float(uint16_t value) {
+    static_assert(std::numeric_limits<float>::is_iec559, "IEEE 754 required");
+    
     uint16_t sign = (value >> 15) & 0x1;
     uint16_t exp = (value >> 10) & 0x1F;
     uint16_t mant = value & 0x3FF;
@@ -43,6 +45,8 @@ float float16_to_float(uint16_t value) {
 
 // Function to convert float to float16 (IEEE 754 half-precision)
 uint16_t float_to_float16(float value) {
+    static_assert(std::numeric_limits<float>::is_iec559, "IEEE 754 required");
+
     uint32_t fbits;
     memcpy(&fbits, &value, sizeof(fbits));
     

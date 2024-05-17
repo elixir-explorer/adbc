@@ -786,6 +786,9 @@ static int on_load(ErlNifEnv *env, void **, ERL_NIF_TERM) {
     kAtomNil = erlang::nif::atom(env, "nil");
     kAtomTrue = erlang::nif::atom(env, "true");
     kAtomFalse = erlang::nif::atom(env, "false");
+    kAtomInfinity = erlang::nif::atom(env, "infinity");
+    kAtomNegInfinity = erlang::nif::atom(env, "neg_infinity");
+    kAtomNaN = erlang::nif::atom(env, "nan");
     kAtomEndOfSeries = erlang::nif::atom(env, "end_of_series");
     kAtomStructKey = erlang::nif::atom(env, "__struct__");
     kAtomTime32 = erlang::nif::atom(env, "time32");

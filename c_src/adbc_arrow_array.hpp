@@ -668,8 +668,19 @@ int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct 
                 count,
                 (const uint8_t *)values->buffers[bitmap_buffer_index],
                 (const value_type *)values->buffers[data_buffer_index],
-                [](ErlNifEnv *env, const uint16_t val) -> ERL_NIF_TERM {
-                    return enif_make_double(env, float16_to_float(val));
+                [](ErlNifEnv *env, const uint16_t u16) -> ERL_NIF_TERM {
+                    float val = float16_to_float(u16);
+                    if (std::isnan(val)) {
+                        return kAtomNaN;
+                    } else if (std::isinf(val)) {
+                        if (val > 0) {
+                            return kAtomInfinity;
+                        } else {
+                            return kAtomNegInfinity;
+                        }
+                    } else {
+                        return enif_make_double(env, val);
+                    }
                 }
             );
         } else if (format[0] == 'f') {
@@ -687,7 +698,19 @@ int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct 
                 count,
                 (const uint8_t *)values->buffers[bitmap_buffer_index],
                 (const value_type *)values->buffers[data_buffer_index],
-                enif_make_double
+                [](ErlNifEnv *env, double val) -> ERL_NIF_TERM {
+                    if (std::isnan(val)) {
+                        return kAtomNaN;
+                    } else if (std::isinf(val)) {
+                        if (val > 0) {
+                            return kAtomInfinity;
+                        } else {
+                            return kAtomNegInfinity;
+                        }
+                    } else {
+                        return enif_make_double(env, val);
+                    }
+                }
             );
         } else if (format[0] == 'g') {
             // NANOARROW_TYPE_DOUBLE
@@ -704,7 +727,19 @@ int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct 
                 count,
                 (const uint8_t *)values->buffers[bitmap_buffer_index],
                 (const value_type *)values->buffers[data_buffer_index],
-                enif_make_double
+                [](ErlNifEnv *env, double val) -> ERL_NIF_TERM {
+                    if (std::isnan(val)) {
+                        return kAtomNaN;
+                    } else if (std::isinf(val)) {
+                        if (val > 0) {
+                            return kAtomInfinity;
+                        } else {
+                            return kAtomNegInfinity;
+                        }
+                    } else {
+                        return enif_make_double(env, val);
+                    }
+                }
             );
         } else if (format[0] == 'b') {
             // NANOARROW_TYPE_BOOL

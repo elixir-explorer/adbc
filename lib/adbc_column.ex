@@ -123,7 +123,7 @@ defmodule Adbc.Column do
 
   ## Examples
 
-      iex> Adbc.Buffer.boolean([true, false, true])
+      iex> Adbc.Column.boolean([true, false, true])
       %Adbc.Column{
         name: nil,
         type: :boolean,
@@ -154,7 +154,7 @@ defmodule Adbc.Column do
 
   ## Examples
 
-      iex> Adbc.Buffer.u8([1, 2, 3])
+      iex> Adbc.Column.u8([1, 2, 3])
       %Adbc.Column{
         name: nil,
         type: :u8,
@@ -185,7 +185,7 @@ defmodule Adbc.Column do
 
   ## Examples
 
-      iex> Adbc.Buffer.u16([1, 2, 3])
+      iex> Adbc.Column.u16([1, 2, 3])
       %Adbc.Column{
         name: nil,
         type: :u16,
@@ -216,7 +216,7 @@ defmodule Adbc.Column do
 
   ## Examples
 
-      iex> Adbc.Buffer.u32([1, 2, 3])
+      iex> Adbc.Column.u32([1, 2, 3])
       %Adbc.Column{
         name: nil,
         type: :u32,
@@ -247,7 +247,7 @@ defmodule Adbc.Column do
 
   ## Examples
 
-      iex> Adbc.Buffer.u32([1, 2, 3])
+      iex> Adbc.Column.u32([1, 2, 3])
       %Adbc.Column{
         name: nil,
         type: :u32,
@@ -278,7 +278,7 @@ defmodule Adbc.Column do
 
   ## Examples
 
-      iex> Adbc.Buffer.i8([1, 2, 3])
+      iex> Adbc.Column.i8([1, 2, 3])
       %Adbc.Column{
         name: nil,
         type: :i8,
@@ -309,7 +309,7 @@ defmodule Adbc.Column do
 
   ## Examples
 
-      iex> Adbc.Buffer.i16([1, 2, 3])
+      iex> Adbc.Column.i16([1, 2, 3])
       %Adbc.Column{
         name: nil,
         type: :i16,
@@ -340,7 +340,7 @@ defmodule Adbc.Column do
 
   ## Examples
 
-      iex> Adbc.Buffer.i32([1, 2, 3])
+      iex> Adbc.Column.i32([1, 2, 3])
       %Adbc.Column{
         name: nil,
         type: :i32,
@@ -371,7 +371,7 @@ defmodule Adbc.Column do
 
   ## Examples
 
-      iex> Adbc.Buffer.i64([1, 2, 3])
+      iex> Adbc.Column.i64([1, 2, 3])
       %Adbc.Column{
         name: nil,
         type: :i64,
@@ -403,7 +403,7 @@ defmodule Adbc.Column do
 
   ## Examples
 
-      iex> Adbc.Buffer.f16([1.0, 2.0, 3.0])
+      iex> Adbc.Column.f16([1.0, 2.0, 3.0])
       %Adbc.Column{
         name: nil,
         type: :f16,
@@ -434,7 +434,7 @@ defmodule Adbc.Column do
 
   ## Examples
 
-      iex> Adbc.Buffer.f32([1.0, 2.0, 3.0])
+      iex> Adbc.Column.f32([1.0, 2.0, 3.0])
       %Adbc.Column{
         name: nil,
         type: :f32,
@@ -465,7 +465,7 @@ defmodule Adbc.Column do
 
   ## Examples
 
-      iex> Adbc.Buffer.f64([1.0, 2.0, 3.0])
+      iex> Adbc.Column.f64([1.0, 2.0, 3.0])
       %Adbc.Column{
         name: nil,
         type: :f64,
@@ -603,7 +603,7 @@ defmodule Adbc.Column do
 
   ## Examples
 
-      iex> Adbc.Buffer.string(["a", "ab", "abc"])
+      iex> Adbc.Column.string(["a", "ab", "abc"])
       %Adbc.Column{
         name: nil,
         type: :string,
@@ -636,7 +636,7 @@ defmodule Adbc.Column do
 
   ## Examples
 
-      iex> Adbc.Buffer.large_string(["a", "ab", "abc"])
+      iex> Adbc.Column.large_string(["a", "ab", "abc"])
       %Adbc.Column{
         name: nil,
         type: :large_string,
@@ -667,7 +667,7 @@ defmodule Adbc.Column do
 
   ## Examples
 
-      iex> Adbc.Buffer.binary([<<0>>, <<1>>, <<2>>])
+      iex> Adbc.Column.binary([<<0>>, <<1>>, <<2>>])
       %Adbc.Column{
         name: nil,
         type: :binary,
@@ -700,7 +700,7 @@ defmodule Adbc.Column do
 
   ## Examples
 
-      iex> Adbc.Buffer.large_binary([<<0>>, <<1>>, <<2>>])
+      iex> Adbc.Column.large_binary([<<0>>, <<1>>, <<2>>])
       %Adbc.Column{
         name: nil,
         type: :large_binary,
@@ -734,7 +734,7 @@ defmodule Adbc.Column do
 
   ## Examples
 
-      iex> Adbc.Buffer.fixed_size_binary([<<0>>, <<1>>, <<2>>], 1)
+      iex> Adbc.Column.fixed_size_binary([<<0>>, <<1>>, <<2>>], 1)
       %Adbc.Column{
         name: nil,
         type: {:fixed_size_binary, 1},

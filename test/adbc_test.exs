@@ -224,6 +224,33 @@ defmodule AdbcTest do
                ]
              } = Connection.query!(conn, query)
     end
+
+    test "inf/-inf/nan", %{db: _, conn: conn} do
+      assert {
+               :ok,
+               %Adbc.Result{
+                 data: [
+                   %Adbc.Column{
+                     data: [
+                       %Adbc.Column{
+                         name: "item",
+                         type: :string,
+                         nullable: true,
+                         metadata: %{
+                           "ADBC:postgresql:typname" => "numeric"
+                         },
+                         data: ["inf", "-inf", "4.2", "nan"]
+                       }
+                     ],
+                     metadata: nil,
+                     name: "array",
+                     nullable: true,
+                     type: :list
+                   }
+                 ]
+               }
+             } = Adbc.Connection.query(conn, "SELECT ARRAY['infinity'::NUMERIC, '-infinity'::NUMERIC, 4.2::NUMERIC, 'nan'::NUMERIC];")
+    end
   end
 
   describe "duckdb smoke tests" do
@@ -284,12 +311,12 @@ defmodule AdbcTest do
                      data: [Decimal.new("-9876543210987654321098765432109876543.2")]
                    },
                    %Adbc.Column{
-                    name: "d7",
-                    type: {:decimal, 128, 38, 37},
-                    nullable: true,
-                    metadata: nil,
-                    data: [Decimal.new("1E-37")]
-                  }
+                     name: "d7",
+                     type: {:decimal, 128, 38, 37},
+                     nullable: true,
+                     metadata: nil,
+                     data: [Decimal.new("1E-37")]
+                   }
                  ],
                  num_rows: 0
                }

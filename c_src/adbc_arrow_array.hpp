@@ -2,11 +2,13 @@
 #pragma once
 
 #include <stdio.h>
+#include <cmath>
 #include <cstdbool>
 #include <cstdint>
 #include <vector>
 #include <adbc.h>
 #include <erl_nif.h>
+#include "adbc_half_float.hpp"
 
 static int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct ArrowArray * values, uint64_t level, std::vector<ERL_NIF_TERM> &out_terms, ERL_NIF_TERM &value_type, ERL_NIF_TERM &metadata, ERL_NIF_TERM &error, bool *end_of_series = nullptr);
 static int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct ArrowArray * values, int64_t offset, int64_t count, int64_t level, std::vector<ERL_NIF_TERM> &out_terms, ERL_NIF_TERM &value_type, ERL_NIF_TERM &metadata, ERL_NIF_TERM &error, bool *end_of_series = nullptr);
@@ -650,6 +652,25 @@ int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct 
                 (const uint8_t *)values->buffers[bitmap_buffer_index],
                 (const value_type *)values->buffers[data_buffer_index],
                 enif_make_uint64
+            );
+        } else if (format[0] == 'e') {
+            // NANOARROW_TYPE_HALF_FLOAT
+            using value_type = uint16_t;
+            term_type = kAdbcColumnTypeF16;
+            if (count == -1) count = values->length;
+            if (values->n_buffers != 2) {
+                error = erlang::nif::error(env, "invalid n_buffers value for ArrowArray (format=e), values->n_buffers != 2");
+                return 1;
+            }
+            current_term = values_from_buffer(
+                env,
+                offset,
+                count,
+                (const uint8_t *)values->buffers[bitmap_buffer_index],
+                (const value_type *)values->buffers[data_buffer_index],
+                [](ErlNifEnv *env, const uint16_t val) -> ERL_NIF_TERM {
+                    return enif_make_double(env, float16_to_float(val));
+                }
             );
         } else if (format[0] == 'f') {
             // NANOARROW_TYPE_FLOAT

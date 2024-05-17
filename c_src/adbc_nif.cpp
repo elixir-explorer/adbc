@@ -829,6 +829,7 @@ static int on_load(ErlNifEnv *env, void **, ERL_NIF_TERM) {
     kAdbcColumnTypeI16 = erlang::nif::atom(env, "i16");
     kAdbcColumnTypeI32 = erlang::nif::atom(env, "i32");
     kAdbcColumnTypeI64 = erlang::nif::atom(env, "i64");
+    kAdbcColumnTypeF16 = erlang::nif::atom(env, "f16");
     kAdbcColumnTypeF32 = erlang::nif::atom(env, "f32");
     kAdbcColumnTypeF64 = erlang::nif::atom(env, "f64");
     kAdbcColumnTypeStruct = erlang::nif::atom(env, "struct");

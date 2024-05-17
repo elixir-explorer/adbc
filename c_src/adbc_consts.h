@@ -51,6 +51,7 @@ static ERL_NIF_TERM kAdbcColumnTypeI8;
 static ERL_NIF_TERM kAdbcColumnTypeI16;
 static ERL_NIF_TERM kAdbcColumnTypeI32;
 static ERL_NIF_TERM kAdbcColumnTypeI64;
+static ERL_NIF_TERM kAdbcColumnTypeF16;
 static ERL_NIF_TERM kAdbcColumnTypeF32;
 static ERL_NIF_TERM kAdbcColumnTypeF64;
 static ERL_NIF_TERM kAdbcColumnTypeStruct;

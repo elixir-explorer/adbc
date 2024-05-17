@@ -388,6 +388,37 @@ defmodule Adbc.Column do
   end
 
   @doc """
+  A column that contains 16-bit half-precision floats.
+
+  ## Arguments
+
+  * `data`: A list of 32-bit single-precision float values (will be converted to 16-bit floats in C)
+  * `opts`: A keyword list of options
+
+  ## Options
+
+  * `:name` - The name of the column
+  * `:nullable` - A boolean value indicating whether the column is nullable
+  * `:metadata` - A map of metadata
+
+  ## Examples
+
+      iex> Adbc.Buffer.f16([1.0, 2.0, 3.0])
+      %Adbc.Column{
+        name: nil,
+        type: :f16,
+        nullable: false,
+        metadata: %{},
+        data: [1.0, 2.0, 3.0]
+      }
+
+  """
+  @spec f16([float], Keyword.t()) :: %Adbc.Column{}
+  def f16(data, opts \\ []) when is_list(data) and is_list(opts) do
+    column(:f16, data, opts)
+  end
+
+  @doc """
   A column that contains 32-bit single-precision floats.
 
   ## Arguments

@@ -9,6 +9,7 @@
 #include <adbc.h>
 #include <erl_nif.h>
 #include "adbc_consts.h"
+#include "adbc_half_float.hpp"
 #include "nif_utils.hpp"
 
 ERL_NIF_TERM make_adbc_column(ErlNifEnv *env, ERL_NIF_TERM name_term, ERL_NIF_TERM type_term, bool nullable, ERL_NIF_TERM metadata, ERL_NIF_TERM data) {
@@ -118,6 +119,28 @@ int get_list_float(ErlNifEnv *env, ERL_NIF_TERM list, bool nullable, const std::
         callback(val, false);
     }
     return 0;
+}
+
+int do_get_list_half_float(ErlNifEnv *env, ERL_NIF_TERM list, bool nullable, ArrowType nanoarrow_type, struct ArrowArray* array_out, struct ArrowSchema* schema_out, struct ArrowError* error_out) {
+    NANOARROW_RETURN_NOT_OK(ArrowSchemaSetType(schema_out, nanoarrow_type));
+    NANOARROW_RETURN_NOT_OK(ArrowArrayInitFromSchema(array_out, schema_out, error_out));
+    struct ArrowArrayPrivateData* private_data = (struct ArrowArrayPrivateData*)array_out->private_data;
+    auto storage_type = private_data->storage_type;
+    private_data->storage_type = NANOARROW_TYPE_UINT16;
+    NANOARROW_RETURN_NOT_OK(ArrowArrayStartAppending(array_out));
+    if (nullable) {
+        return get_list_float(env, list, nullable, [&array_out](double val, bool is_nil) -> void {
+            ArrowArrayAppendUInt(array_out, float_to_float16(val));
+            if (is_nil) {
+                ArrowArrayAppendNull(array_out, 1);
+            }
+        });
+    } else {
+        return get_list_float(env, list, nullable, [&array_out](double val, bool) -> void {
+            ArrowArrayAppendUInt(array_out, float_to_float16(val));
+        });
+    }
+    private_data->storage_type = storage_type;
 }
 
 int do_get_list_float(ErlNifEnv *env, ERL_NIF_TERM list, bool nullable, ArrowType nanoarrow_type, struct ArrowArray* array_out, struct ArrowSchema* schema_out, struct ArrowError* error_out) {
@@ -730,6 +753,8 @@ int adbc_column_to_adbc_field(ErlNifEnv *env, ERL_NIF_TERM adbc_buffer, struct A
         ret = do_get_list_integer<uint32_t>(env, data_term, nullable, NANOARROW_TYPE_UINT32, array_out, schema_out, error_out);
     } else if (enif_is_identical(type_term, kAdbcColumnTypeU64)) {
         ret = do_get_list_integer<uint64_t>(env, data_term, nullable, NANOARROW_TYPE_UINT64, array_out, schema_out, error_out);
+    } else if (enif_is_identical(type_term, kAdbcColumnTypeF16)) {
+        ret = do_get_list_half_float(env, data_term, nullable, NANOARROW_TYPE_HALF_FLOAT, array_out, schema_out, error_out);
     } else if (enif_is_identical(type_term, kAdbcColumnTypeF32)) {
         ret = do_get_list_float(env, data_term, nullable, NANOARROW_TYPE_FLOAT, array_out, schema_out, error_out);
     } else if (enif_is_identical(type_term, kAdbcColumnTypeF64)) {

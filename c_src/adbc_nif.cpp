@@ -797,6 +797,7 @@ static int on_load(ErlNifEnv *env, void **, ERL_NIF_TERM) {
     kAtomNanoseconds = erlang::nif::atom(env, "nanoseconds");
     kAtomTimestamp = erlang::nif::atom(env, "timestamp");
     kAtomDecimal = erlang::nif::atom(env, "decimal");
+    kAtomFixedSizeBinary = erlang::nif::atom(env, "fixed_size_binary");
 
     kAtomCalendarKey = erlang::nif::atom(env, "calendar");
     kAtomCalendarISO = erlang::nif::atom(env, "Elixir.Calendar.ISO");
@@ -839,7 +840,6 @@ static int on_load(ErlNifEnv *env, void **, ERL_NIF_TERM) {
     kAdbcColumnTypeLargeString = erlang::nif::atom(env, "large_string");
     kAdbcColumnTypeBinary = erlang::nif::atom(env, "binary");
     kAdbcColumnTypeLargeBinary = erlang::nif::atom(env, "large_binary");
-    kAdbcColumnTypeFixedSizeBinary = erlang::nif::atom(env, "fixed_size_binary");
     kAdbcColumnTypeDenseUnion = erlang::nif::atom(env, "dense_union");
     kAdbcColumnTypeSparseUnion = erlang::nif::atom(env, "sparse_union");
     kAdbcColumnTypeDate32 = erlang::nif::atom(env, "date32");

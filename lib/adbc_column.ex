@@ -60,7 +60,7 @@ defmodule Adbc.Column do
           | :large_string
           | :binary
           | :large_binary
-          | :fixed_size_binary
+          | {:fixed_size_binary, non_neg_integer()}
           | :date32
           | :date64
           | time32_t
@@ -674,6 +674,7 @@ defmodule Adbc.Column do
   ## Arguments
 
   * `data`: A list of binary values
+  * `nbytes`: The fixed size of the binary values in bytes
   * `opts`: A keyword list of options
 
   ## Options
@@ -684,19 +685,19 @@ defmodule Adbc.Column do
 
   ## Examples
 
-      iex> Adbc.Buffer.fixed_size_binary([<<0>>, <<1>>, <<2>>])
+      iex> Adbc.Buffer.fixed_size_binary([<<0>>, <<1>>, <<2>>], 1)
       %Adbc.Column{
         name: nil,
-        type: :fixed_size_binary,
+        type: {:fixed_size_binary, 1},
         nullable: false,
         metadata: %{},
         data: [<<0>>, <<1>>, <<2>>]
       }
 
   """
-  @spec fixed_size_binary([binary()], Keyword.t()) :: %Adbc.Column{}
-  def fixed_size_binary(data, opts \\ []) when is_list(data) and is_list(opts) do
-    column(:fixed_size_binary, data, opts)
+  @spec fixed_size_binary([binary() | nil], non_neg_integer(), Keyword.t()) :: %Adbc.Column{}
+  def fixed_size_binary(data, nbytes, opts \\ []) when is_list(data) and is_list(opts) do
+    column({:fixed_size_binary, nbytes}, data, opts)
   end
 
   @doc """

@@ -108,12 +108,10 @@ static ERL_NIF_TERM fixed_size_binary_from_buffer(
             values[i - element_offset] = value_to_nif(env, &value_buffer[element_bytes * i]);
         }
     } else {
-        int64_t index = 0;
         for (int64_t i = element_offset; i < element_offset + element_count; i++) {
             uint8_t vbyte = validity_bitmap[i / 8];
             if (vbyte & (1 << (i % 8))) {
-                values[i - element_offset] = value_to_nif(env, &value_buffer[element_bytes * index]);
-                index++;
+                values[i - element_offset] = value_to_nif(env, &value_buffer[element_bytes * i]);
             } else {
                 values[i - element_offset] = kAtomNil;
             }
@@ -803,13 +801,30 @@ int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct 
             // NANOARROW_TYPE_FIXED_SIZE_LIST
             term_type = kAdbcColumnTypeFixedSizeList;
             children_term = get_arrow_array_list_children(env, schema, values, offset, count, level);
-        } else if (format_len > 3 && strncmp("w:", format, 2) == 0) {
+        } else if (format_len >= 3 && strncmp("w:", format, 2) == 0) {
             // NANOARROW_TYPE_FIXED_SIZE_BINARY
-            if (get_arrow_array_children_as_list(env, schema, values, offset, count, level, children, error) == 1) {
+            if (count == -1) count = values->length;
+            if (values->n_buffers != 2) {
+                snprintf(err_msg_buf, 255, "invalid n_buffers value for ArrowArray (format=%s), values->n_buffers != 2", schema->format);
+                error = erlang::nif::error(env, erlang::nif::make_binary(env, err_msg_buf));
                 return 1;
             }
-            term_type = kAdbcColumnTypeFixedSizeBinary;
-            children_term = enif_make_list_from_array(env, children.data(), (unsigned)count);
+            size_t nbytes = 0;
+            for (size_t i = 2; i < format_len; i++) {
+                nbytes = nbytes * 10 + (format[i] - '0');
+            }
+            term_type = kAdbcColumnTypeFixedSizeBinary(nbytes);
+            current_term = fixed_size_binary_from_buffer(
+                env,
+                offset,
+                count,
+                nbytes,
+                (const uint8_t *)values->buffers[bitmap_buffer_index],
+                (const uint8_t *)values->buffers[data_buffer_index],
+                [&](ErlNifEnv *env, const uint8_t * val) -> ERL_NIF_TERM {
+                    return erlang::nif::make_binary(env, (const char *)val, nbytes);
+                }
+            );
         } else if (format_len > 4 && (strncmp("+ud:", format, 4) == 0)) {
             // NANOARROW_TYPE_DENSE_UNION
             term_type = kAdbcColumnTypeDenseUnion;

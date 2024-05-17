@@ -454,7 +454,9 @@ defmodule Adbc.Column do
 
   ## Arguments
 
-  * `data`: a list of `Decimal.t()`
+  * `data`: a list, each element can be either
+    * a `Decimal.t()`
+    * a `number()`
   * `precision`: The precision of the decimal values
   * `scale`: The scale of the decimal values
   * `opts`: A keyword list of options
@@ -465,8 +467,9 @@ defmodule Adbc.Column do
   * `:nullable` - A boolean value indicating whether the column is nullable
   * `:metadata` - A map of metadata
   """
-  @spec decimal128([Decimal.t()], integer(), integer(), Keyword.t()) :: %Adbc.Column{}
-  def decimal128(data, precision, scale, opts \\ []) do
+  @spec decimal128([Decimal.t() | number()], integer(), integer(), Keyword.t()) :: %Adbc.Column{}
+  def decimal128(data, precision, scale, opts \\ [])
+      when is_integer(precision) and precision >= 1 and precision <= 38 do
     bitwidth = 128
 
     column(
@@ -481,7 +484,9 @@ defmodule Adbc.Column do
 
   ## Arguments
 
-  * `data`: a list of `Decimal.t()`
+  * `data`: a list, each element can be either
+    * a `Decimal.t()`
+    * a `number()`
   * `precision`: The precision of the decimal values
   * `scale`: The scale of the decimal values
   * `opts`: A keyword list of options
@@ -492,8 +497,9 @@ defmodule Adbc.Column do
   * `:nullable` - A boolean value indicating whether the column is nullable
   * `:metadata` - A map of metadata
   """
-  @spec decimal256([Decimal.t()], integer(), integer(), Keyword.t()) :: %Adbc.Column{}
-  def decimal256(data, precision, scale, opts \\ []) do
+  @spec decimal256([Decimal.t() | number()], integer(), integer(), Keyword.t()) :: %Adbc.Column{}
+  def decimal256(data, precision, scale, opts \\ [])
+      when is_integer(precision) and precision >= 1 and precision <= 38 do
     bitwidth = 256
 
     column(
@@ -507,6 +513,40 @@ defmodule Adbc.Column do
 
   defp preprocess_decimal(bitwidth, precision, scale, [nil | rest], acc) do
     preprocess_decimal(bitwidth, precision, scale, rest, [nil | acc])
+  end
+
+  defp preprocess_decimal(bitwidth, precision, scale, [integer | rest], acc)
+       when is_integer(integer) do
+    if Decimal.coef_length(integer) > precision do
+      raise Adbc.Error,
+            "`#{Integer.to_string(integer)}` cannot be fitted into a decimal#{Integer.to_string(bitwidth)} with the specified precision #{Integer.to_string(precision)}"
+    else
+      coef = trunc(integer * :math.pow(10, scale))
+      acc = [<<coef::signed-integer-little-size(bitwidth)>> | acc]
+      preprocess_decimal(bitwidth, precision, scale, rest, acc)
+    end
+  end
+
+  defp preprocess_decimal(bitwidth, precision, scale, [float | rest], acc) when is_float(float) do
+    float_string = Float.to_string(float)
+    [i, f] = String.split(float_string, ".")
+    min_scale = String.length(String.trim_trailing(f, "0"))
+
+    if min_scale > scale do
+      raise Adbc.Error,
+            "Rescaling `#{float_string}` as a valid decimal#{Integer.to_string(bitwidth)} number would cause data loss with scale value `#{scale}`"
+    else
+      min_precision = String.length(i) + min_scale
+
+      if min_precision > precision do
+        raise Adbc.Error,
+              "Rescaling `#{float_string}` as a valid decimal#{Integer.to_string(bitwidth)} number would cause data loss with precision #{Integer.to_string(precision)}"
+      else
+        scaled = trunc(float * :math.pow(10, scale))
+        acc = [<<scaled::signed-integer-little-size(bitwidth)>> | acc]
+        preprocess_decimal(bitwidth, precision, scale, rest, acc)
+      end
+    end
   end
 
   defp preprocess_decimal(

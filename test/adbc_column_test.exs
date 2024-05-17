@@ -10,28 +10,34 @@ defmodule Adbc.Column.Test do
       decimal = Decimal.new(value)
 
       assert %Adbc.Column{
-               data: [data],
+               data: [decimal_data, value_data],
                metadata: nil,
                name: nil,
                nullable: false,
                type: {:decimal, ^bitwidth, ^precision, ^scale}
-             } = Adbc.Column.decimal128([decimal], precision, scale)
+             } = Adbc.Column.decimal128([decimal, value], precision, scale)
 
-      assert <<decode::signed-integer-little-size(bitwidth)>> = data
-      assert value == decode / :math.pow(10, scale)
+      assert <<decode1::signed-integer-little-size(bitwidth)>> = decimal_data
+      assert value == decode1 / :math.pow(10, scale)
+
+      assert <<decode2::signed-integer-little-size(bitwidth)>> = value_data
+      assert value == decode2 / :math.pow(10, scale)
 
       bitwidth = 256
 
       assert %Adbc.Column{
-               data: [data],
+               data: [decimal_data, value_data],
                metadata: nil,
                name: nil,
                nullable: false,
                type: {:decimal, ^bitwidth, ^precision, ^scale}
-             } = Adbc.Column.decimal256([decimal], precision, scale)
+             } = Adbc.Column.decimal256([decimal, value], precision, scale)
 
-      assert <<decode::signed-integer-little-size(bitwidth)>> = data
-      assert value == decode / :math.pow(10, scale)
+      assert <<decode1::signed-integer-little-size(bitwidth)>> = decimal_data
+      assert value == decode1 / :math.pow(10, scale)
+
+      assert <<decode2::signed-integer-little-size(bitwidth)>> = value_data
+      assert value == decode2 / :math.pow(10, scale)
     end
 
     test "floats" do
@@ -84,36 +90,54 @@ defmodule Adbc.Column.Test do
                    end
 
       assert_raise Adbc.Error,
+                   "`54321` cannot be fitted into a decimal128 with the specified precision 4",
+                   fn ->
+                     Adbc.Column.decimal128([value], precision, scale)
+                   end
+
+      assert_raise Adbc.Error,
                    "`54321` cannot be fitted into a decimal256 with the specified precision 4",
                    fn ->
                      Adbc.Column.decimal256([decimal], precision, scale)
                    end
 
+      assert_raise Adbc.Error,
+                   "`54321` cannot be fitted into a decimal256 with the specified precision 4",
+                   fn ->
+                     Adbc.Column.decimal256([value], precision, scale)
+                   end
+
       precision = 5
 
       assert %Adbc.Column{
-               data: [data],
+               data: [decimal_data, value_data],
                metadata: nil,
                name: nil,
                nullable: false,
                type: {:decimal, ^bitwidth, ^precision, ^scale}
-             } = Adbc.Column.decimal128([decimal], precision, scale)
+             } = Adbc.Column.decimal128([decimal, value], precision, scale)
 
-      assert <<decode::signed-integer-little-size(bitwidth)>> = data
-      assert value == decode / :math.pow(10, scale)
+      assert <<decode1::signed-integer-little-size(bitwidth)>> = decimal_data
+      assert value == decode1 / :math.pow(10, scale)
+
+      assert <<decode2::signed-integer-little-size(bitwidth)>> = value_data
+      assert value == decode2 / :math.pow(10, scale)
 
       bitwidth = 256
 
       assert %Adbc.Column{
-               data: [data],
+               data: [decimal_data, value_data],
                metadata: nil,
                name: nil,
                nullable: false,
                type: {:decimal, ^bitwidth, ^precision, ^scale}
-             } = Adbc.Column.decimal256([decimal], precision, scale)
+             } = Adbc.Column.decimal256([decimal, value], precision, scale)
 
-      assert <<decode::signed-integer-little-size(bitwidth)>> = data
-      assert value == decode / :math.pow(10, scale)
+      assert <<decode1::signed-integer-little-size(bitwidth)>> = decimal_data
+      assert value == decode1 / :math.pow(10, scale)
+
+      assert <<decode2::signed-integer-little-size(bitwidth)>> = value_data
+      assert value == decode2 / :math.pow(10, scale)
     end
 
     test "raise if scale value is insufficient" do

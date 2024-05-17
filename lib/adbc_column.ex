@@ -24,6 +24,11 @@ defmodule Adbc.Column do
   @type floating ::
           :f32
           | :f64
+  @type decimal128 :: {:decimal, 128, integer(), integer()}
+  @type decimal256 :: {:decimal, 256, integer(), integer()}
+  @type decimal_t ::
+          decimal128
+          | decimal256
   @type time_unit ::
           :seconds
           | :milliseconds
@@ -50,6 +55,7 @@ defmodule Adbc.Column do
           | signed_integer
           | unsigned_integer
           | floating
+          | decimal_t
           | :string
           | :large_string
           | :binary
@@ -441,6 +447,95 @@ defmodule Adbc.Column do
   @spec f64([float], Keyword.t()) :: %Adbc.Column{}
   def f64(data, opts \\ []) when is_list(data) and is_list(opts) do
     column(:f64, data, opts)
+  end
+
+  @doc """
+  A column that contains 128-bit decimals.
+
+  ## Arguments
+
+  * `data`: a list of `Decimal.t()`
+  * `precision`: The precision of the decimal values
+  * `scale`: The scale of the decimal values
+  * `opts`: A keyword list of options
+
+  ## Options
+
+  * `:name` - The name of the column
+  * `:nullable` - A boolean value indicating whether the column is nullable
+  * `:metadata` - A map of metadata
+  """
+  @spec decimal128([Decimal.t()], integer(), integer(), Keyword.t()) :: %Adbc.Column{}
+  def decimal128(data, precision, scale, opts \\ []) do
+    bitwidth = 128
+
+    column(
+      {:decimal, bitwidth, precision, scale},
+      preprocess_decimal(bitwidth, precision, scale, data, []),
+      opts
+    )
+  end
+
+  @doc """
+  A column that contains 256-bit decimals.
+
+  ## Arguments
+
+  * `data`: a list of `Decimal.t()`
+  * `precision`: The precision of the decimal values
+  * `scale`: The scale of the decimal values
+  * `opts`: A keyword list of options
+
+  ## Options
+
+  * `:name` - The name of the column
+  * `:nullable` - A boolean value indicating whether the column is nullable
+  * `:metadata` - A map of metadata
+  """
+  @spec decimal256([Decimal.t()], integer(), integer(), Keyword.t()) :: %Adbc.Column{}
+  def decimal256(data, precision, scale, opts \\ []) do
+    bitwidth = 256
+
+    column(
+      {:decimal, bitwidth, precision, scale},
+      preprocess_decimal(bitwidth, precision, scale, data, []),
+      opts
+    )
+  end
+
+  defp preprocess_decimal(_bitwidth, _precision, _scale, [], acc), do: Enum.reverse(acc)
+
+  defp preprocess_decimal(bitwidth, precision, scale, [nil | rest], acc) do
+    preprocess_decimal(bitwidth, precision, scale, rest, [nil | acc])
+  end
+
+  defp preprocess_decimal(
+         bitwidth,
+         _precision,
+         scale,
+         [%Decimal{exp: exp} = decimal | _rest],
+         _acc
+       )
+       when -exp > scale do
+    raise Adbc.Error,
+          "`#{Decimal.to_string(decimal)}` with exponent `#{exp}` cannot be represented as a valid decimal#{Integer.to_string(bitwidth)} number with scale value `#{scale}`"
+  end
+
+  defp preprocess_decimal(bitwidth, precision, scale, [%Decimal{exp: exp} = decimal | rest], acc)
+       when -exp <= scale do
+    if Decimal.inf?(decimal) or Decimal.nan?(decimal) do
+      raise Adbc.Error,
+            "`#{Decimal.to_string(decimal)}` cannot be represented as a valid decimal#{Integer.to_string(bitwidth)} number"
+    else
+      if Decimal.coef_length(decimal.coef) > precision do
+        raise Adbc.Error,
+              "`#{Decimal.to_string(decimal)}` cannot be fitted into a decimal#{Integer.to_string(bitwidth)} with the specified precision #{Integer.to_string(precision)}"
+      else
+        coef = trunc(decimal.coef * decimal.sign * :math.pow(10, exp + scale))
+        acc = [<<coef::signed-integer-little-size(bitwidth)>> | acc]
+        preprocess_decimal(bitwidth, precision, scale, rest, acc)
+      end
+    end
   end
 
   @doc """

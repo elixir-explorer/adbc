@@ -407,13 +407,38 @@ defmodule Adbc.Connection do
     end
   end
 
-  defp merge_columns([result]), do: result
+  defp merge_columns([result]), do: handle_decimal(result)
 
   defp merge_columns(chucked_results) do
     Enum.zip_with(chucked_results, fn columns ->
       Enum.reduce(columns, fn column, merged_column ->
+        column = handle_decimal(column)
         %{merged_column | data: merged_column.data ++ column.data}
       end)
+    end)
+  end
+
+  defp handle_decimal([column | rest]) do
+    [handle_decimal(column) | handle_decimal(rest)]
+  end
+
+  defp handle_decimal(%Adbc.Column{type: {:decimal, bits, _, scale}, data: decimal_data} = column) do
+    %{column | data: handle_decimal(decimal_data, bits, scale)}
+  end
+
+  defp handle_decimal(column) do
+    column
+  end
+
+  defp handle_decimal(decimal_data, bits, scale) do
+    Enum.map(decimal_data, fn data ->
+      <<decimal::signed-integer-size(bits)-little>> = data
+
+      if decimal < 0 do
+        Decimal.new(-1, -decimal, -scale)
+      else
+        Decimal.new(1, decimal, -scale)
+      end
     end)
   end
 

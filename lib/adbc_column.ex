@@ -164,7 +164,7 @@ defmodule Adbc.Column do
       }
 
   """
-  @spec u8([0..255], Keyword.t()) :: %Adbc.Column{}
+  @spec u8([0..255 | nil], Keyword.t()) :: %Adbc.Column{}
   def u8(data, opts \\ []) when is_list(data) and is_list(opts) do
     column(:u8, data, opts)
   end
@@ -195,7 +195,7 @@ defmodule Adbc.Column do
       }
 
   """
-  @spec u16([0..65535], Keyword.t()) :: %Adbc.Column{}
+  @spec u16([0..65535 | nil], Keyword.t()) :: %Adbc.Column{}
   def u16(data, opts \\ []) when is_list(data) and is_list(opts) do
     column(:u16, data, opts)
   end
@@ -226,7 +226,7 @@ defmodule Adbc.Column do
       }
 
   """
-  @spec u32([0..4_294_967_295], Keyword.t()) :: %Adbc.Column{}
+  @spec u32([0..4_294_967_295 | nil], Keyword.t()) :: %Adbc.Column{}
   def u32(data, opts \\ []) when is_list(data) and is_list(opts) do
     column(:u32, data, opts)
   end
@@ -257,7 +257,7 @@ defmodule Adbc.Column do
       }
 
   """
-  @spec u64([0..18_446_744_073_709_551_615], Keyword.t()) :: %Adbc.Column{}
+  @spec u64([0..18_446_744_073_709_551_615 | nil], Keyword.t()) :: %Adbc.Column{}
   def u64(data, opts \\ []) when is_list(data) and is_list(opts) do
     column(:u64, data, opts)
   end
@@ -288,7 +288,7 @@ defmodule Adbc.Column do
       }
 
   """
-  @spec i8([-128..127], Keyword.t()) :: %Adbc.Column{}
+  @spec i8([-128..127 | nil], Keyword.t()) :: %Adbc.Column{}
   def i8(data, opts \\ []) when is_list(data) and is_list(opts) do
     column(:i8, data, opts)
   end
@@ -319,7 +319,7 @@ defmodule Adbc.Column do
       }
 
   """
-  @spec i16([-32768..32767], Keyword.t()) :: %Adbc.Column{}
+  @spec i16([-32768..32767 | nil], Keyword.t()) :: %Adbc.Column{}
   def i16(data, opts \\ []) when is_list(data) and is_list(opts) do
     column(:i16, data, opts)
   end
@@ -350,7 +350,7 @@ defmodule Adbc.Column do
       }
 
   """
-  @spec i32([-2_147_483_648..2_147_483_647], Keyword.t()) :: %Adbc.Column{}
+  @spec i32([-2_147_483_648..2_147_483_647 | nil], Keyword.t()) :: %Adbc.Column{}
   def i32(data, opts \\ []) when is_list(data) and is_list(opts) do
     column(:i32, data, opts)
   end
@@ -381,7 +381,7 @@ defmodule Adbc.Column do
       }
 
   """
-  @spec i64([-9_223_372_036_854_775_808..9_223_372_036_854_775_807], Keyword.t()) ::
+  @spec i64([-9_223_372_036_854_775_808..9_223_372_036_854_775_807 | nil], Keyword.t()) ::
           %Adbc.Column{}
   def i64(data, opts \\ []) when is_list(data) and is_list(opts) do
     column(:i64, data, opts)
@@ -413,7 +413,7 @@ defmodule Adbc.Column do
       }
 
   """
-  @spec f16([float], Keyword.t()) :: %Adbc.Column{}
+  @spec f16([float | nil | :infinity | :neg_infinity | :nan], Keyword.t()) :: %Adbc.Column{}
   def f16(data, opts \\ []) when is_list(data) and is_list(opts) do
     column(:f16, data, opts)
   end
@@ -444,7 +444,7 @@ defmodule Adbc.Column do
       }
 
   """
-  @spec f32([float], Keyword.t()) :: %Adbc.Column{}
+  @spec f32([float | nil | :infinity | :neg_infinity | :nan], Keyword.t()) :: %Adbc.Column{}
   def f32(data, opts \\ []) when is_list(data) and is_list(opts) do
     column(:f32, data, opts)
   end
@@ -475,7 +475,7 @@ defmodule Adbc.Column do
       }
 
   """
-  @spec f64([float], Keyword.t()) :: %Adbc.Column{}
+  @spec f64([float | nil | :infinity | :neg_infinity | :nan], Keyword.t()) :: %Adbc.Column{}
   def f64(data, opts \\ []) when is_list(data) and is_list(opts) do
     column(:f64, data, opts)
   end
@@ -498,7 +498,7 @@ defmodule Adbc.Column do
   * `:nullable` - A boolean value indicating whether the column is nullable
   * `:metadata` - A map of metadata
   """
-  @spec decimal128([Decimal.t() | integer()], integer(), integer(), Keyword.t()) :: %Adbc.Column{}
+  @spec decimal128([Decimal.t() | integer() | nil], integer(), integer(), Keyword.t()) :: %Adbc.Column{}
   def decimal128(data, precision, scale, opts \\ [])
       when is_integer(precision) and precision >= 1 and precision <= 38 do
     bitwidth = 128
@@ -528,7 +528,7 @@ defmodule Adbc.Column do
   * `:nullable` - A boolean value indicating whether the column is nullable
   * `:metadata` - A map of metadata
   """
-  @spec decimal256([Decimal.t() | integer()], integer(), integer(), Keyword.t()) :: %Adbc.Column{}
+  @spec decimal256([Decimal.t() | integer() | nil], integer(), integer(), Keyword.t()) :: %Adbc.Column{}
   def decimal256(data, precision, scale, opts \\ [])
       when is_integer(precision) and precision >= 1 and precision <= 38 do
     bitwidth = 256
@@ -613,7 +613,7 @@ defmodule Adbc.Column do
       }
 
   """
-  @spec string([String.t()], Keyword.t()) :: %Adbc.Column{}
+  @spec string([String.t() | nil], Keyword.t()) :: %Adbc.Column{}
   def string(data, opts \\ []) when is_list(data) and is_list(opts) do
     column(:string, data, opts)
   end
@@ -646,7 +646,7 @@ defmodule Adbc.Column do
       }
 
   """
-  @spec large_string([String.t()], Keyword.t()) :: %Adbc.Column{}
+  @spec large_string([String.t() | nil], Keyword.t()) :: %Adbc.Column{}
   def large_string(data, opts \\ []) when is_list(data) and is_list(opts) do
     column(:large_string, data, opts)
   end
@@ -677,7 +677,7 @@ defmodule Adbc.Column do
       }
 
   """
-  @spec binary([binary()], Keyword.t()) :: %Adbc.Column{}
+  @spec binary([binary() | nil], Keyword.t()) :: %Adbc.Column{}
   def binary(data, opts \\ []) when is_list(data) and is_list(opts) do
     column(:binary, data, opts)
   end
@@ -710,7 +710,7 @@ defmodule Adbc.Column do
       }
 
   """
-  @spec large_binary([binary()], Keyword.t()) :: %Adbc.Column{}
+  @spec large_binary([binary() | nil], Keyword.t()) :: %Adbc.Column{}
   def large_binary(data, opts \\ []) when is_list(data) and is_list(opts) do
     column(:large_binary, data, opts)
   end
@@ -764,7 +764,7 @@ defmodule Adbc.Column do
   * `:nullable` - A boolean value indicating whether the column is nullable
   * `:metadata` - A map of metadata
   """
-  @spec date32([Date.t() | integer()], Keyword.t()) :: %Adbc.Column{}
+  @spec date32([Date.t() | integer() | nil], Keyword.t()) :: %Adbc.Column{}
   def date32(data, opts \\ []) when is_list(data) and is_list(opts) do
     column(:date32, data, opts)
   end
@@ -784,7 +784,7 @@ defmodule Adbc.Column do
   * `:nullable` - A boolean value indicating whether the column is nullable
   * `:metadata` - A map of metadata
   """
-  @spec date64([Date.t() | integer()], Keyword.t()) :: %Adbc.Column{}
+  @spec date64([Date.t() | integer() | nil], Keyword.t()) :: %Adbc.Column{}
   def date64(data, opts \\ []) when is_list(data) and is_list(opts) do
     column(:date64, data, opts)
   end
@@ -816,7 +816,7 @@ defmodule Adbc.Column do
   * `:nullable` - A boolean value indicating whether the column is nullable
   * `:metadata` - A map of metadata
   """
-  @spec time([Time.t()] | [integer()], time_unit(), Keyword.t()) :: %Adbc.Column{}
+  @spec time([Time.t() | nil] | [integer() | nil], time_unit(), Keyword.t()) :: %Adbc.Column{}
   def time(data, unit, opts \\ [])
 
   def time(data, :seconds, opts) when is_list(data) and is_list(opts) do
@@ -865,7 +865,7 @@ defmodule Adbc.Column do
   * `:nullable` - A boolean value indicating whether the column is nullable
   * `:metadata` - A map of metadata
   """
-  @spec timestamp([NaiveDateTime.t()] | [integer()], time_unit(), String.t(), Keyword.t()) ::
+  @spec timestamp([NaiveDateTime.t() | nil] | [integer() | nil], time_unit(), String.t(), Keyword.t()) ::
           %Adbc.Column{}
   def timestamp(data, unit, timezone, opts \\ [])
 
@@ -910,7 +910,7 @@ defmodule Adbc.Column do
   * `:nullable` - A boolean value indicating whether the column is nullable
   * `:metadata` - A map of metadata
   """
-  @spec duration([integer()], time_unit(), Keyword.t()) :: %Adbc.Column{}
+  @spec duration([integer() | nil], time_unit(), Keyword.t()) :: %Adbc.Column{}
   def duration(data, unit, opts \\ [])
 
   def duration(data, :seconds, opts) when is_list(data) and is_list(opts) do

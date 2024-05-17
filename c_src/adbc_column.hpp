@@ -269,7 +269,7 @@ int get_list_fixed_size_binary(ErlNifEnv *env, ERL_NIF_TERM list, bool nullable,
             val.data.data = bytes.data;
             val.size_bytes = static_cast<int64_t>(bytes.size);
             callback(val, false);
-        } if (nullable && enif_is_identical(head, kAtomNil)) {
+        } else if (nullable && enif_is_identical(head, kAtomNil)) {
             callback(val, true);
         } else {
             return 1;
@@ -278,8 +278,8 @@ int get_list_fixed_size_binary(ErlNifEnv *env, ERL_NIF_TERM list, bool nullable,
     return 0;
 }
 
-int do_get_list_fixed_size_binary(ErlNifEnv *env, ERL_NIF_TERM list, bool nullable, ArrowType nanoarrow_type, struct ArrowArray* array_out, struct ArrowSchema* schema_out, struct ArrowError* error_out) {
-    NANOARROW_RETURN_NOT_OK(ArrowSchemaSetType(schema_out, nanoarrow_type));
+int do_get_list_fixed_size_binary(ErlNifEnv *env, ERL_NIF_TERM list, bool nullable, ArrowType nanoarrow_type, int32_t fixed_size, struct ArrowArray* array_out, struct ArrowSchema* schema_out, struct ArrowError* error_out) {
+    NANOARROW_RETURN_NOT_OK(ArrowSchemaSetTypeFixedSize(schema_out, nanoarrow_type, fixed_size));
     NANOARROW_RETURN_NOT_OK(ArrowArrayInitFromSchema(array_out, schema_out, error_out));
     NANOARROW_RETURN_NOT_OK(ArrowArrayStartAppending(array_out));
     if (nullable) {
@@ -742,8 +742,6 @@ int adbc_column_to_adbc_field(ErlNifEnv *env, ERL_NIF_TERM adbc_buffer, struct A
         ret = do_get_list_string(env, data_term, nullable, NANOARROW_TYPE_BINARY, array_out, schema_out, error_out);
     } else if (enif_is_identical(type_term, kAdbcColumnTypeLargeBinary)) {
         ret = do_get_list_string(env, data_term, nullable, NANOARROW_TYPE_LARGE_BINARY, array_out, schema_out, error_out);
-    } else if (enif_is_identical(type_term, kAdbcColumnTypeFixedSizeBinary)) {
-        ret = do_get_list_fixed_size_binary(env, data_term, nullable, NANOARROW_TYPE_FIXED_SIZE_BINARY, array_out, schema_out, error_out);
     } else if (enif_is_identical(type_term, kAdbcColumnTypeDate32)) {
         ret = do_get_list_date(env, data_term, nullable, NANOARROW_TYPE_DATE32, array_out, schema_out, error_out);
     } else if (enif_is_identical(type_term, kAdbcColumnTypeDate64)) {
@@ -779,7 +777,15 @@ int adbc_column_to_adbc_field(ErlNifEnv *env, ERL_NIF_TERM adbc_buffer, struct A
             const ERL_NIF_TERM *tuple = nullptr;
             int arity;
             if (enif_get_tuple(env, type_term, &arity, &tuple)) {
-                if (arity == 3) {
+                if (arity == 2) {
+                    // NANOARROW_TYPE_FIXED_SIZE_BINARY
+                    if (enif_is_identical(tuple[0], kAtomFixedSizeBinary)) {
+                        int32_t fixed_size;
+                        if (erlang::nif::get(env, tuple[1], &fixed_size)) {
+                            ret = do_get_list_fixed_size_binary(env, data_term, nullable, NANOARROW_TYPE_FIXED_SIZE_BINARY, fixed_size, array_out, schema_out, error_out);
+                        }
+                    }
+                } else if (arity == 3) {
                     // NANOARROW_TYPE_TIMESTAMP
                     if (enif_is_identical(tuple[0], kAtomTimestamp)) {
                         std::string timezone;

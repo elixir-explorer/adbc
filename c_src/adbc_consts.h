@@ -17,8 +17,9 @@ static ERL_NIF_TERM kAtomSeconds;
 static ERL_NIF_TERM kAtomMilliseconds;
 static ERL_NIF_TERM kAtomMicroseconds;
 static ERL_NIF_TERM kAtomNanoseconds;
-static ERL_NIF_TERM kAtomTimestamp;
 static ERL_NIF_TERM kAtomDecimal;
+static ERL_NIF_TERM kAtomTimestamp;
+static ERL_NIF_TERM kAtomFixedSizeBinary;
 
 static ERL_NIF_TERM kAtomCalendarKey;
 static ERL_NIF_TERM kAtomCalendarISO;
@@ -61,7 +62,6 @@ static ERL_NIF_TERM kAdbcColumnTypeString;
 static ERL_NIF_TERM kAdbcColumnTypeLargeString;
 static ERL_NIF_TERM kAdbcColumnTypeBinary;
 static ERL_NIF_TERM kAdbcColumnTypeLargeBinary;
-static ERL_NIF_TERM kAdbcColumnTypeFixedSizeBinary;
 static ERL_NIF_TERM kAdbcColumnTypeDenseUnion;
 static ERL_NIF_TERM kAdbcColumnTypeSparseUnion;
 static ERL_NIF_TERM kAdbcColumnTypeDate32;
@@ -78,6 +78,7 @@ static ERL_NIF_TERM kAdbcColumnTypeBool;
 #define kAdbcColumnTypeDurationMicroseconds enif_make_tuple2(env, kAtomDuration, kAtomMicroseconds)
 #define kAdbcColumnTypeDurationNanoseconds enif_make_tuple2(env, kAtomDuration, kAtomNanoseconds)
 #define kAdbcColumnTypeDecimal(bitwidth, precision, scale) enif_make_tuple4(env, kAtomDecimal, enif_make_int(env, bitwidth), enif_make_int(env, precision), enif_make_int(env, scale))
+#define kAdbcColumnTypeFixedSizeBinary(nbytes) enif_make_tuple2(env, kAtomFixedSizeBinary, enif_make_int64(env, nbytes))
 
 // error codes
 constexpr int kErrorBufferIsNotAMap = 1;

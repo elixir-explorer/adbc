@@ -786,6 +786,9 @@ static int on_load(ErlNifEnv *env, void **, ERL_NIF_TERM) {
     kAtomNil = erlang::nif::atom(env, "nil");
     kAtomTrue = erlang::nif::atom(env, "true");
     kAtomFalse = erlang::nif::atom(env, "false");
+    kAtomInfinity = erlang::nif::atom(env, "infinity");
+    kAtomNegInfinity = erlang::nif::atom(env, "neg_infinity");
+    kAtomNaN = erlang::nif::atom(env, "nan");
     kAtomEndOfSeries = erlang::nif::atom(env, "end_of_series");
     kAtomStructKey = erlang::nif::atom(env, "__struct__");
     kAtomTime32 = erlang::nif::atom(env, "time32");
@@ -829,6 +832,7 @@ static int on_load(ErlNifEnv *env, void **, ERL_NIF_TERM) {
     kAdbcColumnTypeI16 = erlang::nif::atom(env, "i16");
     kAdbcColumnTypeI32 = erlang::nif::atom(env, "i32");
     kAdbcColumnTypeI64 = erlang::nif::atom(env, "i64");
+    kAdbcColumnTypeF16 = erlang::nif::atom(env, "f16");
     kAdbcColumnTypeF32 = erlang::nif::atom(env, "f32");
     kAdbcColumnTypeF64 = erlang::nif::atom(env, "f64");
     kAdbcColumnTypeStruct = erlang::nif::atom(env, "struct");

@@ -2,11 +2,13 @@
 #pragma once
 
 #include <stdio.h>
+#include <cmath>
 #include <cstdbool>
 #include <cstdint>
 #include <vector>
 #include <adbc.h>
 #include <erl_nif.h>
+#include "adbc_half_float.hpp"
 
 static int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct ArrowArray * values, uint64_t level, std::vector<ERL_NIF_TERM> &out_terms, ERL_NIF_TERM &value_type, ERL_NIF_TERM &metadata, ERL_NIF_TERM &error, bool *end_of_series = nullptr);
 static int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct ArrowArray * values, int64_t offset, int64_t count, int64_t level, std::vector<ERL_NIF_TERM> &out_terms, ERL_NIF_TERM &value_type, ERL_NIF_TERM &metadata, ERL_NIF_TERM &error, bool *end_of_series = nullptr);
@@ -503,7 +505,7 @@ int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct 
             while (ArrowMetadataReaderRead(&metadata_reader, &key, &value) == NANOARROW_OK) {
                 // printf("key: %.*s, value: %.*s\n", (int)key.size_bytes, key.data, (int)value.size_bytes, value.data);
                 metadata_keys.push_back(erlang::nif::make_binary(env, key.data, (size_t)key.size_bytes));
-                metadata_values.push_back(erlang::nif::make_binary(env, value.data, (size_t)key.size_bytes));
+                metadata_values.push_back(erlang::nif::make_binary(env, value.data, (size_t)value.size_bytes));
             }
             if (metadata_keys.size() > 0) {
                 enif_make_map_from_arrays(env, metadata_keys.data(), metadata_values.data(), (unsigned)metadata_keys.size(), &arrow_metadata);
@@ -651,6 +653,36 @@ int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct 
                 (const value_type *)values->buffers[data_buffer_index],
                 enif_make_uint64
             );
+        } else if (format[0] == 'e') {
+            // NANOARROW_TYPE_HALF_FLOAT
+            using value_type = uint16_t;
+            term_type = kAdbcColumnTypeF16;
+            if (count == -1) count = values->length;
+            if (values->n_buffers != 2) {
+                error = erlang::nif::error(env, "invalid n_buffers value for ArrowArray (format=e), values->n_buffers != 2");
+                return 1;
+            }
+            current_term = values_from_buffer(
+                env,
+                offset,
+                count,
+                (const uint8_t *)values->buffers[bitmap_buffer_index],
+                (const value_type *)values->buffers[data_buffer_index],
+                [](ErlNifEnv *env, const uint16_t u16) -> ERL_NIF_TERM {
+                    float val = float16_to_float(u16);
+                    if (std::isnan(val)) {
+                        return kAtomNaN;
+                    } else if (std::isinf(val)) {
+                        if (val > 0) {
+                            return kAtomInfinity;
+                        } else {
+                            return kAtomNegInfinity;
+                        }
+                    } else {
+                        return enif_make_double(env, val);
+                    }
+                }
+            );
         } else if (format[0] == 'f') {
             // NANOARROW_TYPE_FLOAT
             using value_type = float;
@@ -666,7 +698,19 @@ int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct 
                 count,
                 (const uint8_t *)values->buffers[bitmap_buffer_index],
                 (const value_type *)values->buffers[data_buffer_index],
-                enif_make_double
+                [](ErlNifEnv *env, double val) -> ERL_NIF_TERM {
+                    if (std::isnan(val)) {
+                        return kAtomNaN;
+                    } else if (std::isinf(val)) {
+                        if (val > 0) {
+                            return kAtomInfinity;
+                        } else {
+                            return kAtomNegInfinity;
+                        }
+                    } else {
+                        return enif_make_double(env, val);
+                    }
+                }
             );
         } else if (format[0] == 'g') {
             // NANOARROW_TYPE_DOUBLE
@@ -683,7 +727,19 @@ int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct 
                 count,
                 (const uint8_t *)values->buffers[bitmap_buffer_index],
                 (const value_type *)values->buffers[data_buffer_index],
-                enif_make_double
+                [](ErlNifEnv *env, double val) -> ERL_NIF_TERM {
+                    if (std::isnan(val)) {
+                        return kAtomNaN;
+                    } else if (std::isinf(val)) {
+                        if (val > 0) {
+                            return kAtomInfinity;
+                        } else {
+                            return kAtomNegInfinity;
+                        }
+                    } else {
+                        return enif_make_double(env, val);
+                    }
+                }
             );
         } else if (format[0] == 'b') {
             // NANOARROW_TYPE_BOOL

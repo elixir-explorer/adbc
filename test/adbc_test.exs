@@ -249,7 +249,11 @@ defmodule AdbcTest do
                    }
                  ]
                }
-             } = Adbc.Connection.query(conn, "SELECT ARRAY['infinity'::NUMERIC, '-infinity'::NUMERIC, 4.2::NUMERIC, 'nan'::NUMERIC];")
+             } =
+               Adbc.Connection.query(
+                 conn,
+                 "SELECT ARRAY['infinity'::NUMERIC, '-infinity'::NUMERIC, 4.2::NUMERIC, 'nan'::NUMERIC];"
+               )
     end
   end
 

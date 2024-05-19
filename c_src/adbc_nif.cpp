@@ -791,17 +791,22 @@ static int on_load(ErlNifEnv *env, void **, ERL_NIF_TERM) {
     kAtomNaN = erlang::nif::atom(env, "nan");
     kAtomEndOfSeries = erlang::nif::atom(env, "end_of_series");
     kAtomStructKey = erlang::nif::atom(env, "__struct__");
+
+    kAtomDecimal = erlang::nif::atom(env, "decimal");
+    kAtomFixedSizeBinary = erlang::nif::atom(env, "fixed_size_binary");
     kAtomTime32 = erlang::nif::atom(env, "time32");
     kAtomTime64 = erlang::nif::atom(env, "time64");
+    kAtomTimestamp = erlang::nif::atom(env, "timestamp");
     kAtomDuration = erlang::nif::atom(env, "duration");
+    kAtomInterval = erlang::nif::atom(env, "interval");
     kAtomSeconds = erlang::nif::atom(env, "seconds");
     kAtomMilliseconds = erlang::nif::atom(env, "milliseconds");
     kAtomMicroseconds = erlang::nif::atom(env, "microseconds");
     kAtomNanoseconds = erlang::nif::atom(env, "nanoseconds");
-    kAtomTimestamp = erlang::nif::atom(env, "timestamp");
-    kAtomDecimal = erlang::nif::atom(env, "decimal");
-    kAtomFixedSizeBinary = erlang::nif::atom(env, "fixed_size_binary");
-
+    kAtomMonth = erlang::nif::atom(env, "month");
+    kAtomDayTime = erlang::nif::atom(env, "day_time");
+    kAtomMonthDayNano = erlang::nif::atom(env, "month_day_nano");
+    
     kAtomCalendarKey = erlang::nif::atom(env, "calendar");
     kAtomCalendarISO = erlang::nif::atom(env, "Elixir.Calendar.ISO");
 
@@ -824,31 +829,31 @@ static int on_load(ErlNifEnv *env, void **, ERL_NIF_TERM) {
     kAtomMetadataKey = erlang::nif::atom(env, "metadata");
     kAtomDataKey = erlang::nif::atom(env, "data");
 
-    kAdbcColumnTypeU8 = erlang::nif::atom(env, "u8");
-    kAdbcColumnTypeU16 = erlang::nif::atom(env, "u16");
-    kAdbcColumnTypeU32 = erlang::nif::atom(env, "u32");
-    kAdbcColumnTypeU64 = erlang::nif::atom(env, "u64");
+    kAdbcColumnTypeBool = erlang::nif::atom(env, "boolean");
     kAdbcColumnTypeI8 = erlang::nif::atom(env, "i8");
+    kAdbcColumnTypeU8 = erlang::nif::atom(env, "u8");
     kAdbcColumnTypeI16 = erlang::nif::atom(env, "i16");
+    kAdbcColumnTypeU16 = erlang::nif::atom(env, "u16");
     kAdbcColumnTypeI32 = erlang::nif::atom(env, "i32");
+    kAdbcColumnTypeU32 = erlang::nif::atom(env, "u32");
     kAdbcColumnTypeI64 = erlang::nif::atom(env, "i64");
+    kAdbcColumnTypeU64 = erlang::nif::atom(env, "u64");
     kAdbcColumnTypeF16 = erlang::nif::atom(env, "f16");
     kAdbcColumnTypeF32 = erlang::nif::atom(env, "f32");
     kAdbcColumnTypeF64 = erlang::nif::atom(env, "f64");
-    kAdbcColumnTypeStruct = erlang::nif::atom(env, "struct");
-    kAdbcColumnTypeMap = erlang::nif::atom(env, "map");
+    kAdbcColumnTypeBinary = erlang::nif::atom(env, "binary");
+    kAdbcColumnTypeLargeBinary = erlang::nif::atom(env, "large_binary");
+    kAdbcColumnTypeString = erlang::nif::atom(env, "string");
+    kAdbcColumnTypeLargeString = erlang::nif::atom(env, "large_string");
+    kAdbcColumnTypeDate32 = erlang::nif::atom(env, "date32");
+    kAdbcColumnTypeDate64 = erlang::nif::atom(env, "date64");
     kAdbcColumnTypeList = erlang::nif::atom(env, "list");
     kAdbcColumnTypeLargeList = erlang::nif::atom(env, "large_list");
     kAdbcColumnTypeFixedSizeList = erlang::nif::atom(env, "fixed_size_list");
-    kAdbcColumnTypeString = erlang::nif::atom(env, "string");
-    kAdbcColumnTypeLargeString = erlang::nif::atom(env, "large_string");
-    kAdbcColumnTypeBinary = erlang::nif::atom(env, "binary");
-    kAdbcColumnTypeLargeBinary = erlang::nif::atom(env, "large_binary");
+    kAdbcColumnTypeStruct = erlang::nif::atom(env, "struct");
+    kAdbcColumnTypeMap = erlang::nif::atom(env, "map");
     kAdbcColumnTypeDenseUnion = erlang::nif::atom(env, "dense_union");
     kAdbcColumnTypeSparseUnion = erlang::nif::atom(env, "sparse_union");
-    kAdbcColumnTypeDate32 = erlang::nif::atom(env, "date32");
-    kAdbcColumnTypeDate64 = erlang::nif::atom(env, "date64");
-    kAdbcColumnTypeBool = erlang::nif::atom(env, "boolean");
 
     return 0;
 }

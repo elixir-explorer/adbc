@@ -935,7 +935,10 @@ int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct 
                     }
                 );
             }
-        } else if (strncmp("td", format, 2) == 0) {
+        } else if (format_len == 3 && strncmp("td", format, 2) == 0) {
+            // possible format strings:
+            // tdD - date32 [days]
+            // tdm - date64 [milliseconds]
             char unit = format[2];
 
             if (unit == 'D' || unit == 'm') {
@@ -1008,7 +1011,12 @@ int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct 
               format_processed = false;
             }
         // time
-        } else if (strncmp("tt", format, 2) == 0) {
+        } else if (format_len == 3 && strncmp("tt", format, 2) == 0) {
+            // possible format strings:
+            // tts - time32 [seconds]
+            // ttm - time32 [milliseconds]
+            // ttu - time64 [microseconds]
+            // ttn - time64 [nanoseconds]
             uint64_t unit;
             uint8_t us_precision;
             switch (format[2]) {
@@ -1089,6 +1097,15 @@ int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct 
             }
         // timestamp
         } else if (strncmp("ts", format, 2) == 0) {
+            // possible format strings:
+            // tss - timestamp [seconds]
+            // tsm - timestamp [milliseconds]
+            // tsu - timestamp [microseconds]
+            // tsn - timestamp [nanoseconds]
+            //
+            // if there're any timezone infomation
+            // it should be in the format like `tsu:timezone`
+
             // NANOARROW_TYPE_TIMESTAMP
             uint64_t unit;
             uint8_t us_precision;
@@ -1120,7 +1137,7 @@ int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct 
             }
 
             if (format_processed) {
-                if (format_len > 4) {
+                if (format_len > 4 && format[3] == ':') {
                     std::string timezone(&format[4]);
                     term_timezone = erlang::nif::make_binary(env, timezone);
                 }
@@ -1179,7 +1196,13 @@ int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct 
                     }
                 );
             }
-        } else if (strncmp("tD", format, 2) == 0) {
+        } else if (format_len == 3 && strncmp("tD", format, 2) == 0) {
+            // possible format strings:
+            // tDs - duration [seconds]
+            // tDm - duration [milliseconds]
+            // tDu - duration [microseconds]
+            // tDn - duration [nanoseconds]
+            
             // NANOARROW_TYPE_DURATION
             switch (format[2]) {
                 case 's': // seconds

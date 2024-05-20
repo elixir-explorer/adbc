@@ -658,6 +658,119 @@ int do_get_list_duration(ErlNifEnv *env, ERL_NIF_TERM list, bool nullable, Arrow
     }
 }
 
+int get_list_interval_month(ErlNifEnv *env, ERL_NIF_TERM list, bool nullable, const std::function<void(struct ArrowInterval * val, bool is_nil)> &callback) {
+    ERL_NIF_TERM head, tail;
+    tail = list;
+    struct ArrowInterval val{};
+    val.type = NANOARROW_TYPE_INTERVAL_MONTHS;
+    while (enif_get_list_cell(env, tail, &head, &tail)) {
+        if (enif_is_identical(head, kAtomNil)) {
+            callback(nullptr, true);
+        } else {
+            int32_t months;
+            if (erlang::nif::get(env, head, &months)) {
+                val.months = months;
+                callback(&val, false);
+            } else {
+                return 1;
+            }
+        }
+    }
+    return 0;
+}
+
+int get_list_interval_day_time(ErlNifEnv *env, ERL_NIF_TERM list, bool nullable, const std::function<void(struct ArrowInterval * val, bool is_nil)> &callback) {
+    ERL_NIF_TERM head, tail;
+    tail = list;
+    struct ArrowInterval val{};
+    val.type = NANOARROW_TYPE_INTERVAL_DAY_TIME;
+    while (enif_get_list_cell(env, tail, &head, &tail)) {
+        if (enif_is_identical(head, kAtomNil)) {
+            callback(nullptr, true);
+        } else {
+            int32_t days, milliseconds;
+            const ERL_NIF_TERM *tuple = nullptr;
+            int arity;
+            if (enif_get_tuple(env, head, &arity, &tuple) && arity == 2) {
+                if (!erlang::nif::get(env, tuple[0], &days) || !erlang::nif::get(env, tuple[1], &milliseconds)) {
+                    return 1;
+                }
+                val.days = days;
+                val.ms = milliseconds;
+                callback(&val, false);
+            } else {
+                return 1;
+            }
+        }
+    }
+    return 0;
+}
+
+int get_list_duration_month_day_nano(ErlNifEnv *env, ERL_NIF_TERM list, bool nullable, const std::function<void(struct ArrowInterval * val, bool is_nil)> &callback) {
+    ERL_NIF_TERM head, tail;
+    tail = list;
+    struct ArrowInterval val{};
+    val.type = NANOARROW_TYPE_INTERVAL_MONTH_DAY_NANO;
+    while (enif_get_list_cell(env, tail, &head, &tail)) {
+        if (enif_is_identical(head, kAtomNil)) {
+            callback(nullptr, true);
+        } else {
+            int32_t months, days;
+            int64_t nanoseconds;
+            const ERL_NIF_TERM *tuple = nullptr;
+            int arity;
+            if (enif_get_tuple(env, head, &arity, &tuple) && arity == 3) {
+                if (!erlang::nif::get(env, tuple[0], &months) || 
+                    !erlang::nif::get(env, tuple[1], &days) || 
+                    !erlang::nif::get(env, tuple[2], &nanoseconds)) {
+                    return 1;
+                }
+                val.months = months;
+                val.days = days;
+                val.ns = nanoseconds;
+                callback(&val, false);
+            } else {
+                return 1;
+            }
+        }
+    }
+    return 0;
+}
+
+int do_get_list_interval(ErlNifEnv *env, ERL_NIF_TERM list, bool nullable, ArrowType nanoarrow_type, struct ArrowArray* array_out, struct ArrowSchema* schema_out, struct ArrowError* error_out) {
+    NANOARROW_RETURN_NOT_OK(ArrowSchemaSetType(schema_out, nanoarrow_type));
+    NANOARROW_RETURN_NOT_OK(ArrowArrayInitFromSchema(array_out, schema_out, error_out));
+    NANOARROW_RETURN_NOT_OK(ArrowArrayStartAppending(array_out));
+
+    auto appendNullableInterval = [&array_out](struct ArrowInterval * val, bool is_nil) -> void {
+        ArrowArrayAppendInterval(array_out, val);
+        if (is_nil) {
+            ArrowArrayAppendNull(array_out, 1);
+        }
+    };
+    auto appendNonNullableInterval = [&array_out](struct ArrowInterval * val, bool) -> void {
+        ArrowArrayAppendInterval(array_out, val);
+    };
+
+    int(*get_list_interval)(ErlNifEnv *, ERL_NIF_TERM, bool, const std::function<void(struct ArrowInterval *, bool)> &) = nullptr;
+
+    if (nanoarrow_type == NANOARROW_TYPE_INTERVAL_MONTHS) {
+        get_list_interval = get_list_interval_month;
+    } else if (nanoarrow_type == NANOARROW_TYPE_INTERVAL_DAY_TIME) {
+        get_list_interval = get_list_interval_day_time;
+    } else if (nanoarrow_type == NANOARROW_TYPE_INTERVAL_MONTH_DAY_NANO) {
+        get_list_interval = get_list_duration_month_day_nano;
+    } else {
+        return 1;
+    } 
+
+    if (nullable) {
+        return get_list_interval(env, list, nullable, appendNullableInterval);
+    } else {
+        return get_list_interval(env, list, nullable, appendNonNullableInterval);
+    }
+}
+
 // non-zero return value indicating errors
 int adbc_column_to_adbc_field(ErlNifEnv *env, ERL_NIF_TERM adbc_buffer, struct ArrowArray* array_out, struct ArrowSchema* schema_out, struct ArrowError* error_out) {
     array_out->release = NULL;
@@ -809,6 +922,15 @@ int adbc_column_to_adbc_field(ErlNifEnv *env, ERL_NIF_TERM adbc_buffer, struct A
         } else if (enif_is_identical(type_term, kAdbcColumnTypeDurationNanoseconds)) {
             // NANOARROW_TYPE_DURATION
             ret = do_get_list_duration(env, data_term, nullable, NANOARROW_TYPE_DURATION, NANOARROW_TIME_UNIT_NANO, array_out, schema_out, error_out);
+        }  else if (enif_is_identical(type_term, kAdbcColumnTypeIntervalMonth)) {
+            // NANOARROW_TYPE_INTERVAL
+            ret = do_get_list_interval(env, data_term, nullable, NANOARROW_TYPE_INTERVAL_MONTHS, array_out, schema_out, error_out);
+        } else if (enif_is_identical(type_term, kAdbcColumnTypeIntervalDayTime)) {
+            // NANOARROW_TYPE_INTERVAL
+            ret = do_get_list_interval(env, data_term, nullable, NANOARROW_TYPE_INTERVAL_DAY_TIME, array_out, schema_out, error_out);
+        } else if (enif_is_identical(type_term, kAdbcColumnTypeIntervalMonthDayNano)) {
+            // NANOARROW_TYPE_INTERVAL
+            ret = do_get_list_interval(env, data_term, nullable, NANOARROW_TYPE_INTERVAL_MONTH_DAY_NANO, array_out, schema_out, error_out);
         } else {
             const ERL_NIF_TERM *tuple = nullptr;
             int arity;

@@ -983,6 +983,8 @@ defmodule Adbc.Column do
           Keyword.t()
         ) ::
           %Adbc.Column{}
+  def interval(data, interval_unit, opts \\ [])
+
   def interval(data, :month, opts) do
     column({:interval, :month}, data, opts)
   end

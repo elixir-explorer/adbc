@@ -935,7 +935,10 @@ int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct 
                     }
                 );
             }
-        } else if (strncmp("td", format, 2) == 0) {
+        } else if (format_len == 3 && strncmp("td", format, 2) == 0) {
+            // possible format strings:
+            // tdD - date32 [days]
+            // tdm - date64 [milliseconds]
             char unit = format[2];
 
             if (unit == 'D' || unit == 'm') {
@@ -1008,7 +1011,12 @@ int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct 
               format_processed = false;
             }
         // time
-        } else if (strncmp("tt", format, 2) == 0) {
+        } else if (format_len == 3 && strncmp("tt", format, 2) == 0) {
+            // possible format strings:
+            // tts - time32 [seconds]
+            // ttm - time32 [milliseconds]
+            // ttu - time64 [microseconds]
+            // ttn - time64 [nanoseconds]
             uint64_t unit;
             uint8_t us_precision;
             switch (format[2]) {
@@ -1089,6 +1097,15 @@ int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct 
             }
         // timestamp
         } else if (strncmp("ts", format, 2) == 0) {
+            // possible format strings:
+            // tss - timestamp [seconds]
+            // tsm - timestamp [milliseconds]
+            // tsu - timestamp [microseconds]
+            // tsn - timestamp [nanoseconds]
+            //
+            // if there're any timezone infomation
+            // it should be in the format like `tsu:timezone`
+
             // NANOARROW_TYPE_TIMESTAMP
             uint64_t unit;
             uint8_t us_precision;
@@ -1120,7 +1137,7 @@ int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct 
             }
 
             if (format_processed) {
-                if (format_len > 4) {
+                if (format_len > 4 && format[3] == ':') {
                     std::string timezone(&format[4]);
                     term_timezone = erlang::nif::make_binary(env, timezone);
                 }
@@ -1179,7 +1196,13 @@ int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct 
                     }
                 );
             }
-        } else if (strncmp("tD", format, 2) == 0) {
+        } else if (format_len == 3 && strncmp("tD", format, 2) == 0) {
+            // possible format strings:
+            // tDs - duration [seconds]
+            // tDm - duration [milliseconds]
+            // tDu - duration [microseconds]
+            // tDn - duration [nanoseconds]
+
             // NANOARROW_TYPE_DURATION
             switch (format[2]) {
                 case 's': // seconds
@@ -1214,6 +1237,88 @@ int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct 
                     (const value_type *)values->buffers[data_buffer_index],
                     enif_make_int64
                 );
+            }
+        } else if (format_len == 3 && strncmp("ti", format, 2) == 0) {
+            // possible format strings:
+            // tiM - interval [months]
+            // tiD - interval [days, time]
+            // tin - interval [month, day, nanoseconds]
+
+            // NANOARROW_TYPE_INTERVAL
+            switch (format[2]) {
+                case 'M': // months
+                    term_type = kAdbcColumnTypeIntervalMonth;
+                    break;
+                case 'D': // days, time
+                    term_type = kAdbcColumnTypeIntervalDayTime;
+                    break;
+                case 'n': // month, day, nanoseconds
+                    term_type = kAdbcColumnTypeIntervalMonthDayNano;
+                    break;
+                default:
+                    format_processed = false;
+            }
+
+            if (format_processed) {
+                if (format[2] == 'M') {
+                    using value_type = int32_t;
+                    if (count == -1) count = values->length;
+                    if (values->n_buffers != 2) {
+                        error = erlang::nif::error(env, "invalid n_buffers value for ArrowArray (format=tiM), values->n_buffers != 2");
+                        return 1;
+                    }
+
+                    current_term = values_from_buffer(
+                        env,
+                        offset,
+                        count,
+                        (const uint8_t *)values->buffers[bitmap_buffer_index],
+                        (const value_type *)values->buffers[data_buffer_index],
+                        enif_make_int64
+                    );
+                } else if (format[2] == 'D') {
+                    using value_type = int64_t;
+                    if (count == -1) count = values->length;
+                    if (values->n_buffers != 2) {
+                        error = erlang::nif::error(env, "invalid n_buffers value for ArrowArray (format=tiD), values->n_buffers != 2");
+                        return 1;
+                    }
+
+                    current_term = values_from_buffer(
+                        env,
+                        offset,
+                        count,
+                        (const uint8_t *)values->buffers[bitmap_buffer_index],
+                        (const value_type *)values->buffers[data_buffer_index],
+                        [](ErlNifEnv *env, int64_t val) -> ERL_NIF_TERM {
+                            int32_t days = val & 0xFFFFFFFF;
+                            int32_t time = val >> 32;
+                            return enif_make_tuple2(env, enif_make_int(env, days), enif_make_int(env, time));
+                        }
+                    );
+                } else {
+                    using value_type = struct {
+                        int64_t data[2];
+                    };
+                    if (count == -1) count = values->length;
+                    if (values->n_buffers != 2) {
+                        error = erlang::nif::error(env, "invalid n_buffers value for ArrowArray (format=tin), values->n_buffers != 2");
+                        return 1;
+                    }
+
+                    current_term = values_from_buffer(
+                        env,
+                        offset,
+                        count,
+                        (const uint8_t *)values->buffers[bitmap_buffer_index],
+                        (const value_type *)values->buffers[data_buffer_index],
+                        [](ErlNifEnv *env, value_type val) -> ERL_NIF_TERM {
+                            int32_t months = val.data[0] & 0xFFFFFFFF;
+                            int32_t days = val.data[0] >> 32;
+                            return enif_make_tuple3(env, enif_make_int64(env, months), enif_make_int64(env, days), enif_make_int64(env, val.data[1]));
+                        }
+                    );
+                }
             }
         } else {
             format_processed = false;

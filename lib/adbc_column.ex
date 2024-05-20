@@ -11,6 +11,14 @@ defmodule Adbc.Column do
             metadata: %{},
             data: nil
 
+  @type i8 :: -128..127
+  @type u8 :: 0..255
+  @type i16 :: -32768..32767
+  @type u16 :: 0..65535
+  @type i32 :: -2_147_483_648..2_147_483_647
+  @type u32 :: 0..4_294_967_295
+  @type i64 :: -9_223_372_036_854_775_808..9_223_372_036_854_775_807
+  @type u64 :: 0..18_446_744_073_709_551_615
   @type signed_integer ::
           :i8
           | :i16
@@ -24,8 +32,10 @@ defmodule Adbc.Column do
   @type floating ::
           :f32
           | :f64
-  @type decimal128 :: {:decimal, 128, integer(), integer()}
-  @type decimal256 :: {:decimal, 256, integer(), integer()}
+  @type precision128 :: 1..38
+  @type precision256 :: 1..76
+  @type decimal128 :: {:decimal, 128, precision128(), integer()}
+  @type decimal256 :: {:decimal, 256, precision256(), integer()}
   @type decimal_t ::
           decimal128
           | decimal256
@@ -40,6 +50,7 @@ defmodule Adbc.Column do
   @type time64_t ::
           {:time64, :microseconds}
           | {:time64, :nanoseconds}
+  @type time_t :: time32_t() | time64_t()
   @type timestamp_t ::
           {:timestamp, :seconds, String.t()}
           | {:timestamp, :milliseconds, String.t()}
@@ -50,6 +61,17 @@ defmodule Adbc.Column do
           | {:duration, :milliseconds}
           | {:duration, :microseconds}
           | {:duration, :nanoseconds}
+  @type interval_month :: i32()
+  @type interval_day_time :: {i32(), i32()}
+  @type interval_month_day_nano :: {i32(), i32(), i64()}
+  @type interval_unit ::
+          :month
+          | :day_time
+          | :month_day_nano
+  @type interval_t ::
+          {:interval, :month}
+          | {:interval, :day_time}
+          | {:interval, :month_day_nano}
   @type data_type ::
           :boolean
           | signed_integer
@@ -63,10 +85,10 @@ defmodule Adbc.Column do
           | {:fixed_size_binary, non_neg_integer()}
           | :date32
           | :date64
-          | time32_t
-          | time64_t
+          | time_t
           | timestamp_t
           | duration_t
+          | interval_t
 
   @spec column(data_type(), list, Keyword.t()) :: %Adbc.Column{}
   def column(type, data, opts \\ [])
@@ -164,7 +186,7 @@ defmodule Adbc.Column do
       }
 
   """
-  @spec u8([0..255 | nil], Keyword.t()) :: %Adbc.Column{}
+  @spec u8([u8() | nil], Keyword.t()) :: %Adbc.Column{}
   def u8(data, opts \\ []) when is_list(data) and is_list(opts) do
     column(:u8, data, opts)
   end
@@ -195,17 +217,17 @@ defmodule Adbc.Column do
       }
 
   """
-  @spec u16([0..65535 | nil], Keyword.t()) :: %Adbc.Column{}
+  @spec u16([u16() | nil], Keyword.t()) :: %Adbc.Column{}
   def u16(data, opts \\ []) when is_list(data) and is_list(opts) do
     column(:u16, data, opts)
   end
 
   @doc """
-  A column that contains unsigned 32-bit integers.
+  A column that contains un32-bit signed integers.
 
   ## Arguments
 
-  * `data`: A list of unsigned 32-bit integer values
+  * `data`: A list of un32-bit signed integer values
   * `opts`: A keyword list of options
 
   ## Options
@@ -226,17 +248,17 @@ defmodule Adbc.Column do
       }
 
   """
-  @spec u32([0..4_294_967_295 | nil], Keyword.t()) :: %Adbc.Column{}
+  @spec u32([u32() | nil], Keyword.t()) :: %Adbc.Column{}
   def u32(data, opts \\ []) when is_list(data) and is_list(opts) do
     column(:u32, data, opts)
   end
 
   @doc """
-  A column that contains unsigned 64-bit integers.
+  A column that contains un64-bit signed integers.
 
   ## Arguments
 
-  * `data`: A list of unsigned 64-bit integer values
+  * `data`: A list of un64-bit signed integer values
   * `opts`: A keyword list of options
 
   ## Options
@@ -257,7 +279,7 @@ defmodule Adbc.Column do
       }
 
   """
-  @spec u64([0..18_446_744_073_709_551_615 | nil], Keyword.t()) :: %Adbc.Column{}
+  @spec u64([u64() | nil], Keyword.t()) :: %Adbc.Column{}
   def u64(data, opts \\ []) when is_list(data) and is_list(opts) do
     column(:u64, data, opts)
   end
@@ -288,7 +310,7 @@ defmodule Adbc.Column do
       }
 
   """
-  @spec i8([-128..127 | nil], Keyword.t()) :: %Adbc.Column{}
+  @spec i8([i8() | nil], Keyword.t()) :: %Adbc.Column{}
   def i8(data, opts \\ []) when is_list(data) and is_list(opts) do
     column(:i8, data, opts)
   end
@@ -319,17 +341,17 @@ defmodule Adbc.Column do
       }
 
   """
-  @spec i16([-32768..32767 | nil], Keyword.t()) :: %Adbc.Column{}
+  @spec i16([i16() | nil], Keyword.t()) :: %Adbc.Column{}
   def i16(data, opts \\ []) when is_list(data) and is_list(opts) do
     column(:i16, data, opts)
   end
 
   @doc """
-  A column that contains signed 32-bit integers.
+  A column that contains 32-bit signed integers.
 
   ## Arguments
 
-  * `data`: A list of signed 32-bit integer values
+  * `data`: A list of 32-bit signed integer values
   * `opts`: A keyword list of options
 
   ## Options
@@ -350,17 +372,17 @@ defmodule Adbc.Column do
       }
 
   """
-  @spec i32([-2_147_483_648..2_147_483_647 | nil], Keyword.t()) :: %Adbc.Column{}
+  @spec i32([i32() | nil], Keyword.t()) :: %Adbc.Column{}
   def i32(data, opts \\ []) when is_list(data) and is_list(opts) do
     column(:i32, data, opts)
   end
 
   @doc """
-  A column that contains signed 64-bit integers.
+  A column that contains 64-bit signed integers.
 
   ## Arguments
 
-  * `data`: A list of signed 64-bit integer values
+  * `data`: A list of 64-bit signed integer values
   * `opts`: A keyword list of options
 
   ## Options
@@ -381,8 +403,7 @@ defmodule Adbc.Column do
       }
 
   """
-  @spec i64([-9_223_372_036_854_775_808..9_223_372_036_854_775_807 | nil], Keyword.t()) ::
-          %Adbc.Column{}
+  @spec i64([i64() | nil], Keyword.t()) :: %Adbc.Column{}
   def i64(data, opts \\ []) when is_list(data) and is_list(opts) do
     column(:i64, data, opts)
   end
@@ -488,7 +509,7 @@ defmodule Adbc.Column do
   * `data`: a list, each element can be either
     * a `Decimal.t()`
     * an `integer()`
-  * `precision`: The precision of the decimal values
+  * `precision`: The precision of the decimal values; precision should be between 1 and 38
   * `scale`: The scale of the decimal values
   * `opts`: A keyword list of options
 
@@ -498,7 +519,8 @@ defmodule Adbc.Column do
   * `:nullable` - A boolean value indicating whether the column is nullable
   * `:metadata` - A map of metadata
   """
-  @spec decimal128([Decimal.t() | integer() | nil], integer(), integer(), Keyword.t()) :: %Adbc.Column{}
+  @spec decimal128([Decimal.t() | integer() | nil], precision128(), integer(), Keyword.t()) ::
+          %Adbc.Column{}
   def decimal128(data, precision, scale, opts \\ [])
       when is_integer(precision) and precision >= 1 and precision <= 38 do
     bitwidth = 128
@@ -518,7 +540,7 @@ defmodule Adbc.Column do
   * `data`: a list, each element can be either
     * a `Decimal.t()`
     * an `integer()`
-  * `precision`: The precision of the decimal values
+  * `precision`: The precision of the decimal values; precision should be between 1 and 76
   * `scale`: The scale of the decimal values
   * `opts`: A keyword list of options
 
@@ -528,9 +550,10 @@ defmodule Adbc.Column do
   * `:nullable` - A boolean value indicating whether the column is nullable
   * `:metadata` - A map of metadata
   """
-  @spec decimal256([Decimal.t() | integer() | nil], integer(), integer(), Keyword.t()) :: %Adbc.Column{}
+  @spec decimal256([Decimal.t() | integer() | nil], precision256(), integer(), Keyword.t()) ::
+          %Adbc.Column{}
   def decimal256(data, precision, scale, opts \\ [])
-      when is_integer(precision) and precision >= 1 and precision <= 38 do
+      when is_integer(precision) and precision >= 1 and precision <= 76 do
     bitwidth = 256
 
     column(
@@ -750,12 +773,12 @@ defmodule Adbc.Column do
   end
 
   @doc """
-  A column that contains date represented as 32-bit integers in UTC.
+  A column that contains date represented as 32-bit signed integers in UTC.
   ## Arguments
 
   * `data`: a list, each element of which can be one of the following:
     * a `Date.t()`
-    * a 32-bit integer representing the number of days since the Unix epoch.
+    * a 32-bit signed integer representing the number of days since the Unix epoch.
   * `opts`: A keyword list of options
 
   ## Options
@@ -764,18 +787,18 @@ defmodule Adbc.Column do
   * `:nullable` - A boolean value indicating whether the column is nullable
   * `:metadata` - A map of metadata
   """
-  @spec date32([Date.t() | integer() | nil], Keyword.t()) :: %Adbc.Column{}
+  @spec date32([Date.t() | i32() | nil], Keyword.t()) :: %Adbc.Column{}
   def date32(data, opts \\ []) when is_list(data) and is_list(opts) do
     column(:date32, data, opts)
   end
 
   @doc """
-  A column that contains date represented as 64-bit integers in UTC.
+  A column that contains date represented as 64-bit signed integers in UTC.
   ## Arguments
 
   * `data`: a list, each element of which can be one of the following:
     * a `Date.t()`
-    * a 64-bit integer representing the number of milliseconds since the Unix epoch.
+    * a 64-bit signed integer representing the number of milliseconds since the Unix epoch.
   * `opts`: A keyword list of options
 
   ## Options
@@ -784,13 +807,13 @@ defmodule Adbc.Column do
   * `:nullable` - A boolean value indicating whether the column is nullable
   * `:metadata` - A map of metadata
   """
-  @spec date64([Date.t() | integer() | nil], Keyword.t()) :: %Adbc.Column{}
+  @spec date64([Date.t() | i64() | nil], Keyword.t()) :: %Adbc.Column{}
   def date64(data, opts \\ []) when is_list(data) and is_list(opts) do
     column(:date64, data, opts)
   end
 
   @doc """
-  A column that contains time represented as integers in UTC.
+  A column that contains time represented as signed integers in UTC.
   ## Arguments
 
   * `data`:
@@ -798,9 +821,9 @@ defmodule Adbc.Column do
     * a list of integer values representing the time in the specified unit
 
       Note that when using `:seconds` or `:milliseconds` as the unit,
-      the time value is limited to the range of 32-bit integers.
+      the time value is limited to the range of 32-bit signed integers.
 
-      For `:microseconds` and `:nanoseconds`, the time value is limited to the range of 64-bit integers.
+      For `:microseconds` and `:nanoseconds`, the time value is limited to the range of 64-bit signed integers.
 
   * `unit`: specify the unit of the time value, one of the following:
     * `:seconds`
@@ -816,7 +839,7 @@ defmodule Adbc.Column do
   * `:nullable` - A boolean value indicating whether the column is nullable
   * `:metadata` - A map of metadata
   """
-  @spec time([Time.t() | nil] | [integer() | nil], time_unit(), Keyword.t()) :: %Adbc.Column{}
+  @spec time([Time.t() | nil] | [i64() | nil], time_unit(), Keyword.t()) :: %Adbc.Column{}
   def time(data, unit, opts \\ [])
 
   def time(data, :seconds, opts) when is_list(data) and is_list(opts) do
@@ -836,18 +859,13 @@ defmodule Adbc.Column do
   end
 
   @doc """
-  A column that contains timestamps represented as integers in the given timezone.
+  A column that contains timestamps represented as signed integers in the given timezone.
 
   ## Arguments
 
   * `data`:
     * a list of `NaiveDateTime.t()` value
-    * a list of integer values representing the time in the specified unit
-
-      Note that when using `:seconds` or `:milliseconds` as the unit,
-      the time value is limited to the range of 32-bit integers.
-
-      For `:microseconds` and `:nanoseconds`, the time value is limited to the range of 64-bit integers.
+    * a list of 64-bit signed integer values representing the time in the specified unit
 
   * `unit`: specify the unit of the time value, one of the following:
     * `:seconds`
@@ -865,7 +883,7 @@ defmodule Adbc.Column do
   * `:nullable` - A boolean value indicating whether the column is nullable
   * `:metadata` - A map of metadata
   """
-  @spec timestamp([NaiveDateTime.t() | nil] | [integer() | nil], time_unit(), String.t(), Keyword.t()) ::
+  @spec timestamp([NaiveDateTime.t() | nil] | [i64() | nil], time_unit(), String.t(), Keyword.t()) ::
           %Adbc.Column{}
   def timestamp(data, unit, timezone, opts \\ [])
 
@@ -890,7 +908,7 @@ defmodule Adbc.Column do
   end
 
   @doc """
-  A column that contains durations represented as signed 64-bit integers.
+  A column that contains durations represented as 64-bit signed integers.
 
   ## Arguments
 
@@ -910,7 +928,7 @@ defmodule Adbc.Column do
   * `:nullable` - A boolean value indicating whether the column is nullable
   * `:metadata` - A map of metadata
   """
-  @spec duration([integer() | nil], time_unit(), Keyword.t()) :: %Adbc.Column{}
+  @spec duration([i64() | nil], time_unit(), Keyword.t()) :: %Adbc.Column{}
   def duration(data, unit, opts \\ [])
 
   def duration(data, :seconds, opts) when is_list(data) and is_list(opts) do
@@ -927,5 +945,55 @@ defmodule Adbc.Column do
 
   def duration(data, :nanoseconds, opts) when is_list(data) and is_list(opts) do
     column({:duration, :nanoseconds}, data, opts)
+  end
+
+  @doc """
+  A column that contains durations represented as signed integers.
+
+  ## Arguments
+
+  * `data`: a list, each element of which can be one of the following:
+    - if `unit` is `:month`:
+      * a 32-bit signed integer representing the number of months.
+
+    - if `unit` is `:day_time`:
+      * a 2-tuple, both the number of days and the number of milliseconds are in 32-bit signed integers.
+
+    - if `unit` is `:month_day_nano`:
+      * a 3-tuple, the number of months, days, and nanoseconds;
+        the number of months and days are in 32-bit signed integers,
+        and the number of nanoseconds is in 64-bit signed integers
+
+  * `unit`: specify the unit of the time value, one of the following:
+    * `:month`
+    * `:day_time`
+    * `:month_day_nano`
+
+  * `opts`: A keyword list of options
+
+  ## Options
+
+  * `:name` - The name of the column
+  * `:nullable` - A boolean value indicating whether the column is nullable
+  * `:metadata` - A map of metadata
+  """
+  @spec interval(
+          [interval_month() | interval_day_time() | interval_month_day_nano() | nil],
+          interval_unit(),
+          Keyword.t()
+        ) ::
+          %Adbc.Column{}
+  def interval(data, interval_unit, opts \\ [])
+
+  def interval(data, :month, opts) do
+    column({:interval, :month}, data, opts)
+  end
+
+  def interval(data, :day_time, opts) do
+    column({:interval, :day_time}, data, opts)
+  end
+
+  def interval(data, :month_day_nano, opts) do
+    column({:interval, :month_day_nano}, data, opts)
   end
 end

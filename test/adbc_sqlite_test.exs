@@ -268,4 +268,31 @@ defmodule Adbc.SQLite.Test do
     assert abs(r1 - 1.1) < 1.0e-6
     assert abs(r3 - 3.3) < 1.0e-6
   end
+
+  test "bulk-queries", %{db: _, conn: conn} do
+    assert {:ok,
+            %Adbc.Result{
+              data: [
+                %Adbc.Column{
+                  data: [1, 2],
+                  metadata: nil,
+                  name: "I64",
+                  nullable: true,
+                  type: :i64
+                },
+                %Adbc.Column{
+                  name: "F64",
+                  type: :f64,
+                  nullable: true,
+                  metadata: nil,
+                  data: [3.3, 4.4]
+                }
+              ],
+              num_rows: nil
+            }} ==
+             Connection.query(conn, "SELECT ? AS I64, ? AS F64", [
+               Adbc.Column.i64([1, 2]),
+               Adbc.Column.f64([3.3, 4.4])
+             ])
+  end
 end

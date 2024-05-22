@@ -1074,6 +1074,7 @@ int adbc_column_to_arrow_type_struct(ErlNifEnv *env, ERL_NIF_TERM values, struct
             }
         } else if (enif_is_map(env, head)) {
             int ret = adbc_column_to_adbc_field(env, head, child_i, schema_i, error_out);
+            array_out->length = child_i->length;
             switch (ret)
             {
             case kErrorBufferIsNotAMap:

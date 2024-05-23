@@ -776,29 +776,13 @@ int do_get_list_interval(ErlNifEnv *env, ERL_NIF_TERM list, bool nullable, Arrow
 int do_get_list(ErlNifEnv *env, ERL_NIF_TERM list, bool nullable, ArrowType nanoarrow_type, struct ArrowArray* array_out, struct ArrowSchema* schema_out, struct ArrowError* error_out) {
     printf("do_get_list\n");
     NANOARROW_RETURN_NOT_OK(ArrowSchemaSetType(schema_out, nanoarrow_type));
-    printf("ArrowSchemaSetType ok\n");
     NANOARROW_RETURN_NOT_OK(ArrowArrayInitFromType(array_out, nanoarrow_type));
-    printf("ArrowArrayInitFromType ok\n");
-
-    if (array_out->n_children == 0) {
-        NANOARROW_RETURN_NOT_OK(ArrowArrayAllocateChildren(array_out, static_cast<int64_t>(1)));
-        printf("ArrowArrayAllocateChildren ok\n");
-    }
-    array_out->length = 1;
 
     unsigned n_items = 0;
     if (!enif_get_list_length(env, list, &n_items)) {
         return 1;
     }
     printf("n_items: %d\n", n_items);
-    // printf("schema_out->n_children: %d\n", schema_out->n_children);
-    // printf("array_out->n_children: %d\n", array_out->n_children);
-    // struct ArrowSchema *items_schema = schema_out->children[0];
-    // struct ArrowArray *items_values = array_out->children[0];
-    // NANOARROW_RETURN_NOT_OK(ArrowSchemaAllocateChildren(items_schema, static_cast<int64_t>(n_items)));
-    // NANOARROW_RETURN_NOT_OK(ArrowArrayAllocateChildren(items_values, static_cast<int64_t>(n_items)));
-
-    printf("AllocateChildren\n");
 
     size_t index = 0;
     ERL_NIF_TERM head, tail;
@@ -877,41 +861,59 @@ int build_metadata_from_nif(ErlNifEnv *env, ERL_NIF_TERM metadata_term, struct A
     return 0;
 }
 
-// non-zero return value indicating errors
-int adbc_column_to_adbc_field(ErlNifEnv *env, ERL_NIF_TERM adbc_buffer, struct ArrowArray* array_out, struct ArrowSchema* schema_out, struct ArrowError* error_out) {
-    if (!enif_is_map(env, adbc_buffer)) {
+int must_be_adbc_column(ErlNifEnv *env,
+    ERL_NIF_TERM adbc_column,
+    ERL_NIF_TERM &struct_name_term,
+    ERL_NIF_TERM &name_term,
+    ERL_NIF_TERM &type_term,
+    ERL_NIF_TERM &nullable_term,
+    ERL_NIF_TERM &metadata_term,
+    ERL_NIF_TERM &data_term,
+    unsigned *n_items)
+{
+    if (!enif_is_map(env, adbc_column)) {
         return kErrorBufferIsNotAMap;
     }
 
-    ERL_NIF_TERM struct_name_term, name_term, type_term, nullable_term, metadata_term, data_term;
-    if (!enif_get_map_value(env, adbc_buffer, kAtomStructKey, &struct_name_term)) {
+    if (!enif_get_map_value(env, adbc_column, kAtomStructKey, &struct_name_term)) {
         return kErrorBufferGetMapValue;
     }
     if (!enif_is_identical(struct_name_term, kAtomAdbcColumnModule)) {
         return kErrorBufferWrongStruct;
     }
 
-    if (!enif_get_map_value(env, adbc_buffer, kAtomNameKey, &name_term)) {
+    if (!enif_get_map_value(env, adbc_column, kAtomNameKey, &name_term)) {
         return kErrorBufferGetMapValue;
     }
-    if (!enif_get_map_value(env, adbc_buffer, kAtomTypeKey, &type_term)) {
+    if (!enif_get_map_value(env, adbc_column, kAtomTypeKey, &type_term)) {
         return kErrorBufferGetMapValue;
     }
-    if (!enif_get_map_value(env, adbc_buffer, kAtomNullableKey, &nullable_term)) {
+    if (!enif_get_map_value(env, adbc_column, kAtomNullableKey, &nullable_term)) {
         return kErrorBufferGetMapValue;
     }
-    if (!enif_get_map_value(env, adbc_buffer, kAtomMetadataKey, &metadata_term)) {
+    if (!enif_get_map_value(env, adbc_column, kAtomMetadataKey, &metadata_term)) {
         return kErrorBufferGetMapValue;
     }
-    if (!enif_get_map_value(env, adbc_buffer, kAtomDataKey, &data_term)) {
+    if (!enif_get_map_value(env, adbc_column, kAtomDataKey, &data_term)) {
         return kErrorBufferGetMapValue;
     }
     if (!enif_is_list(env, data_term)) {
         return kErrorBufferDataIsNotAList;
     }
-    unsigned n_items = 0;
-    if (!enif_get_list_length(env, data_term, &n_items)) {
+    if (!enif_get_list_length(env, data_term, n_items)) {
         return kErrorBufferGetDataListLength;
+    }
+
+    return 0;
+}
+
+// non-zero return value indicating errors
+int adbc_column_to_adbc_field(ErlNifEnv *env, ERL_NIF_TERM adbc_buffer, struct ArrowArray* array_out, struct ArrowSchema* schema_out, struct ArrowError* error_out) {
+    ERL_NIF_TERM struct_name_term, name_term, type_term, nullable_term, metadata_term, data_term;
+    unsigned n_items = 0;
+    int ret = must_be_adbc_column(env, adbc_buffer, struct_name_term, name_term, type_term, nullable_term, metadata_term, data_term, &n_items);
+    if (ret != 0) {
+        return ret;
     }
 
     std::string name;
@@ -939,7 +941,7 @@ int adbc_column_to_adbc_field(ErlNifEnv *env, ERL_NIF_TERM adbc_buffer, struct A
 
     // Data types can be found here:
     // https://arrow.apache.org/docs/format/CDataInterface.html
-    int ret = kErrorBufferUnknownType;
+    ret = kErrorBufferUnknownType;
     bool skipFinishBuildingDefault = false;
     if (enif_is_identical(type_term, kAdbcColumnTypeBool)) {
         ret = do_get_list_boolean(env, data_term, nullable, NANOARROW_TYPE_BOOL, array_out, schema_out, error_out);

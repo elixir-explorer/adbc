@@ -860,21 +860,25 @@ int adbc_column_to_adbc_field(ErlNifEnv *env, ERL_NIF_TERM adbc_buffer, struct A
     NANOARROW_RETURN_NOT_OK(ArrowSchemaSetMetadata(schema_out, (const char*)metadata_buffer.data));
     ArrowBufferReset(&metadata_buffer);
 
+    // Data types can be found here:
+    // https://arrow.apache.org/docs/format/CDataInterface.html
     int ret = kErrorBufferUnknownType;
-    if (enif_is_identical(type_term, kAdbcColumnTypeI8)) {
+    if (enif_is_identical(type_term, kAdbcColumnTypeBool)) {
+        ret = do_get_list_boolean(env, data_term, nullable, NANOARROW_TYPE_BOOL, array_out, schema_out, error_out);
+    } else if (enif_is_identical(type_term, kAdbcColumnTypeI8)) {
         ret = do_get_list_integer<int8_t>(env, data_term, nullable, NANOARROW_TYPE_INT8, array_out, schema_out, error_out);
-    } else if (enif_is_identical(type_term, kAdbcColumnTypeI16)) {
-        ret = do_get_list_integer<int16_t>(env, data_term, nullable, NANOARROW_TYPE_INT16, array_out, schema_out, error_out);
-    } else if (enif_is_identical(type_term, kAdbcColumnTypeI32)) {
-        ret = do_get_list_integer<int32_t>(env, data_term, nullable, NANOARROW_TYPE_INT32, array_out, schema_out, error_out);
-    } else if (enif_is_identical(type_term, kAdbcColumnTypeI64)) {
-        ret = do_get_list_integer<int64_t>(env, data_term, nullable, NANOARROW_TYPE_INT64, array_out, schema_out, error_out);
     } else if (enif_is_identical(type_term, kAdbcColumnTypeU8)) {
         ret = do_get_list_integer<uint8_t>(env, data_term, nullable, NANOARROW_TYPE_UINT8, array_out, schema_out, error_out);
+    } else if (enif_is_identical(type_term, kAdbcColumnTypeI16)) {
+        ret = do_get_list_integer<int16_t>(env, data_term, nullable, NANOARROW_TYPE_INT16, array_out, schema_out, error_out);
     } else if (enif_is_identical(type_term, kAdbcColumnTypeU16)) {
         ret = do_get_list_integer<uint16_t>(env, data_term, nullable, NANOARROW_TYPE_UINT16, array_out, schema_out, error_out);
+    } else if (enif_is_identical(type_term, kAdbcColumnTypeI32)) {
+        ret = do_get_list_integer<int32_t>(env, data_term, nullable, NANOARROW_TYPE_INT32, array_out, schema_out, error_out);
     } else if (enif_is_identical(type_term, kAdbcColumnTypeU32)) {
         ret = do_get_list_integer<uint32_t>(env, data_term, nullable, NANOARROW_TYPE_UINT32, array_out, schema_out, error_out);
+    } else if (enif_is_identical(type_term, kAdbcColumnTypeI64)) {
+        ret = do_get_list_integer<int64_t>(env, data_term, nullable, NANOARROW_TYPE_INT64, array_out, schema_out, error_out);
     } else if (enif_is_identical(type_term, kAdbcColumnTypeU64)) {
         ret = do_get_list_integer<uint64_t>(env, data_term, nullable, NANOARROW_TYPE_UINT64, array_out, schema_out, error_out);
     } else if (enif_is_identical(type_term, kAdbcColumnTypeF16)) {
@@ -883,20 +887,18 @@ int adbc_column_to_adbc_field(ErlNifEnv *env, ERL_NIF_TERM adbc_buffer, struct A
         ret = do_get_list_float(env, data_term, nullable, NANOARROW_TYPE_FLOAT, array_out, schema_out, error_out);
     } else if (enif_is_identical(type_term, kAdbcColumnTypeF64)) {
         ret = do_get_list_float(env, data_term, nullable, NANOARROW_TYPE_DOUBLE, array_out, schema_out, error_out);
-    } else if (enif_is_identical(type_term, kAdbcColumnTypeString)) {
-        ret = do_get_list_string(env, data_term, nullable, NANOARROW_TYPE_STRING, array_out, schema_out, error_out);
-    } else if (enif_is_identical(type_term, kAdbcColumnTypeLargeString)) {
-        ret = do_get_list_string(env, data_term, nullable, NANOARROW_TYPE_LARGE_STRING, array_out, schema_out, error_out);
     } else if (enif_is_identical(type_term, kAdbcColumnTypeBinary)) {
         ret = do_get_list_string(env, data_term, nullable, NANOARROW_TYPE_BINARY, array_out, schema_out, error_out);
     } else if (enif_is_identical(type_term, kAdbcColumnTypeLargeBinary)) {
         ret = do_get_list_string(env, data_term, nullable, NANOARROW_TYPE_LARGE_BINARY, array_out, schema_out, error_out);
+    } else if (enif_is_identical(type_term, kAdbcColumnTypeString)) {
+        ret = do_get_list_string(env, data_term, nullable, NANOARROW_TYPE_STRING, array_out, schema_out, error_out);
+    } else if (enif_is_identical(type_term, kAdbcColumnTypeLargeString)) {
+        ret = do_get_list_string(env, data_term, nullable, NANOARROW_TYPE_LARGE_STRING, array_out, schema_out, error_out);
     } else if (enif_is_identical(type_term, kAdbcColumnTypeDate32)) {
         ret = do_get_list_date(env, data_term, nullable, NANOARROW_TYPE_DATE32, array_out, schema_out, error_out);
     } else if (enif_is_identical(type_term, kAdbcColumnTypeDate64)) {
         ret = do_get_list_date(env, data_term, nullable, NANOARROW_TYPE_DATE64, array_out, schema_out, error_out);
-    } else if (enif_is_identical(type_term, kAdbcColumnTypeBool)) {
-        ret = do_get_list_boolean(env, data_term, nullable, NANOARROW_TYPE_BOOL, array_out, schema_out, error_out);
     } else if (enif_is_tuple(env, type_term)) {        
         if (enif_is_identical(type_term, kAdbcColumnTypeTime32Seconds)) {
             // NANOARROW_TYPE_TIME32

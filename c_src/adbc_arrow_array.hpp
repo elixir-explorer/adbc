@@ -843,6 +843,7 @@ int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct 
             children_term = get_arrow_array_map_children(env, schema, values, offset, count, level);
         } else if (strncmp("+l", format, 2) == 0) {
             // NANOARROW_TYPE_LIST
+            printf("format=%s\n", format);
             term_type = kAdbcColumnTypeList;
             children_term = get_arrow_array_list_children(env, schema, values, offset, count, level);
         } else if (strncmp("+L", format, 2) == 0) {

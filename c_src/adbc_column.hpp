@@ -12,6 +12,8 @@
 #include "adbc_half_float.hpp"
 #include "nif_utils.hpp"
 
+int adbc_column_to_adbc_field(ErlNifEnv *env, ERL_NIF_TERM adbc_buffer, struct ArrowArray* array_out, struct ArrowSchema* schema_out, struct ArrowError* error_out);
+
 ERL_NIF_TERM make_adbc_column(ErlNifEnv *env, ERL_NIF_TERM name_term, ERL_NIF_TERM type_term, bool nullable, ERL_NIF_TERM metadata, ERL_NIF_TERM data) {
     ERL_NIF_TERM nullable_term = nullable ? kAtomTrue : kAtomFalse;
 
@@ -720,8 +722,8 @@ int get_list_duration_month_day_nano(ErlNifEnv *env, ERL_NIF_TERM list, bool nul
             const ERL_NIF_TERM *tuple = nullptr;
             int arity;
             if (enif_get_tuple(env, head, &arity, &tuple) && arity == 3) {
-                if (!erlang::nif::get(env, tuple[0], &months) || 
-                    !erlang::nif::get(env, tuple[1], &days) || 
+                if (!erlang::nif::get(env, tuple[0], &months) ||
+                    !erlang::nif::get(env, tuple[1], &days) ||
                     !erlang::nif::get(env, tuple[2], &nanoseconds)) {
                     return 1;
                 }
@@ -762,7 +764,7 @@ int do_get_list_interval(ErlNifEnv *env, ERL_NIF_TERM list, bool nullable, Arrow
         get_list_interval = get_list_duration_month_day_nano;
     } else {
         return 1;
-    } 
+    }
 
     if (nullable) {
         return get_list_interval(env, list, nullable, appendNullableInterval);
@@ -771,10 +773,77 @@ int do_get_list_interval(ErlNifEnv *env, ERL_NIF_TERM list, bool nullable, Arrow
     }
 }
 
+int do_get_list(ErlNifEnv *env, ERL_NIF_TERM list, bool nullable, ArrowType nanoarrow_type, struct ArrowArray* array_out, struct ArrowSchema* schema_out, struct ArrowError* error_out) {
+    printf("do_get_list\n");
+    NANOARROW_RETURN_NOT_OK(ArrowSchemaSetType(schema_out, nanoarrow_type));
+    printf("ArrowSchemaSetType ok\n");
+    NANOARROW_RETURN_NOT_OK(ArrowArrayInitFromType(array_out, nanoarrow_type));
+    printf("ArrowArrayInitFromType ok\n");
+
+    if (array_out->n_children == 0) {
+        NANOARROW_RETURN_NOT_OK(ArrowArrayAllocateChildren(array_out, static_cast<int64_t>(1)));
+        printf("ArrowArrayAllocateChildren ok\n");
+    }
+    array_out->length = 1;
+
+    unsigned n_items = 0;
+    if (!enif_get_list_length(env, list, &n_items)) {
+        return 1;
+    }
+    printf("n_items: %d\n", n_items);
+    // printf("schema_out->n_children: %d\n", schema_out->n_children);
+    // printf("array_out->n_children: %d\n", array_out->n_children);
+    // struct ArrowSchema *items_schema = schema_out->children[0];
+    // struct ArrowArray *items_values = array_out->children[0];
+    // NANOARROW_RETURN_NOT_OK(ArrowSchemaAllocateChildren(items_schema, static_cast<int64_t>(n_items)));
+    // NANOARROW_RETURN_NOT_OK(ArrowArrayAllocateChildren(items_values, static_cast<int64_t>(n_items)));
+
+    printf("AllocateChildren\n");
+
+    size_t index = 0;
+    ERL_NIF_TERM head, tail;
+    tail = list;
+    while (enif_get_list_cell(env, tail, &head, &tail)) {
+        if (enif_is_identical(head, kAtomNil)) {
+            ArrowArrayAppendNull(array_out, 1);
+        } else {
+            // each element in the list should be an `Adbc.Column`
+            // but it can also be another list or struct
+            // lets handle all primitive types plus the list type
+            // and leave all other types later
+            struct ArrowSchema *item_schema = schema_out->children[index];
+            struct ArrowArray *item_values = array_out->children[index];
+            ArrowArrayAppendEmpty(array_out, 1);
+            printf("before adbc_column_to_adbc_field\n");
+            int ret = adbc_column_to_adbc_field(env, head, item_values, item_schema, error_out);
+            printf("after adbc_column_to_adbc_field: %d\n", ret);
+            if (ret != 0) {
+            //    for (int i = 0; i < n_items; i++) {
+            //         ArrowSchemaRelease(items_schema->children[i]);
+            //         ArrowArrayRelease(items_values->children[i]);
+            //     }
+                return ret;
+            }
+        }
+        index++;
+        printf("next index: %d\n", index);
+    }
+
+    return 0;
+}
+
+int do_get_fixed_size_list(ErlNifEnv *env, ERL_NIF_TERM list, bool nullable, ArrowType nanoarrow_type, struct ArrowArray* array_out, struct ArrowSchema* schema_out, struct ArrowError* error_out) {
+    // NANOARROW_RETURN_NOT_OK(ArrowSchemaSetTypeFixedSize(schema_out, nanoarrow_type));
+    // NANOARROW_RETURN_NOT_OK(ArrowArrayInitFromSchema(array_out, schema_out, error_out));
+    // NANOARROW_RETURN_NOT_OK(ArrowArrayStartAppending(array_out));
+
+    return 0;
+}
+
 // non-zero return value indicating errors
 int adbc_column_to_adbc_field(ErlNifEnv *env, ERL_NIF_TERM adbc_buffer, struct ArrowArray* array_out, struct ArrowSchema* schema_out, struct ArrowError* error_out) {
-    array_out->release = NULL;
-    schema_out->release = NULL;
+    // array_out->release = NULL;
+    // schema_out->release = NULL;
 
     if (!enif_is_map(env, adbc_buffer)) {
         return kErrorBufferIsNotAMap;
@@ -863,6 +932,7 @@ int adbc_column_to_adbc_field(ErlNifEnv *env, ERL_NIF_TERM adbc_buffer, struct A
     // Data types can be found here:
     // https://arrow.apache.org/docs/format/CDataInterface.html
     int ret = kErrorBufferUnknownType;
+    bool skipFinishBuildingDefault = false;
     if (enif_is_identical(type_term, kAdbcColumnTypeBool)) {
         ret = do_get_list_boolean(env, data_term, nullable, NANOARROW_TYPE_BOOL, array_out, schema_out, error_out);
     } else if (enif_is_identical(type_term, kAdbcColumnTypeI8)) {
@@ -899,7 +969,15 @@ int adbc_column_to_adbc_field(ErlNifEnv *env, ERL_NIF_TERM adbc_buffer, struct A
         ret = do_get_list_date(env, data_term, nullable, NANOARROW_TYPE_DATE32, array_out, schema_out, error_out);
     } else if (enif_is_identical(type_term, kAdbcColumnTypeDate64)) {
         ret = do_get_list_date(env, data_term, nullable, NANOARROW_TYPE_DATE64, array_out, schema_out, error_out);
-    } else if (enif_is_tuple(env, type_term)) {        
+    } else if (enif_is_identical(type_term, kAdbcColumnTypeList)) {
+        ret = do_get_list(env, data_term, nullable, NANOARROW_TYPE_LIST, array_out, schema_out, error_out);
+        printf("do_get_list: %d\n", ret);
+        skipFinishBuildingDefault = true;
+    } else if (enif_is_identical(type_term, kAdbcColumnTypeLargeList)) {
+        ret = do_get_list(env, data_term, nullable, NANOARROW_TYPE_LARGE_LIST, array_out, schema_out, error_out);
+    } else if (enif_is_identical(type_term, kAdbcColumnTypeFixedSizeList)) {
+        ret = do_get_list(env, data_term, nullable, NANOARROW_TYPE_FIXED_SIZE_LIST, array_out, schema_out, error_out);
+    } else if (enif_is_tuple(env, type_term)) {
         if (enif_is_identical(type_term, kAdbcColumnTypeTime32Seconds)) {
             // NANOARROW_TYPE_TIME32
             ret = do_get_list_time(env, data_term, nullable, NANOARROW_TYPE_TIME32, NANOARROW_TIME_UNIT_SECOND, 1000000000, array_out, schema_out, error_out);
@@ -991,8 +1069,11 @@ int adbc_column_to_adbc_field(ErlNifEnv *env, ERL_NIF_TERM adbc_buffer, struct A
         return ret;
     }
 
-    NANOARROW_RETURN_NOT_OK(ArrowArrayFinishBuildingDefault(array_out, error_out));
-    return 0;   
+    if (!skipFinishBuildingDefault) {
+        NANOARROW_RETURN_NOT_OK(ArrowArrayFinishBuildingDefault(array_out, error_out));
+    }
+    printf("FinishBuilding\n");
+    return 0;
 }
 
 // non-zero return value indicating errors
@@ -1062,7 +1143,7 @@ int adbc_column_to_arrow_type_struct(ErlNifEnv *env, ERL_NIF_TERM values, struct
                 enif_snprintf(error_out->message, sizeof(error_out->message), "atom `:%T` is not supported yet.", head);
                 return 1;
             }
-            
+
             NANOARROW_RETURN_NOT_OK(ArrowSchemaSetType(schema_i, type));
             NANOARROW_RETURN_NOT_OK(ArrowSchemaSetName(schema_i, ""));
             NANOARROW_RETURN_NOT_OK(ArrowArrayInitFromSchema(child_i, schema_i, error_out));
@@ -1076,7 +1157,8 @@ int adbc_column_to_arrow_type_struct(ErlNifEnv *env, ERL_NIF_TERM values, struct
             }
         } else if (enif_is_map(env, head)) {
             int ret = adbc_column_to_adbc_field(env, head, child_i, schema_i, error_out);
-            array_out->length = child_i->length;
+            printf("adbc_column_to_adbc_field: %d\n", ret);
+            // array_out->length = child_i->length;
             switch (ret)
             {
             case kErrorBufferIsNotAMap:
@@ -1107,7 +1189,7 @@ int adbc_column_to_arrow_type_struct(ErlNifEnv *env, ERL_NIF_TERM values, struct
         }
         processed++;
     }
-    NANOARROW_RETURN_NOT_OK(ArrowArrayFinishBuildingDefault(array_out, error_out));
+    NANOARROW_RETURN_NOT_OK(ArrowArrayFinishBuilding(array_out, NANOARROW_VALIDATION_LEVEL_FULL, error_out));
     return !(processed == n_items);
 }
 

@@ -996,4 +996,14 @@ defmodule Adbc.Column do
   def interval(data, :month_day_nano, opts) do
     column({:interval, :month_day_nano}, data, opts)
   end
+
+  def list(data, opts \\ [])
+
+  def list(%Adbc.Column{}=data, opts) do
+    column(:list, [data], opts)
+  end
+
+  def list(data, opts) do
+    column(:list, data, opts)
+  end
 end

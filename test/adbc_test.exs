@@ -47,6 +47,32 @@ defmodule AdbcTest do
                Connection.query(conn, "SELECT 123 as num")
     end
 
+    test "list paramters for query", %{conn: conn} do
+      assert {:ok,
+              %Adbc.Result{
+                data: [
+                  %Adbc.Column{
+                    name: "num",
+                    type: :list,
+                    nullable: true,
+                    metadata: nil,
+                    data: [
+                      %Adbc.Column{
+                        name: "item",
+                        type: :i32,
+                        nullable: true,
+                        metadata: nil,
+                        data: [1, 2, 3]
+                      }
+                    ]
+                  }
+                ]
+              }} =
+               Connection.query(conn, "SELECT ANY(?1::INT[]) as num", [
+                Adbc.Column.list(Adbc.Column.i32([1,2,3], name: "item"))
+               ])
+    end
+
     test "list responses", %{conn: conn} do
       assert {:ok,
               %Adbc.Result{

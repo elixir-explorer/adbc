@@ -8,6 +8,7 @@
 #include <type_traits>
 #include <adbc.h>
 #include <erl_nif.h>
+#include <nanoarrow/nanoarrow.hpp>
 #include "adbc_consts.h"
 #include "adbc_half_float.hpp"
 #include "nif_utils.hpp"
@@ -90,38 +91,38 @@ ERL_NIF_TERM make_adbc_column(ErlNifEnv *env, const char * name, const char * ty
 
 template <typename Integer, typename std::enable_if<
         std::is_integral<Integer>{} && std::is_signed<Integer>{}, bool>::type = true>
-int get_list_integer(ErlNifEnv *env, ERL_NIF_TERM list, bool nullable, const std::function<void(Integer val, bool is_nil)> &callback) {
+int get_list_integer(ErlNifEnv *env, ERL_NIF_TERM list, bool nullable, const std::function<int(Integer val, bool is_nil)> &callback) {
     ERL_NIF_TERM head, tail;
     tail = list;
     while (enif_get_list_cell(env, tail, &head, &tail)) {
         int64_t val;
         if (!erlang::nif::get(env, head, &val)) {
             if (nullable && enif_is_identical(head, kAtomNil)) {
-                callback(0, true);
+                NANOARROW_RETURN_NOT_OK(callback(0, true));
             } else {
                 return 1;
             }
         }
-        callback((Integer)val, false);
+        NANOARROW_RETURN_NOT_OK(callback((Integer)val, false));
     }
     return 0;
 }
 
 template <typename Integer, typename std::enable_if<
         std::is_integral<Integer>{} && !std::is_signed<Integer>{}, bool>::type = true>
-int get_list_integer(ErlNifEnv *env, ERL_NIF_TERM list, bool nullable, const std::function<void(Integer val, bool is_nil)> &callback) {
+int get_list_integer(ErlNifEnv *env, ERL_NIF_TERM list, bool nullable, const std::function<int(Integer val, bool is_nil)> &callback) {
     ERL_NIF_TERM head, tail;
     tail = list;
     while (enif_get_list_cell(env, tail, &head, &tail)) {
         uint64_t val;
         if (!erlang::nif::get(env, head, &val)) {
             if (nullable && enif_is_identical(head, kAtomNil)) {
-                callback(0, true);
+                NANOARROW_RETURN_NOT_OK(callback(0, true));
             } else {
                 return 1;
             }
         }
-        callback((Integer)val, false);
+        NANOARROW_RETURN_NOT_OK(callback((Integer)val, false));
     }
     return 0;
 }
@@ -129,41 +130,52 @@ int get_list_integer(ErlNifEnv *env, ERL_NIF_TERM list, bool nullable, const std
 template <typename T>
 int do_get_list_integer(ErlNifEnv *env, ERL_NIF_TERM list, bool nullable, ArrowType nanoarrow_type, struct ArrowArray* array_out, struct ArrowSchema* schema_out, struct ArrowError* error_out) {
     NANOARROW_RETURN_NOT_OK(ArrowSchemaSetType(schema_out, nanoarrow_type));
-    NANOARROW_RETURN_NOT_OK(ArrowArrayInitFromSchema(array_out, schema_out, error_out));
-    NANOARROW_RETURN_NOT_OK(ArrowArrayStartAppending(array_out));
+
+    nanoarrow::UniqueArray tmp;
+    NANOARROW_RETURN_NOT_OK(ArrowArrayInitFromSchema(tmp.get(), schema_out, error_out));
+    NANOARROW_RETURN_NOT_OK(ArrowArrayStartAppending(tmp.get()));
+    int ret;
     if (nullable) {
-        return get_list_integer<T>(env, list, nullable, [&array_out](T val, bool is_nil) -> void {
-            ArrowArrayAppendInt(array_out, val);
+        ret = get_list_integer<T>(env, list, nullable, [&tmp](T val, bool is_nil) -> int {
+            NANOARROW_RETURN_NOT_OK(ArrowArrayAppendInt(tmp.get(), val));
             if (is_nil) {
-                ArrowArrayAppendNull(array_out, 1);
+                NANOARROW_RETURN_NOT_OK(ArrowArrayAppendNull(tmp.get(), 1));
             }
+            return 0;
         });
+        
     } else {
-        return get_list_integer<T>(env, list, nullable, [&array_out](T val, bool) -> void {
-            ArrowArrayAppendInt(array_out, val);
+        ret = get_list_integer<T>(env, list, nullable, [&tmp](T val, bool) -> int {
+            return ArrowArrayAppendInt(tmp.get(), val);
         });
     }
+
+    if (ret == 0) {
+        NANOARROW_RETURN_NOT_OK(ArrowArrayFinishBuildingDefault(tmp.get(), error_out));
+        ArrowArrayMove(tmp.get(), array_out);    
+    }
+    return ret;
 }
 
-int get_list_float(ErlNifEnv *env, ERL_NIF_TERM list, bool nullable, const std::function<void(double val, bool is_nil)> &callback) {
+int get_list_float(ErlNifEnv *env, ERL_NIF_TERM list, bool nullable, const std::function<int(double val, bool is_nil)> &callback) {
     ERL_NIF_TERM head, tail;
     tail = list;
     while (enif_get_list_cell(env, tail, &head, &tail)) {
         double val;
         if (!erlang::nif::get(env, head, &val)) {
             if (nullable && enif_is_identical(head, kAtomNil)) {
-                callback(0, true);
+                NANOARROW_RETURN_NOT_OK(callback(0, true));
             } else if (enif_is_identical(head, kAtomInfinity)) {
-                callback(std::numeric_limits<double>::infinity(), false);
+                NANOARROW_RETURN_NOT_OK(callback(std::numeric_limits<double>::infinity(), false));
             } else if (enif_is_identical(head, kAtomNegInfinity)) {
-                callback(-std::numeric_limits<double>::infinity(), false);
+                NANOARROW_RETURN_NOT_OK(callback(-std::numeric_limits<double>::infinity(), false));
             } else if (enif_is_identical(head, kAtomNaN)) {
-                callback(std::numeric_limits<double>::quiet_NaN(), false);
+                NANOARROW_RETURN_NOT_OK(callback(std::numeric_limits<double>::quiet_NaN(), false));
             } else {
                 return 1;
             }
         } else {
-            callback(val, false);
+            NANOARROW_RETURN_NOT_OK(callback(val, false));
         }
     }
     return 0;
@@ -171,49 +183,65 @@ int get_list_float(ErlNifEnv *env, ERL_NIF_TERM list, bool nullable, const std::
 
 int do_get_list_half_float(ErlNifEnv *env, ERL_NIF_TERM list, bool nullable, ArrowType nanoarrow_type, struct ArrowArray* array_out, struct ArrowSchema* schema_out, struct ArrowError* error_out) {
     NANOARROW_RETURN_NOT_OK(ArrowSchemaSetType(schema_out, nanoarrow_type));
-    NANOARROW_RETURN_NOT_OK(ArrowArrayInitFromSchema(array_out, schema_out, error_out));
-    struct ArrowArrayPrivateData* private_data = (struct ArrowArrayPrivateData*)array_out->private_data;
+
+    nanoarrow::UniqueArray tmp;
+    NANOARROW_RETURN_NOT_OK(ArrowArrayInitFromSchema(tmp.get(), schema_out, error_out));
+    struct ArrowArrayPrivateData* private_data = (struct ArrowArrayPrivateData*)tmp.get()->private_data;
     auto storage_type = private_data->storage_type;
     private_data->storage_type = NANOARROW_TYPE_UINT16;
-    NANOARROW_RETURN_NOT_OK(ArrowArrayStartAppending(array_out));
+    NANOARROW_RETURN_NOT_OK(ArrowArrayStartAppending(tmp.get()));
     int ret;
     if (nullable) {
-        ret = get_list_float(env, list, nullable, [&array_out](double val, bool is_nil) -> void {
-            ArrowArrayAppendUInt(array_out, float_to_float16(val));
+        ret = get_list_float(env, list, nullable, [&tmp](double val, bool is_nil) -> int {
+            NANOARROW_RETURN_NOT_OK(ArrowArrayAppendUInt(tmp.get(), float_to_float16(val)));
             if (is_nil) {
-                ArrowArrayAppendNull(array_out, 1);
+                NANOARROW_RETURN_NOT_OK(ArrowArrayAppendNull(tmp.get(), 1));
             }
+            return 0;
         });
-        private_data->storage_type = storage_type;
-        return ret;
     } else {
-        ret = get_list_float(env, list, nullable, [&array_out](double val, bool) -> void {
-            ArrowArrayAppendUInt(array_out, float_to_float16(val));
+        ret = get_list_float(env, list, nullable, [&tmp](double val, bool) -> int {
+            return ArrowArrayAppendUInt(tmp.get(), float_to_float16(val));
         });
-        private_data->storage_type = storage_type;
-        return ret;
     }
+
+    if (ret == 0) {
+        private_data->storage_type = storage_type;
+        NANOARROW_RETURN_NOT_OK(ArrowArrayFinishBuildingDefault(tmp.get(), error_out));
+        ArrowArrayMove(tmp.get(), array_out);    
+    }
+    return ret;
 }
 
 int do_get_list_float(ErlNifEnv *env, ERL_NIF_TERM list, bool nullable, ArrowType nanoarrow_type, struct ArrowArray* array_out, struct ArrowSchema* schema_out, struct ArrowError* error_out) {
     NANOARROW_RETURN_NOT_OK(ArrowSchemaSetType(schema_out, nanoarrow_type));
-    NANOARROW_RETURN_NOT_OK(ArrowArrayInitFromSchema(array_out, schema_out, error_out));
-    NANOARROW_RETURN_NOT_OK(ArrowArrayStartAppending(array_out));
+
+    nanoarrow::UniqueArray tmp;
+    NANOARROW_RETURN_NOT_OK(ArrowArrayInitFromSchema(tmp.get(), schema_out, error_out));
+    NANOARROW_RETURN_NOT_OK(ArrowArrayStartAppending(tmp.get()));
+    int ret;
     if (nullable) {
-        return get_list_float(env, list, nullable, [&array_out](double val, bool is_nil) -> void {
-            ArrowArrayAppendDouble(array_out, val);
+        ret = get_list_float(env, list, nullable, [&tmp](double val, bool is_nil) -> int {
+            NANOARROW_RETURN_NOT_OK(ArrowArrayAppendDouble(tmp.get(), val));
             if (is_nil) {
-                ArrowArrayAppendNull(array_out, 1);
+                NANOARROW_RETURN_NOT_OK(ArrowArrayAppendNull(tmp.get(), 1));
             }
+            return 0;
         });
     } else {
-        return get_list_float(env, list, nullable, [&array_out](double val, bool) -> void {
-            ArrowArrayAppendDouble(array_out, val);
+        ret = get_list_float(env, list, nullable, [&tmp](double val, bool) -> int {
+            return ArrowArrayAppendDouble(tmp.get(), val);
         });
     }
+
+    if (ret == 0) {
+        NANOARROW_RETURN_NOT_OK(ArrowArrayFinishBuildingDefault(tmp.get(), error_out));
+        ArrowArrayMove(tmp.get(), array_out);    
+    }
+    return ret;
 }
 
-int get_list_decimal(ErlNifEnv *env, ERL_NIF_TERM list, bool nullable, ArrowType nanoarrow_type, int32_t bitwidth, int32_t precision, int32_t scale, const std::function<void(struct ArrowDecimal * val, bool is_nil)> &callback) {
+int get_list_decimal(ErlNifEnv *env, ERL_NIF_TERM list, bool nullable, ArrowType nanoarrow_type, int32_t bitwidth, int32_t precision, int32_t scale, const std::function<int(struct ArrowDecimal * val, bool is_nil)> &callback) {
     ERL_NIF_TERM head, tail;
     tail = list;
     while (enif_get_list_cell(env, tail, &head, &tail)) {
@@ -234,9 +262,9 @@ int get_list_decimal(ErlNifEnv *env, ERL_NIF_TERM list, bool nullable, ArrowType
             } else {
                 return 1;
             }
-            callback(&val, false);
+            NANOARROW_RETURN_NOT_OK(callback(&val, false));
         } else if (nullable && enif_is_identical(head, kAtomNil)) {
-            callback(&val, true);
+            NANOARROW_RETURN_NOT_OK(callback(&val, true));
         } else {
             return 1;
         }
@@ -246,23 +274,33 @@ int get_list_decimal(ErlNifEnv *env, ERL_NIF_TERM list, bool nullable, ArrowType
 
 int do_get_list_decimal(ErlNifEnv *env, ERL_NIF_TERM list, bool nullable, ArrowType nanoarrow_type, int32_t bitwidth, int32_t precision, int32_t scale, struct ArrowArray* array_out, struct ArrowSchema* schema_out, struct ArrowError* error_out) {
     NANOARROW_RETURN_NOT_OK(ArrowSchemaSetTypeDecimal(schema_out, nanoarrow_type, precision, scale));
-    NANOARROW_RETURN_NOT_OK(ArrowArrayInitFromSchema(array_out, schema_out, error_out));
-    NANOARROW_RETURN_NOT_OK(ArrowArrayStartAppending(array_out));
+
+    nanoarrow::UniqueArray tmp;
+    NANOARROW_RETURN_NOT_OK(ArrowArrayInitFromSchema(tmp.get(), schema_out, error_out));
+    NANOARROW_RETURN_NOT_OK(ArrowArrayStartAppending(tmp.get()));
+    int ret;
     if (nullable) {
-        return get_list_decimal(env, list, nullable, nanoarrow_type, bitwidth, precision, scale, [&array_out](struct ArrowDecimal * val, bool is_nil) -> void {
-            ArrowArrayAppendDecimal(array_out, val);
+        ret = get_list_decimal(env, list, nullable, nanoarrow_type, bitwidth, precision, scale, [&tmp](struct ArrowDecimal * val, bool is_nil) -> int {
+            NANOARROW_RETURN_NOT_OK(ArrowArrayAppendDecimal(tmp.get(), val));
             if (is_nil) {
-                ArrowArrayAppendNull(array_out, 1);
+                NANOARROW_RETURN_NOT_OK(ArrowArrayAppendNull(tmp.get(), 1));
             }
+            return 0;
         });
     } else {
-        return get_list_decimal(env, list, nullable, nanoarrow_type,  bitwidth, precision, scale, [&array_out](struct ArrowDecimal * val, bool) -> void {
-            ArrowArrayAppendDecimal(array_out, val);
+        ret = get_list_decimal(env, list, nullable, nanoarrow_type,  bitwidth, precision, scale, [&tmp](struct ArrowDecimal * val, bool) -> int {
+            return ArrowArrayAppendDecimal(tmp.get(), val);
         });
     }
+
+    if (ret == 0) {
+        NANOARROW_RETURN_NOT_OK(ArrowArrayFinishBuildingDefault(tmp.get(), error_out));
+        ArrowArrayMove(tmp.get(), array_out);    
+    }
+    return ret;
 }
 
-int get_list_string(ErlNifEnv *env, ERL_NIF_TERM list, bool nullable, const std::function<void(struct ArrowStringView val, bool is_nil)> &callback) {
+int get_list_string(ErlNifEnv *env, ERL_NIF_TERM list, bool nullable, const std::function<int(struct ArrowStringView val, bool is_nil)> &callback) {
     ERL_NIF_TERM head, tail;
     tail = list;
     while (enif_get_list_cell(env, tail, &head, &tail)) {
@@ -271,9 +309,9 @@ int get_list_string(ErlNifEnv *env, ERL_NIF_TERM list, bool nullable, const std:
         if (enif_is_binary(env, head) && enif_inspect_binary(env, head, &bytes)) {
             val.data = (const char *)bytes.data;
             val.size_bytes = static_cast<int64_t>(bytes.size);
-            callback(val, false);
+            NANOARROW_RETURN_NOT_OK(callback(val, false));
         } else if (nullable && enif_is_identical(head, kAtomNil)) {
-            callback(val, true);
+            NANOARROW_RETURN_NOT_OK(callback(val, true));
         } else {
             return 1;
         }
@@ -283,32 +321,42 @@ int get_list_string(ErlNifEnv *env, ERL_NIF_TERM list, bool nullable, const std:
 
 int do_get_list_string(ErlNifEnv *env, ERL_NIF_TERM list, bool nullable, ArrowType nanoarrow_type, struct ArrowArray* array_out, struct ArrowSchema* schema_out, struct ArrowError* error_out) {
     NANOARROW_RETURN_NOT_OK(ArrowSchemaSetType(schema_out, nanoarrow_type));
-    NANOARROW_RETURN_NOT_OK(ArrowArrayInitFromSchema(array_out, schema_out, error_out));
-    NANOARROW_RETURN_NOT_OK(ArrowArrayStartAppending(array_out));
+
+    nanoarrow::UniqueArray tmp;
+    NANOARROW_RETURN_NOT_OK(ArrowArrayInitFromSchema(tmp.get(), schema_out, error_out));
+    NANOARROW_RETURN_NOT_OK(ArrowArrayStartAppending(tmp.get()));
+    int ret;
     if (nullable) {
-        return get_list_string(env, list, nullable, [&array_out](struct ArrowStringView val, bool is_nil) -> void {
-            ArrowArrayAppendString(array_out, val);
+        ret = get_list_string(env, list, nullable, [&tmp](struct ArrowStringView val, bool is_nil) -> int {
+            NANOARROW_RETURN_NOT_OK(ArrowArrayAppendString(tmp.get(), val));
             if (is_nil) {
-                ArrowArrayAppendNull(array_out, 1);
+                NANOARROW_RETURN_NOT_OK(ArrowArrayAppendNull(tmp.get(), 1));
             }
+            return 0;
         });
     } else {
-        return get_list_string(env, list, nullable, [&array_out](struct ArrowStringView val, bool) -> void {
-            ArrowArrayAppendString(array_out, val);
+        ret = get_list_string(env, list, nullable, [&tmp](struct ArrowStringView val, bool) -> int {
+            return ArrowArrayAppendString(tmp.get(), val);
         });
     }
+
+    if (ret == 0) {
+        NANOARROW_RETURN_NOT_OK(ArrowArrayFinishBuildingDefault(tmp.get(), error_out));
+        ArrowArrayMove(tmp.get(), array_out);    
+    }
+    return ret;
 }
 
-int get_list_boolean(ErlNifEnv *env, ERL_NIF_TERM list, bool nullable, const std::function<void(bool val, bool is_nil)> &callback) {
+int get_list_boolean(ErlNifEnv *env, ERL_NIF_TERM list, bool nullable, const std::function<int(bool val, bool is_nil)> &callback) {
     ERL_NIF_TERM head, tail;
     tail = list;
     while (enif_get_list_cell(env, tail, &head, &tail)) {
         if (enif_is_identical(head, kAtomTrue)) {
-            callback(true, false);
+            NANOARROW_RETURN_NOT_OK(callback(true, false));
         } else if (enif_is_identical(head, kAtomFalse)) {
-            callback(false, false);
+            NANOARROW_RETURN_NOT_OK(callback(false, false));
         } else if (enif_is_identical(head, kAtomNil)) {
-            callback(true, true);
+            NANOARROW_RETURN_NOT_OK(callback(true, true));
         } else {
             return 1;
         }
@@ -318,23 +366,33 @@ int get_list_boolean(ErlNifEnv *env, ERL_NIF_TERM list, bool nullable, const std
 
 int do_get_list_boolean(ErlNifEnv *env, ERL_NIF_TERM list, bool nullable, ArrowType nanoarrow_type, struct ArrowArray* array_out, struct ArrowSchema* schema_out, struct ArrowError* error_out) {
     NANOARROW_RETURN_NOT_OK(ArrowSchemaSetType(schema_out, nanoarrow_type));
-    NANOARROW_RETURN_NOT_OK(ArrowArrayInitFromSchema(array_out, schema_out, error_out));
-    NANOARROW_RETURN_NOT_OK(ArrowArrayStartAppending(array_out));
+
+    nanoarrow::UniqueArray tmp;
+    NANOARROW_RETURN_NOT_OK(ArrowArrayInitFromSchema(tmp.get(), schema_out, error_out));
+    NANOARROW_RETURN_NOT_OK(ArrowArrayStartAppending(tmp.get()));
+    int ret;
     if (nullable) {
-        return get_list_boolean(env, list, nullable, [&array_out](bool val, bool is_nil) -> void {
-            ArrowArrayAppendInt(array_out, val);
+        ret = get_list_boolean(env, list, nullable, [&tmp](bool val, bool is_nil) -> int {
+            NANOARROW_RETURN_NOT_OK(ArrowArrayAppendInt(tmp.get(), val));
             if (is_nil) {
-                ArrowArrayAppendNull(array_out, 1);
+                NANOARROW_RETURN_NOT_OK(ArrowArrayAppendNull(tmp.get(), 1));
             }
+            return 0;
         });
     } else {
-        return get_list_boolean(env, list, nullable, [&array_out](bool val, bool) -> void {
-            ArrowArrayAppendInt(array_out, val);
+        ret = get_list_boolean(env, list, nullable, [&tmp](bool val, bool) -> int {
+            return ArrowArrayAppendInt(tmp.get(), val);
         });
     }
+
+    if (ret == 0) {
+        NANOARROW_RETURN_NOT_OK(ArrowArrayFinishBuildingDefault(tmp.get(), error_out));
+        ArrowArrayMove(tmp.get(), array_out);    
+    }
+    return ret;
 }
 
-int get_list_fixed_size_binary(ErlNifEnv *env, ERL_NIF_TERM list, bool nullable, const std::function<void(struct ArrowBufferView val, bool is_nil)> &callback) {
+int get_list_fixed_size_binary(ErlNifEnv *env, ERL_NIF_TERM list, bool nullable, const std::function<int(struct ArrowBufferView val, bool is_nil)> &callback) {
     ERL_NIF_TERM head, tail;
     tail = list;
     while (enif_get_list_cell(env, tail, &head, &tail)) {
@@ -343,9 +401,9 @@ int get_list_fixed_size_binary(ErlNifEnv *env, ERL_NIF_TERM list, bool nullable,
         if (enif_is_binary(env, head) && enif_inspect_binary(env, head, &bytes)) {
             val.data.data = bytes.data;
             val.size_bytes = static_cast<int64_t>(bytes.size);
-            callback(val, false);
+            NANOARROW_RETURN_NOT_OK(callback(val, false));
         } else if (nullable && enif_is_identical(head, kAtomNil)) {
-            callback(val, true);
+            NANOARROW_RETURN_NOT_OK(callback(val, true));
         } else {
             return 1;
         }
@@ -355,20 +413,30 @@ int get_list_fixed_size_binary(ErlNifEnv *env, ERL_NIF_TERM list, bool nullable,
 
 int do_get_list_fixed_size_binary(ErlNifEnv *env, ERL_NIF_TERM list, bool nullable, ArrowType nanoarrow_type, int32_t fixed_size, struct ArrowArray* array_out, struct ArrowSchema* schema_out, struct ArrowError* error_out) {
     NANOARROW_RETURN_NOT_OK(ArrowSchemaSetTypeFixedSize(schema_out, nanoarrow_type, fixed_size));
-    NANOARROW_RETURN_NOT_OK(ArrowArrayInitFromSchema(array_out, schema_out, error_out));
-    NANOARROW_RETURN_NOT_OK(ArrowArrayStartAppending(array_out));
+
+    nanoarrow::UniqueArray tmp;
+    NANOARROW_RETURN_NOT_OK(ArrowArrayInitFromSchema(tmp.get(), schema_out, error_out));
+    NANOARROW_RETURN_NOT_OK(ArrowArrayStartAppending(tmp.get()));
+    int ret;
     if (nullable) {
-        return get_list_fixed_size_binary(env, list, nullable, [&array_out](struct ArrowBufferView val, bool is_nil) -> void {
-            ArrowArrayAppendBytes(array_out, val);
+        ret = get_list_fixed_size_binary(env, list, nullable, [&tmp](struct ArrowBufferView val, bool is_nil) -> int {
+            NANOARROW_RETURN_NOT_OK(ArrowArrayAppendBytes(tmp.get(), val));
             if (is_nil) {
-                ArrowArrayAppendNull(array_out, 1);
+                NANOARROW_RETURN_NOT_OK(ArrowArrayAppendNull(tmp.get(), 1));
             }
+            return 0;
         });
     } else {
-        return get_list_fixed_size_binary(env, list, nullable, [&array_out](struct ArrowBufferView val, bool) -> void {
-            ArrowArrayAppendBytes(array_out, val);
+        ret = get_list_fixed_size_binary(env, list, nullable, [&tmp](struct ArrowBufferView val, bool) -> int {
+            return ArrowArrayAppendBytes(tmp.get(), val);
         });
     }
+
+    if (ret == 0) {
+        NANOARROW_RETURN_NOT_OK(ArrowArrayFinishBuildingDefault(tmp.get(), error_out));
+        ArrowArrayMove(tmp.get(), array_out);    
+    }
+    return ret;
 }
 
 int get_utc_offset() {
@@ -383,16 +451,16 @@ int get_utc_offset() {
     return gmtime_hours;
 }
 
-int get_list_date(ErlNifEnv *env, ERL_NIF_TERM list, bool nullable, const std::function<int64_t(int64_t)> &normalize_ex_value, const std::function<void(int64_t val, bool is_nil)> &callback) {
+int get_list_date(ErlNifEnv *env, ERL_NIF_TERM list, bool nullable, const std::function<int64_t(int64_t)> &normalize_ex_value, const std::function<int(int64_t val, bool is_nil)> &callback) {
     ERL_NIF_TERM head, tail;
     tail = list;
     while (enif_get_list_cell(env, tail, &head, &tail)) {
         if (enif_is_identical(head, kAtomNil)) {
-            callback(0, true);
+            NANOARROW_RETURN_NOT_OK(callback(0, true));
         } else {
             int64_t val;
             if (erlang::nif::get(env, head, &val)) {
-                callback(val, false);
+                NANOARROW_RETURN_NOT_OK(callback(val, false));
             } else if (enif_is_map(env, head)) {
                 ERL_NIF_TERM struct_name_term, calendar_term, year_term, month_term, day_term;
                 if (!enif_get_map_value(env, head, kAtomStructKey, &struct_name_term)) {
@@ -428,7 +496,7 @@ int get_list_date(ErlNifEnv *env, ERL_NIF_TERM list, bool nullable, const std::f
                 // mktime always gives local time
                 // so we need to adjust it to UTC
                 val = mktime(&time) + get_utc_offset() * 3600;
-                callback(normalize_ex_value(val), false);
+                NANOARROW_RETURN_NOT_OK(callback(normalize_ex_value(val), false));
             } else {
                 return 1;
             }
@@ -439,8 +507,10 @@ int get_list_date(ErlNifEnv *env, ERL_NIF_TERM list, bool nullable, const std::f
 
 int do_get_list_date(ErlNifEnv *env, ERL_NIF_TERM list, bool nullable, ArrowType nanoarrow_type, struct ArrowArray* array_out, struct ArrowSchema* schema_out, struct ArrowError* error_out) {
     NANOARROW_RETURN_NOT_OK(ArrowSchemaSetType(schema_out, nanoarrow_type));
-    NANOARROW_RETURN_NOT_OK(ArrowArrayInitFromSchema(array_out, schema_out, error_out));
-    NANOARROW_RETURN_NOT_OK(ArrowArrayStartAppending(array_out));
+
+    nanoarrow::UniqueArray tmp;
+    NANOARROW_RETURN_NOT_OK(ArrowArrayInitFromSchema(tmp.get(), schema_out, error_out));
+    NANOARROW_RETURN_NOT_OK(ArrowArrayStartAppending(tmp.get()));
     std::function<int64_t(int64_t)> normalize_ex_value;
     if (nanoarrow_type == NANOARROW_TYPE_DATE32) {
         normalize_ex_value = [](int64_t val) -> int64_t {
@@ -451,30 +521,38 @@ int do_get_list_date(ErlNifEnv *env, ERL_NIF_TERM list, bool nullable, ArrowType
             return val * 1000;
         };
     }
+    int ret;
     if (nullable) {
-        return get_list_date(env, list, nullable, normalize_ex_value, [&array_out](int64_t val, bool is_nil) -> void {
-            ArrowArrayAppendInt(array_out, val);
+        ret = get_list_date(env, list, nullable, normalize_ex_value, [&tmp](int64_t val, bool is_nil) -> int {
+            NANOARROW_RETURN_NOT_OK(ArrowArrayAppendInt(tmp.get(), val));
             if (is_nil) {
-                ArrowArrayAppendNull(array_out, 1);
+                NANOARROW_RETURN_NOT_OK(ArrowArrayAppendNull(tmp.get(), 1));
             }
+            return 0;
         });
     } else {
-        return get_list_date(env, list, nullable, normalize_ex_value, [&array_out](int64_t val, bool) -> void {
-            ArrowArrayAppendInt(array_out, val);
+        ret = get_list_date(env, list, nullable, normalize_ex_value, [&tmp](int64_t val, bool) -> int {
+            return ArrowArrayAppendInt(tmp.get(), val);
         });
     }
+
+    if (ret == 0) {
+        NANOARROW_RETURN_NOT_OK(ArrowArrayFinishBuildingDefault(tmp.get(), error_out));
+        ArrowArrayMove(tmp.get(), array_out);    
+    }
+    return ret;
 }
 
-int get_list_time(ErlNifEnv *env, ERL_NIF_TERM list, bool nullable, const std::function<int64_t(int64_t, uint64_t)> &normalize_ex_value, const std::function<void(int64_t val, bool is_nil)> &callback) {
+int get_list_time(ErlNifEnv *env, ERL_NIF_TERM list, bool nullable, const std::function<int64_t(int64_t, uint64_t)> &normalize_ex_value, const std::function<int(int64_t val, bool is_nil)> &callback) {
     ERL_NIF_TERM head, tail;
     tail = list;
     while (enif_get_list_cell(env, tail, &head, &tail)) {
         if (enif_is_identical(head, kAtomNil)) {
-            callback(0, true);
+            NANOARROW_RETURN_NOT_OK(callback(0, true));
         } else {
             int64_t val;
             if (erlang::nif::get(env, head, &val)) {
-                callback(val, false);
+                NANOARROW_RETURN_NOT_OK(callback(val, false));
             } else if (enif_is_map(env, head)) {
                 ERL_NIF_TERM struct_name_term, calendar_term, hour_term, minute_term, second_term, microsecond_term;
                 if (!enif_get_map_value(env, head, kAtomStructKey, &struct_name_term)) {
@@ -521,7 +599,7 @@ int get_list_time(ErlNifEnv *env, ERL_NIF_TERM list, bool nullable, const std::f
                 }
 
                 val = time.tm_hour * 3600 + time.tm_min * 60 + time.tm_sec;
-                callback(normalize_ex_value(val, us), false);
+                NANOARROW_RETURN_NOT_OK(callback(normalize_ex_value(val, us), false));
             } else {
                 return 1;
             }
@@ -532,8 +610,10 @@ int get_list_time(ErlNifEnv *env, ERL_NIF_TERM list, bool nullable, const std::f
 
 int do_get_list_time(ErlNifEnv *env, ERL_NIF_TERM list, bool nullable, ArrowType nanoarrow_type, enum ArrowTimeUnit time_unit, uint64_t unit, struct ArrowArray* array_out, struct ArrowSchema* schema_out, struct ArrowError* error_out) {
     NANOARROW_RETURN_NOT_OK(ArrowSchemaSetTypeDateTime(schema_out, nanoarrow_type, time_unit, NULL));
-    NANOARROW_RETURN_NOT_OK(ArrowArrayInitFromSchema(array_out, schema_out, error_out));
-    NANOARROW_RETURN_NOT_OK(ArrowArrayStartAppending(array_out));
+
+    nanoarrow::UniqueArray tmp;
+    NANOARROW_RETURN_NOT_OK(ArrowArrayInitFromSchema(tmp.get(), schema_out, error_out));
+    NANOARROW_RETURN_NOT_OK(ArrowArrayStartAppending(tmp.get()));
     auto normalize_ex_value = [=](int64_t val, uint64_t us) -> int64_t {
         if (time_unit == NANOARROW_TIME_UNIT_SECOND) {
             return val;
@@ -541,30 +621,38 @@ int do_get_list_time(ErlNifEnv *env, ERL_NIF_TERM list, bool nullable, ArrowType
         val = (val * 1000000 + us) * 1000 / unit;
         return val;
     };
+    int ret;
     if (nullable) {
-        return get_list_time(env, list, nullable, normalize_ex_value, [&array_out](int64_t val, bool is_nil) -> void {
-            ArrowArrayAppendInt(array_out, val);
+        ret = get_list_time(env, list, nullable, normalize_ex_value, [&tmp](int64_t val, bool is_nil) -> int {
+            NANOARROW_RETURN_NOT_OK(ArrowArrayAppendInt(tmp.get(), val));
             if (is_nil) {
-                ArrowArrayAppendNull(array_out, 1);
+                NANOARROW_RETURN_NOT_OK(ArrowArrayAppendNull(tmp.get(), 1));
             }
+            return 0;
         });
     } else {
-        return get_list_time(env, list, nullable, normalize_ex_value, [&array_out](int64_t val, bool) -> void {
-            ArrowArrayAppendInt(array_out, val);
+        ret = get_list_time(env, list, nullable, normalize_ex_value, [&tmp](int64_t val, bool) -> int {
+            return ArrowArrayAppendInt(tmp.get(), val);
         });
     }
+
+    if (ret == 0) {
+        NANOARROW_RETURN_NOT_OK(ArrowArrayFinishBuildingDefault(tmp.get(), error_out));
+        ArrowArrayMove(tmp.get(), array_out);    
+    }
+    return ret;
 }
 
-int get_list_timestamp(ErlNifEnv *env, ERL_NIF_TERM list, bool nullable, const std::function<int64_t(int64_t, uint64_t)> &normalize_ex_value, const std::function<void(int64_t val, bool is_nil)> &callback) {
+int get_list_timestamp(ErlNifEnv *env, ERL_NIF_TERM list, bool nullable, const std::function<int64_t(int64_t, uint64_t)> &normalize_ex_value, const std::function<int(int64_t val, bool is_nil)> &callback) {
     ERL_NIF_TERM head, tail;
     tail = list;
     while (enif_get_list_cell(env, tail, &head, &tail)) {
         if (enif_is_identical(head, kAtomNil)) {
-            callback(0, true);
+            NANOARROW_RETURN_NOT_OK(callback(0, true));
         } else {
             int64_t val;
             if (erlang::nif::get(env, head, &val)) {
-                callback(val, false);
+                NANOARROW_RETURN_NOT_OK(callback(val, false));
             } else if (enif_is_map(env, head)) {
                 ERL_NIF_TERM struct_name_term, calendar_term, year_term, month_term, day_term, hour_term, minute_term, second_term, microsecond_term;
                 if (!enif_get_map_value(env, head, kAtomStructKey, &struct_name_term)) {
@@ -629,7 +717,7 @@ int get_list_timestamp(ErlNifEnv *env, ERL_NIF_TERM list, bool nullable, const s
                 // mktime always gives local time
                 // so we need to adjust it to UTC
                 val = mktime(&time) + get_utc_offset() * 3600;
-                callback(normalize_ex_value(val, us), false);
+                NANOARROW_RETURN_NOT_OK(callback(normalize_ex_value(val, us), false));
             } else {
                 return 1;
             }
@@ -640,8 +728,10 @@ int get_list_timestamp(ErlNifEnv *env, ERL_NIF_TERM list, bool nullable, const s
 
 int do_get_list_timestamp(ErlNifEnv *env, ERL_NIF_TERM list, bool nullable, ArrowType nanoarrow_type, enum ArrowTimeUnit time_unit, uint64_t unit, const char * timezone, struct ArrowArray* array_out, struct ArrowSchema* schema_out, struct ArrowError* error_out) {
     NANOARROW_RETURN_NOT_OK(ArrowSchemaSetTypeDateTime(schema_out, nanoarrow_type, time_unit, timezone));
-    NANOARROW_RETURN_NOT_OK(ArrowArrayInitFromSchema(array_out, schema_out, error_out));
-    NANOARROW_RETURN_NOT_OK(ArrowArrayStartAppending(array_out));
+
+    nanoarrow::UniqueArray tmp;
+    NANOARROW_RETURN_NOT_OK(ArrowArrayInitFromSchema(tmp.get(), schema_out, error_out));
+    NANOARROW_RETURN_NOT_OK(ArrowArrayStartAppending(tmp.get()));
     auto normalize_ex_value = [=](int64_t val, uint64_t us) -> int64_t {
         if (time_unit == NANOARROW_TIME_UNIT_SECOND) {
             return val;
@@ -649,30 +739,38 @@ int do_get_list_timestamp(ErlNifEnv *env, ERL_NIF_TERM list, bool nullable, Arro
         val = (val * 1000000 + us) * 1000 / unit;
         return val;
     };
+    int ret;
     if (nullable) {
-        return get_list_timestamp(env, list, nullable, normalize_ex_value, [&array_out](int64_t val, bool is_nil) -> void {
-            ArrowArrayAppendInt(array_out, val);
+        ret = get_list_timestamp(env, list, nullable, normalize_ex_value, [&tmp](int64_t val, bool is_nil) -> int {
+            NANOARROW_RETURN_NOT_OK(ArrowArrayAppendInt(tmp.get(), val));
             if (is_nil) {
-                ArrowArrayAppendNull(array_out, 1);
+                NANOARROW_RETURN_NOT_OK(ArrowArrayAppendNull(tmp.get(), 1));
             }
+            return 0;
         });
     } else {
-        return get_list_timestamp(env, list, nullable, normalize_ex_value, [&array_out](int64_t val, bool) -> void {
-            ArrowArrayAppendInt(array_out, val);
+        ret = get_list_timestamp(env, list, nullable, normalize_ex_value, [&tmp](int64_t val, bool) -> int {
+            return ArrowArrayAppendInt(tmp.get(), val);
         });
     }
+
+    if (ret == 0) {
+        NANOARROW_RETURN_NOT_OK(ArrowArrayFinishBuildingDefault(tmp.get(), error_out));
+        ArrowArrayMove(tmp.get(), array_out);    
+    }
+    return ret;
 }
 
-int get_list_duration(ErlNifEnv *env, ERL_NIF_TERM list, bool nullable, const std::function<void(int64_t val, bool is_nil)> &callback) {
+int get_list_duration(ErlNifEnv *env, ERL_NIF_TERM list, bool nullable, const std::function<int(int64_t val, bool is_nil)> &callback) {
     ERL_NIF_TERM head, tail;
     tail = list;
     while (enif_get_list_cell(env, tail, &head, &tail)) {
         if (enif_is_identical(head, kAtomNil)) {
-            callback(0, true);
+            NANOARROW_RETURN_NOT_OK(callback(0, true));
         } else {
             int64_t val;
             if (erlang::nif::get(env, head, &val)) {
-                callback(val, false);
+                NANOARROW_RETURN_NOT_OK(callback(val, false));
             } else {
                 return 1;
             }
@@ -683,35 +781,45 @@ int get_list_duration(ErlNifEnv *env, ERL_NIF_TERM list, bool nullable, const st
 
 int do_get_list_duration(ErlNifEnv *env, ERL_NIF_TERM list, bool nullable, ArrowType nanoarrow_type, enum ArrowTimeUnit time_unit, struct ArrowArray* array_out, struct ArrowSchema* schema_out, struct ArrowError* error_out) {
     NANOARROW_RETURN_NOT_OK(ArrowSchemaSetTypeDateTime(schema_out, nanoarrow_type, time_unit, NULL));
-    NANOARROW_RETURN_NOT_OK(ArrowArrayInitFromSchema(array_out, schema_out, error_out));
-    NANOARROW_RETURN_NOT_OK(ArrowArrayStartAppending(array_out));
+
+    nanoarrow::UniqueArray tmp;
+    NANOARROW_RETURN_NOT_OK(ArrowArrayInitFromSchema(tmp.get(), schema_out, error_out));
+    NANOARROW_RETURN_NOT_OK(ArrowArrayStartAppending(tmp.get()));
+    int ret;
     if (nullable) {
-        return get_list_duration(env, list, nullable, [&array_out](int64_t val, bool is_nil) -> void {
-            ArrowArrayAppendInt(array_out, val);
+        ret = get_list_duration(env, list, nullable, [&tmp](int64_t val, bool is_nil) -> int {
+            NANOARROW_RETURN_NOT_OK(ArrowArrayAppendInt(tmp.get(), val));
             if (is_nil) {
-                ArrowArrayAppendNull(array_out, 1);
+                NANOARROW_RETURN_NOT_OK(ArrowArrayAppendNull(tmp.get(), 1));
             }
+            return 0;
         });
     } else {
-        return get_list_duration(env, list, nullable, [&array_out](int64_t val, bool) -> void {
-            ArrowArrayAppendInt(array_out, val);
+        ret = get_list_duration(env, list, nullable, [&tmp](int64_t val, bool) -> int {
+            return ArrowArrayAppendInt(tmp.get(), val);
         });
     }
+
+    if (ret == 0) {
+        NANOARROW_RETURN_NOT_OK(ArrowArrayFinishBuildingDefault(tmp.get(), error_out));
+        ArrowArrayMove(tmp.get(), array_out);    
+    }
+    return ret;
 }
 
-int get_list_interval_month(ErlNifEnv *env, ERL_NIF_TERM list, bool nullable, const std::function<void(struct ArrowInterval * val, bool is_nil)> &callback) {
+int get_list_interval_month(ErlNifEnv *env, ERL_NIF_TERM list, bool nullable, const std::function<int(struct ArrowInterval * val, bool is_nil)> &callback) {
     ERL_NIF_TERM head, tail;
     tail = list;
     struct ArrowInterval val{};
     val.type = NANOARROW_TYPE_INTERVAL_MONTHS;
     while (enif_get_list_cell(env, tail, &head, &tail)) {
         if (enif_is_identical(head, kAtomNil)) {
-            callback(nullptr, true);
+            NANOARROW_RETURN_NOT_OK(callback(nullptr, true));
         } else {
             int32_t months;
             if (erlang::nif::get(env, head, &months)) {
                 val.months = months;
-                callback(&val, false);
+                NANOARROW_RETURN_NOT_OK(callback(&val, false));
             } else {
                 return 1;
             }
@@ -720,14 +828,14 @@ int get_list_interval_month(ErlNifEnv *env, ERL_NIF_TERM list, bool nullable, co
     return 0;
 }
 
-int get_list_interval_day_time(ErlNifEnv *env, ERL_NIF_TERM list, bool nullable, const std::function<void(struct ArrowInterval * val, bool is_nil)> &callback) {
+int get_list_interval_day_time(ErlNifEnv *env, ERL_NIF_TERM list, bool nullable, const std::function<int(struct ArrowInterval * val, bool is_nil)> &callback) {
     ERL_NIF_TERM head, tail;
     tail = list;
     struct ArrowInterval val{};
     val.type = NANOARROW_TYPE_INTERVAL_DAY_TIME;
     while (enif_get_list_cell(env, tail, &head, &tail)) {
         if (enif_is_identical(head, kAtomNil)) {
-            callback(nullptr, true);
+            NANOARROW_RETURN_NOT_OK(callback(nullptr, true));
         } else {
             int32_t days, milliseconds;
             const ERL_NIF_TERM *tuple = nullptr;
@@ -738,7 +846,7 @@ int get_list_interval_day_time(ErlNifEnv *env, ERL_NIF_TERM list, bool nullable,
                 }
                 val.days = days;
                 val.ms = milliseconds;
-                callback(&val, false);
+                NANOARROW_RETURN_NOT_OK(callback(&val, false));
             } else {
                 return 1;
             }
@@ -747,14 +855,14 @@ int get_list_interval_day_time(ErlNifEnv *env, ERL_NIF_TERM list, bool nullable,
     return 0;
 }
 
-int get_list_duration_month_day_nano(ErlNifEnv *env, ERL_NIF_TERM list, bool nullable, const std::function<void(struct ArrowInterval * val, bool is_nil)> &callback) {
+int get_list_duration_month_day_nano(ErlNifEnv *env, ERL_NIF_TERM list, bool nullable, const std::function<int(struct ArrowInterval * val, bool is_nil)> &callback) {
     ERL_NIF_TERM head, tail;
     tail = list;
     struct ArrowInterval val{};
     val.type = NANOARROW_TYPE_INTERVAL_MONTH_DAY_NANO;
     while (enif_get_list_cell(env, tail, &head, &tail)) {
         if (enif_is_identical(head, kAtomNil)) {
-            callback(nullptr, true);
+            NANOARROW_RETURN_NOT_OK(callback(nullptr, true));
         } else {
             int32_t months, days;
             int64_t nanoseconds;
@@ -769,7 +877,7 @@ int get_list_duration_month_day_nano(ErlNifEnv *env, ERL_NIF_TERM list, bool nul
                 val.months = months;
                 val.days = days;
                 val.ns = nanoseconds;
-                callback(&val, false);
+                NANOARROW_RETURN_NOT_OK(callback(&val, false));
             } else {
                 return 1;
             }
@@ -780,20 +888,23 @@ int get_list_duration_month_day_nano(ErlNifEnv *env, ERL_NIF_TERM list, bool nul
 
 int do_get_list_interval(ErlNifEnv *env, ERL_NIF_TERM list, bool nullable, ArrowType nanoarrow_type, struct ArrowArray* array_out, struct ArrowSchema* schema_out, struct ArrowError* error_out) {
     NANOARROW_RETURN_NOT_OK(ArrowSchemaSetType(schema_out, nanoarrow_type));
-    NANOARROW_RETURN_NOT_OK(ArrowArrayInitFromSchema(array_out, schema_out, error_out));
-    NANOARROW_RETURN_NOT_OK(ArrowArrayStartAppending(array_out));
 
-    auto appendNullableInterval = [&array_out](struct ArrowInterval * val, bool is_nil) -> void {
-        ArrowArrayAppendInterval(array_out, val);
+    nanoarrow::UniqueArray tmp;
+    NANOARROW_RETURN_NOT_OK(ArrowArrayInitFromSchema(tmp.get(), schema_out, error_out));
+    NANOARROW_RETURN_NOT_OK(ArrowArrayStartAppending(tmp.get()));
+
+    auto appendNullableInterval = [&tmp](struct ArrowInterval * val, bool is_nil) -> int {
+        NANOARROW_RETURN_NOT_OK(ArrowArrayAppendInterval(tmp.get(), val));
         if (is_nil) {
-            ArrowArrayAppendNull(array_out, 1);
+            NANOARROW_RETURN_NOT_OK(ArrowArrayAppendNull(tmp.get(), 1));
         }
+        return 0;
     };
-    auto appendNonNullableInterval = [&array_out](struct ArrowInterval * val, bool) -> void {
-        ArrowArrayAppendInterval(array_out, val);
+    auto appendNonNullableInterval = [&tmp](struct ArrowInterval * val, bool) -> int {
+        return ArrowArrayAppendInterval(tmp.get(), val);
     };
 
-    int(*get_list_interval)(ErlNifEnv *, ERL_NIF_TERM, bool, const std::function<void(struct ArrowInterval *, bool)> &) = nullptr;
+    int(*get_list_interval)(ErlNifEnv *, ERL_NIF_TERM, bool, const std::function<int(struct ArrowInterval *, bool)> &) = nullptr;
 
     if (nanoarrow_type == NANOARROW_TYPE_INTERVAL_MONTHS) {
         get_list_interval = get_list_interval_month;
@@ -805,11 +916,18 @@ int do_get_list_interval(ErlNifEnv *env, ERL_NIF_TERM list, bool nullable, Arrow
         return 1;
     }
 
+    int ret;
     if (nullable) {
-        return get_list_interval(env, list, nullable, appendNullableInterval);
+        ret = get_list_interval(env, list, nullable, appendNullableInterval);
     } else {
-        return get_list_interval(env, list, nullable, appendNonNullableInterval);
+        ret = get_list_interval(env, list, nullable, appendNonNullableInterval);
     }
+
+    if (ret == 0) {
+        NANOARROW_RETURN_NOT_OK(ArrowArrayFinishBuildingDefault(tmp.get(), error_out));
+        ArrowArrayMove(tmp.get(), array_out);    
+    }
+    return ret;
 }
 
 int do_get_list(ErlNifEnv *env, ERL_NIF_TERM list, bool nullable, ArrowType nanoarrow_type, struct ArrowArray* array_out, struct ArrowSchema* schema_out, struct ArrowError* error_out) {
@@ -1215,6 +1333,10 @@ int adbc_column_to_adbc_field(ErlNifEnv *env, ERL_NIF_TERM adbc_buffer, struct A
         enif_snprintf(error_out->message, sizeof(error_out->message), "type `%T` not supported yet.", type_term);
     }
     return ret;
+    if (ret == kErrorBufferUnknownType) {
+        enif_snprintf(error_out->message, sizeof(error_out->message), "type `%T` not supported yet.", type_term);
+    }
+    return ret; 
 }
 
 // non-zero return value indicating errors

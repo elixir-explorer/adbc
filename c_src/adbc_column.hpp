@@ -1333,10 +1333,6 @@ int adbc_column_to_adbc_field(ErlNifEnv *env, ERL_NIF_TERM adbc_buffer, struct A
         enif_snprintf(error_out->message, sizeof(error_out->message), "type `%T` not supported yet.", type_term);
     }
     return ret;
-    if (ret == kErrorBufferUnknownType) {
-        enif_snprintf(error_out->message, sizeof(error_out->message), "type `%T` not supported yet.", type_term);
-    }
-    return ret; 
 }
 
 // non-zero return value indicating errors

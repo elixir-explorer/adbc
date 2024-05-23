@@ -826,7 +826,6 @@ int do_get_list(ErlNifEnv *env, ERL_NIF_TERM list, bool nullable, ArrowType nano
             }
         }
         index++;
-        printf("next index: %d\n", index);
     }
 
     return 0;
@@ -840,11 +839,46 @@ int do_get_fixed_size_list(ErlNifEnv *env, ERL_NIF_TERM list, bool nullable, Arr
     return 0;
 }
 
+// non-zero return value indicates there was no metadata or an error
+int build_metadata_from_nif(ErlNifEnv *env, ERL_NIF_TERM metadata_term, struct ArrowBuffer *metadata_buffer, struct ArrowError* error_out) {
+    NANOARROW_RETURN_NOT_OK(ArrowMetadataBuilderInit(metadata_buffer, nullptr));
+    if (enif_is_map(env, metadata_term)) {
+        ERL_NIF_TERM metadata_key, metadata_value;
+        ErlNifMapIterator iter;
+        enif_map_iterator_create(env, metadata_term, &iter, ERL_NIF_MAP_ITERATOR_FIRST);
+        while (enif_map_iterator_get_pair(env, &iter, &metadata_key, &metadata_value)) {
+            ErlNifBinary key_bytes, value_bytes;
+            struct ArrowStringView key_view{};
+            struct ArrowStringView value_view{};
+            if (enif_is_binary(env, metadata_key) && enif_inspect_binary(env, metadata_key, &key_bytes)) {
+                key_view.data = (const char *)key_bytes.data;
+                key_view.size_bytes = static_cast<int64_t>(key_bytes.size);
+            } else {
+                ArrowBufferReset(metadata_buffer);
+                enif_map_iterator_destroy(env, &iter);
+                snprintf(error_out->message, sizeof(error_out->message), "cannot get metadata key");
+                return kErrorBufferGetMetadataKey;
+            }
+            if (enif_is_binary(env, metadata_value) && enif_inspect_binary(env, metadata_value, &value_bytes)) {
+                value_view.data = (const char *)value_bytes.data;
+                value_view.size_bytes = static_cast<int64_t>(value_bytes.size);
+            } else {
+                ArrowBufferReset(metadata_buffer);
+                enif_map_iterator_destroy(env, &iter);
+                enif_snprintf(error_out->message, sizeof(error_out->message), "cannot get metadata value for key: `%T`", metadata_key);
+                return kErrorBufferGetMetadataValue;
+            }
+
+            NANOARROW_RETURN_NOT_OK(ArrowMetadataBuilderAppend(metadata_buffer, key_view, value_view));
+            enif_map_iterator_next(env, &iter);
+        }
+        enif_map_iterator_destroy(env, &iter);
+    }
+    return 0;
+}
+
 // non-zero return value indicating errors
 int adbc_column_to_adbc_field(ErlNifEnv *env, ERL_NIF_TERM adbc_buffer, struct ArrowArray* array_out, struct ArrowSchema* schema_out, struct ArrowError* error_out) {
-    // array_out->release = NULL;
-    // schema_out->release = NULL;
-
     if (!enif_is_map(env, adbc_buffer)) {
         return kErrorBufferIsNotAMap;
     }
@@ -889,43 +923,17 @@ int adbc_column_to_adbc_field(ErlNifEnv *env, ERL_NIF_TERM adbc_buffer, struct A
 
     bool nullable = enif_is_identical(nullable_term, kAtomTrue);
 
-    struct ArrowBuffer metadata_buffer{};
-    NANOARROW_RETURN_NOT_OK(ArrowMetadataBuilderInit(&metadata_buffer, nullptr));
-    if (enif_is_map(env, metadata_term)) {
-        ERL_NIF_TERM metadata_key, metadata_value;
-        ErlNifMapIterator iter;
-        enif_map_iterator_create(env, metadata_term, &iter, ERL_NIF_MAP_ITERATOR_FIRST);
-        while (enif_map_iterator_get_pair(env, &iter, &metadata_key, &metadata_value)) {
-            ErlNifBinary key_bytes, value_bytes;
-            struct ArrowStringView key_view{};
-            struct ArrowStringView value_view{};
-            if (enif_is_binary(env, metadata_key) && enif_inspect_binary(env, metadata_key, &key_bytes)) {
-                key_view.data = (const char *)key_bytes.data;
-                key_view.size_bytes = static_cast<int64_t>(key_bytes.size);
-            } else {
-                ArrowBufferReset(&metadata_buffer);
-                enif_map_iterator_destroy(env, &iter);
-                snprintf(error_out->message, sizeof(error_out->message), "cannot get metadata key");
-                return kErrorBufferGetMetadataKey;
-            }
-            if (enif_is_binary(env, metadata_value) && enif_inspect_binary(env, metadata_value, &value_bytes)) {
-                value_view.data = (const char *)value_bytes.data;
-                value_view.size_bytes = static_cast<int64_t>(value_bytes.size);
-            } else {
-                ArrowBufferReset(&metadata_buffer);
-                enif_map_iterator_destroy(env, &iter);
-                enif_snprintf(error_out->message, sizeof(error_out->message), "cannot get metadata value for key: `%T`", metadata_key);
-                return kErrorBufferGetMetadataValue;
-            }
-
-            NANOARROW_RETURN_NOT_OK(ArrowMetadataBuilderAppend(&metadata_buffer, key_view, value_view));
-            enif_map_iterator_next(env, &iter);
-        }
-        enif_map_iterator_destroy(env, &iter);
-    }
-
     ArrowSchemaInit(schema_out);
     NANOARROW_RETURN_NOT_OK(ArrowSchemaSetName(schema_out, name.c_str()));
+
+    struct ArrowBuffer metadata_buffer{};
+    int metadata_ret = build_metadata_from_nif(env, metadata_term, &metadata_buffer, error_out);
+    if (!metadata_ret) {
+        if (schema_out->release) {
+            schema_out->release(schema_out);
+        }
+        return metadata_ret;
+    }
     NANOARROW_RETURN_NOT_OK(ArrowSchemaSetMetadata(schema_out, (const char*)metadata_buffer.data));
     ArrowBufferReset(&metadata_buffer);
 

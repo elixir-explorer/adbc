@@ -1019,4 +1019,27 @@ defmodule Adbc.Column do
   def list(data, opts \\ []) when is_list(data) do
     column(:list, data, opts)
   end
+
+  @doc """
+  Similar to `list/2`, but for large lists.
+
+  ## Arguments
+
+  * `data`: a list, each element of which can be one of the following:
+    - `nil`
+    - `Adbc.Column`
+
+    Note that each `Adbc.Column` in the list should have the same type.
+
+  * `opts`: A keyword list of options
+
+  ## Options
+
+  * `:name` - The name of the column
+  * `:nullable` - A boolean value indicating whether the column is nullable
+  * `:metadata` - A map of metadata
+  """
+  def large_list(data, opts \\ []) when is_list(data) do
+    column(:large_list, data, opts)
+  end
 end

@@ -1000,49 +1000,37 @@ int do_get_list(ErlNifEnv *env, ERL_NIF_TERM list, bool nullable, ArrowType nano
         struct AdbcColumnNifTerm item;
         int ret = AdbcColumnNifTerm::from_term(env, head, true, &item);
         if (ret != 0) return ret;
-        if (item.is_nil) {
-            items.emplace_back(item);
-            continue;
-        }
-
-        column_type = adbc_column_type_to_nanoarrow_type(env, item.type_term);
-        if (column_type.valid == 0) {
-            enif_snprintf(error_out->message, sizeof(error_out->message), "type `%T` not supported yet.", item.type_term);
-            return kErrorBufferUnknownType;
-        } else {
-            if (found_item_type) {
-                if (enif_is_identical(item.type_term, match_type) == 0) {
-                    enif_snprintf(error_out->message, sizeof(error_out->message), "all items in the list must have the same type.");
-                    return kErrorBufferUnknownType;
-                }
+        if (!item.is_nil) {
+            column_type = adbc_column_type_to_nanoarrow_type(env, item.type_term);
+            if (column_type.valid == 0) {
+                enif_snprintf(error_out->message, sizeof(error_out->message), "unsupport type `%T` found in do_get_list:%d", item.type_term, __LINE__);
+                return kErrorBufferUnknownType;
             } else {
-                found_item_type = 1;
-                match_type = item.type_term;
-                list_item_type = column_type;
+                if (found_item_type) {
+                    if (enif_is_identical(item.type_term, match_type) == 0) {
+                        enif_snprintf(error_out->message, sizeof(error_out->message), "all items in the list must have the same type.");
+                        return kErrorBufferUnknownType;
+                    }
+                } else {
+                    found_item_type = 1;
+                    match_type = item.type_term;
+                    list_item_type = column_type;
+                }
             }
-            items.emplace_back(item);
         }
+        items.emplace_back(item);
     }
 
-    // we always return if there was any error in the first pass
-    // so if found_item_type is 0, it means all items were nil
+    // if found_item_type is 0, it means all items were nil
     // hence we can infer that the item type is NANOARROW_TYPE_NA
-    // and we can simply fill the array with nulls and return early
     if (found_item_type == 0) {
         list_item_type.arrow_type = NANOARROW_TYPE_NA;
-        NANOARROW_RETURN_NOT_OK(ArrowSchemaSetType(schema_out->children[0], list_item_type.arrow_type));
-        NANOARROW_RETURN_NOT_OK(ArrowArrayInitFromSchema(array_out, schema_out, error_out));
-        NANOARROW_RETURN_NOT_OK(ArrowArrayStartAppending(array_out));
-        for (unsigned i = 0; i < n_items; i++) {
-            // NANOARROW_RETURN_NOT_OK(ArrowArrayAppendNull(array_out, 1));
-            NANOARROW_RETURN_NOT_OK(ArrowArrayFinishElement(array_out));
-        }
-        return 0;
     }
 
     // set item type
     switch (list_item_type.arrow_type)
     {
+    case NANOARROW_TYPE_NA:
     case NANOARROW_TYPE_BOOL:
     case NANOARROW_TYPE_INT8:
     case NANOARROW_TYPE_UINT8:
@@ -1095,13 +1083,15 @@ int do_get_list(ErlNifEnv *env, ERL_NIF_TERM list, bool nullable, ArrowType nano
     NANOARROW_RETURN_NOT_OK(ArrowArrayStartAppending(array_out));
 
     for (auto &item : items) {
-        if (item.is_nil && list_item_type.arrow_type != NANOARROW_TYPE_NA) {
-            NANOARROW_RETURN_NOT_OK(ArrowArrayAppendNull(array_out->children[0], 1));
-        } else {
-            struct ArrowSchema child_schema{};
-            int ret = adbc_column_to_adbc_field(env, &item, true, true, array_out->children[0], &child_schema, error_out);
-            if (ret != 0) {
-                return ret;
+        if (list_item_type.arrow_type != NANOARROW_TYPE_NA) {
+            if (item.is_nil) {
+                NANOARROW_RETURN_NOT_OK(ArrowArrayAppendNull(array_out->children[0], 1));
+            } else {
+                struct ArrowSchema child_schema{};
+                int ret = adbc_column_to_adbc_field(env, &item, true, true, array_out->children[0], &child_schema, error_out);
+                if (ret != 0) {
+                    return ret;
+                }
             }
         }
         NANOARROW_RETURN_NOT_OK(ArrowArrayFinishElement(array_out));
@@ -1402,7 +1392,7 @@ int adbc_column_to_adbc_field(ErlNifEnv *env, struct AdbcColumnNifTerm * column,
     // https://arrow.apache.org/docs/format/CDataInterface.html
     struct AdbcColumnType column_type = adbc_column_type_to_nanoarrow_type(env, column->type_term);
     if (column_type.valid == 0) {
-        enif_snprintf(error_out->message, sizeof(error_out->message), "adbc_column_to_adbc_field: type `%T` not supported yet.", column->type_term);
+        enif_snprintf(error_out->message, sizeof(error_out->message), "unsupport type `%T` found in adbc_column_to_adbc_field:%d", item.type_term, __LINE__);
         return kErrorBufferUnknownType;
     }
 
@@ -1467,12 +1457,11 @@ int adbc_column_to_adbc_field(ErlNifEnv *env, struct AdbcColumnNifTerm * column,
     } else if (column_type.arrow_type == NANOARROW_TYPE_DECIMAL128 || column_type.arrow_type == NANOARROW_TYPE_DECIMAL256) {
         ret = do_get_list_decimal(env, data_term, nullable, column_type.arrow_type, column_type.bits, column_type.precision, column_type.scale, array_out, schema_out, error_out);
     } else if (column_type.arrow_type == NANOARROW_TYPE_LIST) {
-        printf("NANOARROW_TYPE_LIST!!!!!\n");
         ret = do_get_list(env, data_term, nullable, column_type.arrow_type, array_out, schema_out, error_out);
     }
 
     if (ret == kErrorBufferUnknownType) {
-        enif_snprintf(error_out->message, sizeof(error_out->message), "??? type `%T` (arrow_type=%d) not supported yet.", column->type_term, column_type.arrow_type);
+        enif_snprintf(error_out->message, sizeof(error_out->message), "unsupport type `%T` (arrow_type=%d) found in adbc_column_to_adbc_field:%d", column->type_term, column_type.arrow_type, __LINE__);
     }
     return ret;
 }
@@ -1603,7 +1592,7 @@ int adbc_column_to_arrow_type_struct(ErlNifEnv *env, ERL_NIF_TERM values, struct
                 break;
             }
         } else {
-            snprintf(error_out->message, sizeof(error_out->message), "type not supported yet.");
+            enif_snprintf(error_out->message, sizeof(error_out->message), "unsupported parameter `%T` in adbc_column_to_arrow_type_struct:%d", head, __LINE__);
             return 1;
         }
         processed++;

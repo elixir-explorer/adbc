@@ -997,13 +997,26 @@ defmodule Adbc.Column do
     column({:interval, :month_day_nano}, data, opts)
   end
 
-  def list(data, opts \\ [])
+  @doc """
+  A column that each row is a list of some type or nil.
 
-  def list(%Adbc.Column{}=data, opts) do
-    column(:list, [data], opts)
-  end
+  ## Arguments
 
-  def list(data, opts) do
+  * `data`: a list, each element of which can be one of the following:
+    - `nil`
+    - `Adbc.Column`
+
+    Note that each `Adbc.Column` in the list should have the same type.
+
+  * `opts`: A keyword list of options
+
+  ## Options
+
+  * `:name` - The name of the column
+  * `:nullable` - A boolean value indicating whether the column is nullable
+  * `:metadata` - A map of metadata
+  """
+  def list(data, opts \\ []) when is_list(data) do
     column(:list, data, opts)
   end
 end

@@ -179,10 +179,13 @@ int get_arrow_array_children_as_list(ErlNifEnv *env, struct ArrowSchema * schema
             children[child_i - offset] = childrens[0];
         } else {
             bool nullable = (child_schema->flags & ARROW_FLAG_NULLABLE) || (child_values->null_count > 0);
-            children[child_i - offset] = make_adbc_column(env, childrens[0], child_type, nullable, child_metadata, childrens[1]);
+            if (enif_is_identical(childrens[1], kAtomNil)) {
+                children[child_i - offset] = kAtomNil;
+            } else {
+                children[child_i - offset] = make_adbc_column(env, childrens[0], child_type, nullable, child_metadata, childrens[1]);
+            }
         }
     }
-
     return 0;
 }
 
@@ -444,28 +447,41 @@ ERL_NIF_TERM get_arrow_array_list_children(ErlNifEnv *env, struct ArrowSchema * 
                 children[child_i - offset] = childrens[0];
             } else {
                 bool children_nullable = (item_schema->flags & ARROW_FLAG_NULLABLE) || (item_values->null_count > 0);
-                children[child_i - offset] = make_adbc_column(env, childrens[0], item_type, children_nullable, item_metadata, childrens[1]);
+                if (enif_is_identical(childrens[1], kAtomNil)) {
+                    children[child_i - offset] = kAtomNil;
+                } else {
+                    children[child_i - offset] = make_adbc_column(env, childrens[0], item_type, children_nullable, item_metadata, childrens[1]);
+                }
             }
         }
         return enif_make_list_from_array(env, children.data(), (unsigned)children.size());
     } else {
-        children.resize(1);
-        std::vector<ERL_NIF_TERM> childrens;
-        ERL_NIF_TERM children_type;
-        ERL_NIF_TERM children_metadata;
-        if (arrow_array_to_nif_term(env, items_schema, items_values, offset, count, level + 1, childrens, children_type, children_metadata, error) == 1) {
-            return error;
+        constexpr int64_t offset_buffer_index = 1;
+        const int32_t * offsets = (const int32_t *)values->buffers[offset_buffer_index];
+        if (offsets == nullptr) {
+            return erlang::nif::error(env, "invalid ArrowArray (list), offsets == nullptr");
         }
+        if (count == -1) count = values->length;
+        for (int64_t i = offset; i < offset + count; i++) {
+            std::vector<ERL_NIF_TERM> childrens;
+            ERL_NIF_TERM children_type;
+            ERL_NIF_TERM children_metadata;
+            if (arrow_array_to_nif_term(env, items_schema, items_values, offsets[i], offsets[i+1] - offsets[i], level + 1, childrens, children_type, children_metadata, error) == 1) {
+                return error;
+            }
 
-        if (childrens.size() == 1) {
-            children[0] = childrens[0];
-            return enif_make_list_from_array(env, children.data(), (unsigned)children.size());
-        } else {
-            bool children_nullable = (schema->flags & ARROW_FLAG_NULLABLE) || (values->null_count > 0);
-            ERL_NIF_TERM column[1];
-            column[0] = make_adbc_column(env, childrens[0], children_type, children_nullable, children_metadata, childrens[1]);
-            return enif_make_list_from_array(env, column, 1);
+            if (childrens.size() == 1) {
+                children.emplace_back(childrens[0]);
+            } else {
+                bool children_nullable = (schema->flags & ARROW_FLAG_NULLABLE) || (values->null_count > 0);
+                if (enif_is_identical(childrens[1], kAtomNil)) {
+                    children.emplace_back(kAtomNil);
+                } else {
+                    children.emplace_back(make_adbc_column(env, childrens[0], children_type, children_nullable, children_metadata, childrens[1]));
+                }
+            }
         }
+        return enif_make_list_from_array(env, children.data(), (unsigned)children.size());
     }
 }
 
@@ -517,7 +533,15 @@ int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct 
     size_t format_len = strlen(format);
     bool format_processed = true;
     if (format_len == 1) {
-        if (format[0] == 'l') {
+        if (format[0] == 'n') {
+            term_type = kAtomNil;
+            if (count == -1) count = values->length;
+            std::vector<ERL_NIF_TERM> nils(count);
+            for (int64_t i = offset; i < offset + count; i++) {
+                nils.push_back(kAtomNil);
+            }
+            current_term = kAtomNil;
+        } else if (format[0] == 'l') {
             // NANOARROW_TYPE_INT64
             using value_type = int64_t;
             term_type = kAdbcColumnTypeI64;
@@ -843,7 +867,6 @@ int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct 
             children_term = get_arrow_array_map_children(env, schema, values, offset, count, level);
         } else if (strncmp("+l", format, 2) == 0) {
             // NANOARROW_TYPE_LIST
-            printf("format=%s\n", format);
             term_type = kAdbcColumnTypeList;
             children_term = get_arrow_array_list_children(env, schema, values, offset, count, level);
         } else if (strncmp("+L", format, 2) == 0) {

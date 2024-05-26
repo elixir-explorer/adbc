@@ -101,5 +101,6 @@ constexpr int kErrorBufferUnknownType = 6;
 constexpr int kErrorBufferGetMetadataKey = 7;
 constexpr int kErrorBufferGetMetadataValue = 8;
 constexpr int kErrorExpectedCalendarISO = 9;
+constexpr int kErrorInternalError = 10;
 
 #endif  // ADBC_CONSTS_H

@@ -331,15 +331,7 @@ defmodule Adbc.Connection.Test do
                          type: :list,
                          nullable: false,
                          metadata: nil,
-                         data: [
-                           %Adbc.Column{
-                             name: "item",
-                             type: :string,
-                             nullable: false,
-                             metadata: nil,
-                             data: []
-                           }
-                         ]
+                         data: []
                        },
                        %Adbc.Column{
                          name: "constraint_column_usage",
@@ -419,7 +411,7 @@ defmodule Adbc.Connection.Test do
                      [
                        {"constraint_name", []},
                        {"constraint_type", []},
-                       {"constraint_column_names", [[]]},
+                       {"constraint_column_names", []},
                        {"constraint_column_usage",
                         [
                           {"fk_catalog", []},

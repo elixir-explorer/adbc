@@ -998,6 +998,7 @@ int do_get_list(ErlNifEnv *env, ERL_NIF_TERM list, bool nullable, struct AdbcCol
     if (!enif_get_list_length(env, list, &n_items)) {
         return 1;
     }
+    printf("n_items: %d\n", n_items);
 
     ERL_NIF_TERM head, tail;
     tail = list;
@@ -1088,34 +1089,28 @@ int do_get_list(ErlNifEnv *env, ERL_NIF_TERM list, bool nullable, struct AdbcCol
     }
 
     // build the array
-    NANOARROW_RETURN_NOT_OK(ArrowArrayInitFromSchema(array_out, schema_out, error_out));
-    NANOARROW_RETURN_NOT_OK(ArrowArrayStartAppending(array_out));
-
-    // minor optimization for fixed size lists
-    if (column_type->arrow_type == NANOARROW_TYPE_FIXED_SIZE_LIST) {
-        NANOARROW_RETURN_NOT_OK(ArrowArrayReserve(array_out, items.size() * column_type->fixed_size));
+    // todo: handle nested types
+    if (list_item_type.arrow_type == NANOARROW_TYPE_LIST || list_item_type.arrow_type == NANOARROW_TYPE_LARGE_LIST) {
+        // NANOARROW_RETURN_NOT_OK(ArrowArrayInitFromType(array_out, list_item_type.arrow_type));
+        // NANOARROW_RETURN_NOT_OK(ArrowArrayAllocateChildren(array_out, 1));
+        snprintf(error_out->message, sizeof(error_out->message), "nested types are not supported yet");
+        return kErrorInternalError;
+    } else {
+        NANOARROW_RETURN_NOT_OK(ArrowArrayInitFromSchema(array_out, schema_out, error_out));
+        NANOARROW_RETURN_NOT_OK(ArrowArrayStartAppending(array_out));
     }
 
     for (auto &item : items) {
-        if (list_item_type.arrow_type != NANOARROW_TYPE_NA) {
-            if (item.is_nil) {
-                if (column_type->arrow_type == NANOARROW_TYPE_FIXED_SIZE_LIST) {
-                    NANOARROW_RETURN_NOT_OK(ArrowArrayAppendNull(array_out, 1));
-                    continue;
-                } else {
-                    NANOARROW_RETURN_NOT_OK(ArrowArrayAppendNull(array_out->children[0], 1));
-                }
-            } else {
-                struct ArrowSchema child_schema{};
-                int ret = adbc_column_to_adbc_field(env, &item, true, true, array_out->children[0], &child_schema, error_out);
-                if (ret != 0) {
-                    return ret;
-                }
-            }
+        if (item.is_nil) {
+            NANOARROW_RETURN_NOT_OK(ArrowArrayAppendNull(array_out, 1));
         } else {
-            NANOARROW_RETURN_NOT_OK(ArrowArrayAppendNull(array_out->children[0], 1));
+            struct ArrowSchema child_schema{};
+            int ret = adbc_column_to_adbc_field(env, &item, true, true, array_out->children[0], &child_schema, error_out);
+            if (ret != 0) {
+                return ret;
+            }
+            NANOARROW_RETURN_NOT_OK(ArrowArrayFinishElement(array_out));
         }
-        NANOARROW_RETURN_NOT_OK(ArrowArrayFinishElement(array_out));
     }
     NANOARROW_RETURN_NOT_OK(ArrowArrayFinishBuildingDefault(array_out, error_out));
 

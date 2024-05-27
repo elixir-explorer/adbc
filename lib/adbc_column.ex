@@ -1016,6 +1016,7 @@ defmodule Adbc.Column do
   * `:nullable` - A boolean value indicating whether the column is nullable
   * `:metadata` - A map of metadata
   """
+  @spec list([%Adbc.Column{} | nil], Keyword.t()) :: %Adbc.Column{}
   def list(data, opts \\ []) when is_list(data) do
     column(:list, data, opts)
   end
@@ -1039,7 +1040,35 @@ defmodule Adbc.Column do
   * `:nullable` - A boolean value indicating whether the column is nullable
   * `:metadata` - A map of metadata
   """
+  @spec large_list([%Adbc.Column{} | nil], Keyword.t()) :: %Adbc.Column{}
   def large_list(data, opts \\ []) when is_list(data) do
     column(:large_list, data, opts)
+  end
+
+  @doc """
+  Similar to `list/2`, but the length of the list is the same.
+
+  ## Arguments
+
+  * `data`: a list, each element of which can be one of the following:
+    - `nil`
+    - `Adbc.Column`
+
+    Note that each `Adbc.Column` in the list should have the same type and length.
+
+  * `fixed_size`: The fixed size of the list.
+
+  * `opts`: A keyword list of options
+
+  ## Options
+
+  * `:name` - The name of the column
+  * `:nullable` - A boolean value indicating whether the column is nullable
+  * `:metadata` - A map of metadata
+  """
+  @spec fixed_size_list([%Adbc.Column{} | nil], [i32()], Keyword.t()) ::
+          %Adbc.Column{}
+  def fixed_size_list(data, fixed_size, opts \\ []) when is_list(data) do
+    column({:fixed_size_list, fixed_size}, data, opts)
   end
 end

@@ -35,6 +35,7 @@ struct AdbcColumnType {
     std::string timezone;
 
     // only valid if arrow_type is NANOARROW_TYPE_FIXED_SIZE_*
+    // if the value is `-1`, it means we need to infer the size from the data
     int32_t fixed_size;
 
     // only valid if arrow_type is NANOARROW_TYPE_DECIMAL128 or NANOARROW_TYPE_DECIMAL256
@@ -981,8 +982,17 @@ int do_get_list_interval(ErlNifEnv *env, ERL_NIF_TERM list, bool nullable, Arrow
     return ret;
 }
 
-int do_get_list(ErlNifEnv *env, ERL_NIF_TERM list, bool nullable, ArrowType nanoarrow_type, struct ArrowArray* array_out, struct ArrowSchema* schema_out, struct ArrowError* error_out) {
-    NANOARROW_RETURN_NOT_OK(ArrowSchemaSetType(schema_out, nanoarrow_type));
+int do_get_list(ErlNifEnv *env, ERL_NIF_TERM list, bool nullable, struct AdbcColumnType * column_type, struct ArrowArray* array_out, struct ArrowSchema* schema_out, struct ArrowError* error_out) {
+    if (column_type == nullptr) {
+        enif_snprintf(error_out->message, sizeof(error_out->message), "internal error: column_type is null in do_get_list:%d", __LINE__);
+        return kErrorInternalError;
+    }
+
+    if (column_type->arrow_type == NANOARROW_TYPE_FIXED_SIZE_LIST) {
+        NANOARROW_RETURN_NOT_OK(ArrowSchemaSetTypeFixedSize(schema_out, column_type->arrow_type, column_type->fixed_size));
+    } else {
+        NANOARROW_RETURN_NOT_OK(ArrowSchemaSetType(schema_out, column_type->arrow_type));
+    }
 
     unsigned n_items = 0;
     if (!enif_get_list_length(env, list, &n_items)) {
@@ -991,7 +1001,6 @@ int do_get_list(ErlNifEnv *env, ERL_NIF_TERM list, bool nullable, ArrowType nano
 
     ERL_NIF_TERM head, tail;
     tail = list;
-    struct AdbcColumnType column_type{};
     std::vector<struct AdbcColumnNifTerm> items;
     struct AdbcColumnType list_item_type;
     ERL_NIF_TERM match_type;
@@ -1001,8 +1010,8 @@ int do_get_list(ErlNifEnv *env, ERL_NIF_TERM list, bool nullable, ArrowType nano
         int ret = AdbcColumnNifTerm::from_term(env, head, true, &item);
         if (ret != 0) return ret;
         if (!item.is_nil) {
-            column_type = adbc_column_type_to_nanoarrow_type(env, item.type_term);
-            if (column_type.valid == 0) {
+            struct AdbcColumnType item_column_type = adbc_column_type_to_nanoarrow_type(env, item.type_term);
+            if (item_column_type.valid == 0) {
                 enif_snprintf(error_out->message, sizeof(error_out->message), "unsupport type `%T` found in do_get_list:%d", item.type_term, __LINE__);
                 return kErrorBufferUnknownType;
             } else {
@@ -1014,7 +1023,7 @@ int do_get_list(ErlNifEnv *env, ERL_NIF_TERM list, bool nullable, ArrowType nano
                 } else {
                     found_item_type = 1;
                     match_type = item.type_term;
-                    list_item_type = column_type;
+                    list_item_type = item_column_type;
                 }
             }
         }
@@ -1082,10 +1091,20 @@ int do_get_list(ErlNifEnv *env, ERL_NIF_TERM list, bool nullable, ArrowType nano
     NANOARROW_RETURN_NOT_OK(ArrowArrayInitFromSchema(array_out, schema_out, error_out));
     NANOARROW_RETURN_NOT_OK(ArrowArrayStartAppending(array_out));
 
+    // minor optimization for fixed size lists
+    if (column_type->arrow_type == NANOARROW_TYPE_FIXED_SIZE_LIST) {
+        NANOARROW_RETURN_NOT_OK(ArrowArrayReserve(array_out, items.size() * column_type->fixed_size));
+    }
+
     for (auto &item : items) {
         if (list_item_type.arrow_type != NANOARROW_TYPE_NA) {
             if (item.is_nil) {
-                NANOARROW_RETURN_NOT_OK(ArrowArrayAppendNull(array_out->children[0], 1));
+                if (column_type->arrow_type == NANOARROW_TYPE_FIXED_SIZE_LIST) {
+                    NANOARROW_RETURN_NOT_OK(ArrowArrayAppendNull(array_out, 1));
+                    continue;
+                } else {
+                    NANOARROW_RETURN_NOT_OK(ArrowArrayAppendNull(array_out->children[0], 1));
+                }
             } else {
                 struct ArrowSchema child_schema{};
                 int ret = adbc_column_to_adbc_field(env, &item, true, true, array_out->children[0], &child_schema, error_out);
@@ -1093,18 +1112,12 @@ int do_get_list(ErlNifEnv *env, ERL_NIF_TERM list, bool nullable, ArrowType nano
                     return ret;
                 }
             }
+        } else {
+            NANOARROW_RETURN_NOT_OK(ArrowArrayAppendNull(array_out->children[0], 1));
         }
         NANOARROW_RETURN_NOT_OK(ArrowArrayFinishElement(array_out));
     }
     NANOARROW_RETURN_NOT_OK(ArrowArrayFinishBuildingDefault(array_out, error_out));
-
-    return 0;
-}
-
-int do_get_fixed_size_list(ErlNifEnv *env, ERL_NIF_TERM list, bool nullable, ArrowType nanoarrow_type, struct ArrowArray* array_out, struct ArrowSchema* schema_out, struct ArrowError* error_out) {
-    // NANOARROW_RETURN_NOT_OK(ArrowSchemaSetTypeFixedSize(schema_out, nanoarrow_type));
-    // NANOARROW_RETURN_NOT_OK(ArrowArrayInitFromSchema(array_out, schema_out, error_out));
-    // NANOARROW_RETURN_NOT_OK(ArrowArrayStartAppending(array_out));
 
     return 0;
 }
@@ -1285,12 +1298,16 @@ struct AdbcColumnType adbc_column_type_to_nanoarrow_type(ErlNifEnv *env, ERL_NIF
                         if (erlang::nif::get(env, tuple[1], &fixed_size)) {
                             ret.arrow_type = NANOARROW_TYPE_FIXED_SIZE_BINARY;
                             ret.fixed_size = fixed_size;
+                        } else {
+                            ret.valid = 0;
                         }
-                    } else if (enif_is_identical(tuple[0], kAdbcColumnTypeFixedSizeList)) {
+                    } else if (enif_is_identical(tuple[0], kAtomFixedSizeList)) {
                         int32_t fixed_size;
                         if (erlang::nif::get(env, tuple[1], &fixed_size)) {
                             ret.arrow_type = NANOARROW_TYPE_FIXED_SIZE_LIST;
                             ret.fixed_size = fixed_size;
+                        } else {
+                            ret.valid = 0;
                         }
                     } else {
                         ret.valid = 0;
@@ -1392,7 +1409,7 @@ int adbc_column_to_adbc_field(ErlNifEnv *env, struct AdbcColumnNifTerm * column,
     // https://arrow.apache.org/docs/format/CDataInterface.html
     struct AdbcColumnType column_type = adbc_column_type_to_nanoarrow_type(env, column->type_term);
     if (column_type.valid == 0) {
-        enif_snprintf(error_out->message, sizeof(error_out->message), "unsupport type `%T` found in adbc_column_to_adbc_field:%d", item.type_term, __LINE__);
+        enif_snprintf(error_out->message, sizeof(error_out->message), "unsupport type `%T` found in adbc_column_to_adbc_field:%d", column->type_term, __LINE__);
         return kErrorBufferUnknownType;
     }
 
@@ -1435,11 +1452,11 @@ int adbc_column_to_adbc_field(ErlNifEnv *env, struct AdbcColumnNifTerm * column,
     } else if (column_type.arrow_type == NANOARROW_TYPE_DATE64) {
         ret = do_get_list_date(env, data_term, nullable, NANOARROW_TYPE_DATE64, array_out, schema_out, error_out);
     } else if (column_type.arrow_type == NANOARROW_TYPE_LIST) {
-        ret = do_get_list(env, data_term, nullable, NANOARROW_TYPE_LIST, array_out, schema_out, error_out);
+        ret = do_get_list(env, data_term, nullable, &column_type, array_out, schema_out, error_out);
     } else if (column_type.arrow_type == NANOARROW_TYPE_LARGE_LIST) {
-        ret = do_get_list(env, data_term, nullable, NANOARROW_TYPE_LARGE_LIST, array_out, schema_out, error_out);
+        ret = do_get_list(env, data_term, nullable, &column_type, array_out, schema_out, error_out);
     } else if (column_type.arrow_type == NANOARROW_TYPE_FIXED_SIZE_LIST) {
-        ret = do_get_list(env, data_term, nullable, NANOARROW_TYPE_FIXED_SIZE_LIST, array_out, schema_out, error_out);
+        ret = do_get_list(env, data_term, nullable, &column_type, array_out, schema_out, error_out);
     } else if (column_type.arrow_type == NANOARROW_TYPE_TIME32 || column_type.arrow_type == NANOARROW_TYPE_TIME64) {
         ret = do_get_list_time(env, data_term, nullable, column_type.arrow_type, column_type.time_unit, column_type.unit, array_out, schema_out, error_out);
     } else if (column_type.arrow_type == NANOARROW_TYPE_DURATION) {
@@ -1456,8 +1473,6 @@ int adbc_column_to_adbc_field(ErlNifEnv *env, struct AdbcColumnNifTerm * column,
         ret = do_get_list_fixed_size_binary(env, data_term, nullable, column_type.arrow_type, column_type.fixed_size, array_out, schema_out, error_out);
     } else if (column_type.arrow_type == NANOARROW_TYPE_DECIMAL128 || column_type.arrow_type == NANOARROW_TYPE_DECIMAL256) {
         ret = do_get_list_decimal(env, data_term, nullable, column_type.arrow_type, column_type.bits, column_type.precision, column_type.scale, array_out, schema_out, error_out);
-    } else if (column_type.arrow_type == NANOARROW_TYPE_LIST) {
-        ret = do_get_list(env, data_term, nullable, column_type.arrow_type, array_out, schema_out, error_out);
     }
 
     if (ret == kErrorBufferUnknownType) {

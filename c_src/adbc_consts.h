@@ -16,6 +16,7 @@ static ERL_NIF_TERM kAtomStructKey;
 
 static ERL_NIF_TERM kAtomDecimal;
 static ERL_NIF_TERM kAtomFixedSizeBinary;
+static ERL_NIF_TERM kAtomFixedSizeList;
 static ERL_NIF_TERM kAtomTime32;
 static ERL_NIF_TERM kAtomTime64;
 static ERL_NIF_TERM kAtomTimestamp;
@@ -85,7 +86,7 @@ static ERL_NIF_TERM kAdbcColumnTypeDate64;
 #define kAdbcColumnTypeIntervalMonthDayNano enif_make_tuple2(env, kAtomInterval, kAtomMonthDayNano)
 static ERL_NIF_TERM kAdbcColumnTypeList;
 static ERL_NIF_TERM kAdbcColumnTypeLargeList;
-static ERL_NIF_TERM kAdbcColumnTypeFixedSizeList;
+#define kAdbcColumnTypeFixedSizeList(n_items) enif_make_tuple2(env, kAtomFixedSizeBinary, enif_make_int64(env, n_items))
 static ERL_NIF_TERM kAdbcColumnTypeStruct;
 static ERL_NIF_TERM kAdbcColumnTypeMap;
 static ERL_NIF_TERM kAdbcColumnTypeDenseUnion;
@@ -101,5 +102,6 @@ constexpr int kErrorBufferUnknownType = 6;
 constexpr int kErrorBufferGetMetadataKey = 7;
 constexpr int kErrorBufferGetMetadataValue = 8;
 constexpr int kErrorExpectedCalendarISO = 9;
+constexpr int kErrorInternalError = 10;
 
 #endif  // ADBC_CONSTS_H

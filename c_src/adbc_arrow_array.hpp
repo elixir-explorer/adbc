@@ -464,10 +464,19 @@ ERL_NIF_TERM get_arrow_array_list_children(ErlNifEnv *env, struct ArrowSchema * 
             const void * offsets_ptr = (const void *)values->buffers[offset_buffer_index];
             if (offsets_ptr == nullptr) return erlang::nif::error(env, "invalid ArrowArray (list), offsets == nullptr");
             if (count == -1) count = values->length;
+            bool items_nullable = (schema->flags & ARROW_FLAG_NULLABLE) || (values->null_count > 0);
 
             int has_error = 0;
             auto get_list_children_with_offsets = [&](auto offsets) -> void {
                 for (int64_t i = offset; i < offset + count; i++) {
+                    if (bitmap_buffer && items_nullable) {
+                        uint8_t vbyte = bitmap_buffer[i / 8];
+                        if (!(vbyte & (1 << (i % 8)))) {
+                            children.emplace_back(kAtomNil);
+                            continue;
+                        }
+                    }
+
                     std::vector<ERL_NIF_TERM> childrens;
                     ERL_NIF_TERM children_type;
                     ERL_NIF_TERM children_metadata;
@@ -499,7 +508,7 @@ ERL_NIF_TERM get_arrow_array_list_children(ErlNifEnv *env, struct ArrowSchema * 
         } else {
             // NANOARROW_TYPE_FIXED_SIZE_LIST
             if (count == -1) count = values->length;
-            bool items_nullable = (items_schema->flags & ARROW_FLAG_NULLABLE) || (items_values->null_count > 0);
+            bool items_nullable = (schema->flags & ARROW_FLAG_NULLABLE) || (values->null_count > 0);
             for (int64_t child_i = offset; child_i < offset + count; child_i++) {
                 if (bitmap_buffer && items_nullable) {
                     uint8_t vbyte = bitmap_buffer[child_i / 8];

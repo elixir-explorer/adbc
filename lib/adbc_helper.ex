@@ -122,15 +122,13 @@ defmodule Adbc.Helper do
     end
   end
 
-  defp otp_cacerts do
-    if System.otp_release() >= "25" do
-      # cacerts_get/0 raises if no certs found
-      try do
-        :public_key.cacerts_get()
-      rescue
-        _ ->
-          nil
-      end
+  if System.otp_release() >= "25" do
+    defp otp_cacerts do
+      :public_key.cacerts_get()
+    rescue
+      _ -> nil
     end
+  else
+    defp otp_cacerts, do: nil
   end
 end

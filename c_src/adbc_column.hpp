@@ -998,7 +998,6 @@ int do_get_list(ErlNifEnv *env, ERL_NIF_TERM list, bool nullable, struct AdbcCol
     if (!enif_get_list_length(env, list, &n_items)) {
         return 1;
     }
-    printf("n_items: %d\n", n_items);
 
     ERL_NIF_TERM head, tail;
     tail = list;

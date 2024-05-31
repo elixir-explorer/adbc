@@ -1,8 +1,27 @@
 # CHANGELOG
 
-## v0.4.0-dev
+## v0.4.0
 
-* Add ADBC.Column which can be used as buffer inputs and returned as part of result sets
+#### Changes
+* Use `Adbc.Column` for inputs and outputs of result sets
+
+  `Adbc.Column` is a new module that represents columns in a result set. It
+  supports all primitive types and lists of primitive types (nested list support
+  is not yet implemented).
+
+  Use `Adbc.Result.to_map/1`` to convert a result set to a maps of lists, where
+  each key is a column name and the value is a list of values for that column.
+
+* Add `ADBC_CACERTS_PATH` to allow for custom certs (#75)
+* Support bind named parameters via `Adbc.Column` (#84)
+* Expose more APIs (#64)
+  - `Adbc.Database.get_option/2`
+  - `Adbc.{Database,Connection}.{get,set}_option`
+  - `Adbc.Connection.query_with_options/4`
+
+#### Fixes
+* Fix: set parameter length (rows) correctly (#85)
+* Fix: parsing dense/sparse union (#63)
 
 ## v0.3.1
 

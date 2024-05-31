@@ -1,5 +1,10 @@
 # CHANGELOG
 
+## v0.4.1
+
+#### Fix
+* Remove debug print
+
 ## v0.4.0
 
 #### Changes

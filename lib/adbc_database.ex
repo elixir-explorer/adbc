@@ -95,14 +95,14 @@ defmodule Adbc.Database do
   Set option for the database.
 
   - If `value` is an atom or a string, then corresponding string option will be set.
-  - If `value` is a `{:binary, binary()}`-tuple, then corresponding binary option will be set.
+  - If `value` is a `{:binary, iodata()}`-tuple, then corresponding binary option will be set.
   - If `value` is an integer, then corresponding integer option will be set.
   - If `value` is a float, then corresponding float option will be set.
   """
   @spec set_option(
           pid(),
           atom() | String.t(),
-          atom() | {:binary, binary()} | String.t() | number()
+          atom() | {:binary, iodata()} | String.t() | number()
         ) ::
           :ok | {:error, String.t()}
   def set_option(db, key, value)
@@ -111,7 +111,7 @@ defmodule Adbc.Database do
     Adbc.Helper.option(db, :adbc_database_set_option, [:string, key, value])
   end
 
-  def set_option(db, key, {:binary, value}) when is_pid(db) and is_binary(value) do
+  def set_option(db, key, {:binary, value}) when is_pid(db) do
     Adbc.Helper.option(db, :adbc_database_set_option, [:binary, key, value])
   end
 
@@ -165,7 +165,7 @@ defmodule Adbc.Database do
       {key, value}, :ok when is_binary(value) or is_atom(value) ->
         Adbc.Helper.option_ok_or_halt(ref, :adbc_database_set_option, [:string, key, value])
 
-      {key, {:binary, value}}, :ok when is_binary(value) ->
+      {key, {:binary, value}}, :ok ->
         Adbc.Helper.option_ok_or_halt(ref, :adbc_database_set_option, [:binary, key, value])
 
       {key, value}, :ok when is_integer(value) ->

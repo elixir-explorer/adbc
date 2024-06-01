@@ -91,14 +91,14 @@ defmodule Adbc.Connection do
   Set option for the connection.
 
   - If `value` is an atom or a string, then corresponding string option will be set.
-  - If `value` is a `{:binary, binary()}`-tuple, then corresponding binary option will be set.
+  - If `value` is a `{:binary, iodata()}`-tuple, then corresponding binary option will be set.
   - If `value` is an integer, then corresponding integer option will be set.
   - If `value` is a float, then corresponding float option will be set.
   """
   @spec set_option(
           pid(),
           atom() | String.t(),
-          atom() | {:binary, binary()} | String.t() | number()
+          atom() | {:binary, iodata()} | String.t() | number()
         ) ::
           :ok | {:error, String.t()}
   def set_option(conn, key, value)
@@ -107,7 +107,7 @@ defmodule Adbc.Connection do
     Adbc.Helper.option(conn, :adbc_connection_set_option, [:string, key, value])
   end
 
-  def set_option(conn, key, {:binary, value}) when is_pid(conn) and is_binary(value) do
+  def set_option(conn, key, {:binary, value}) when is_pid(conn) do
     Adbc.Helper.option(conn, :adbc_connection_set_option, [:binary, key, value])
   end
 
@@ -124,7 +124,7 @@ defmodule Adbc.Connection do
       {key, value}, :ok when is_atom(value) or is_binary(value) ->
         Adbc.Helper.option_ok_or_halt(ref, :adbc_connection_set_option, [:string, key, value])
 
-      {key, {:binary, value}}, :ok when is_binary(value) ->
+      {key, {:binary, value}}, :ok ->
         Adbc.Helper.option_ok_or_halt(ref, :adbc_connection_set_option, [:binary, key, value])
 
       {key, value}, :ok when is_integer(value) ->
@@ -140,7 +140,7 @@ defmodule Adbc.Connection do
       {key, value}, :ok when is_atom(value) or is_binary(value) ->
         Adbc.Helper.option_ok_or_halt(ref, :adbc_statement_set_option, [:string, key, value])
 
-      {key, {:binary, value}}, :ok when is_binary(value) ->
+      {key, {:binary, value}}, :ok ->
         Adbc.Helper.option_ok_or_halt(ref, :adbc_statement_set_option, [:binary, key, value])
 
       {key, value}, :ok when is_integer(value) ->

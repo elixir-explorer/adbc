@@ -700,7 +700,7 @@ defmodule Adbc.Column do
       }
 
   """
-  @spec binary([binary() | nil], Keyword.t()) :: %Adbc.Column{}
+  @spec binary([iodata() | nil], Keyword.t()) :: %Adbc.Column{}
   def binary(data, opts \\ []) when is_list(data) and is_list(opts) do
     column(:binary, data, opts)
   end
@@ -733,7 +733,7 @@ defmodule Adbc.Column do
       }
 
   """
-  @spec large_binary([binary() | nil], Keyword.t()) :: %Adbc.Column{}
+  @spec large_binary([iodata() | nil], Keyword.t()) :: %Adbc.Column{}
   def large_binary(data, opts \\ []) when is_list(data) and is_list(opts) do
     column(:large_binary, data, opts)
   end
@@ -767,7 +767,7 @@ defmodule Adbc.Column do
       }
 
   """
-  @spec fixed_size_binary([binary() | nil], non_neg_integer(), Keyword.t()) :: %Adbc.Column{}
+  @spec fixed_size_binary([iodata() | nil], non_neg_integer(), Keyword.t()) :: %Adbc.Column{}
   def fixed_size_binary(data, nbytes, opts \\ []) when is_list(data) and is_list(opts) do
     column({:fixed_size_binary, nbytes}, data, opts)
   end

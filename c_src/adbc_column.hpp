@@ -300,7 +300,7 @@ int get_list_decimal(ErlNifEnv *env, ERL_NIF_TERM list, bool nullable, ArrowType
         struct ArrowDecimal val{};
         ArrowDecimalInit(&val, bitwidth, precision, scale);
         ErlNifBinary bytes;
-        if (enif_is_binary(env, head) && enif_inspect_binary(env, head, &bytes)) {
+        if (enif_inspect_iolist_as_binary(env, head, &bytes)) {
             if (nanoarrow_type == NANOARROW_TYPE_DECIMAL128) {
                 if (bytes.size != 16) {
                     return 1;
@@ -358,7 +358,7 @@ int get_list_string(ErlNifEnv *env, ERL_NIF_TERM list, bool nullable, const std:
     while (enif_get_list_cell(env, tail, &head, &tail)) {
         ErlNifBinary bytes;
         struct ArrowStringView val{};
-        if (enif_is_binary(env, head) && enif_inspect_binary(env, head, &bytes)) {
+        if (enif_inspect_iolist_as_binary(env, head, &bytes)) {
             val.data = (const char *)bytes.data;
             val.size_bytes = static_cast<int64_t>(bytes.size);
             NANOARROW_RETURN_NOT_OK(callback(val, false));
@@ -450,7 +450,7 @@ int get_list_fixed_size_binary(ErlNifEnv *env, ERL_NIF_TERM list, bool nullable,
     while (enif_get_list_cell(env, tail, &head, &tail)) {
         ErlNifBinary bytes;
         struct ArrowBufferView val{};
-        if (enif_is_binary(env, head) && enif_inspect_binary(env, head, &bytes)) {
+        if (enif_inspect_iolist_as_binary(env, head, &bytes)) {
             val.data.data = bytes.data;
             val.size_bytes = static_cast<int64_t>(bytes.size);
             NANOARROW_RETURN_NOT_OK(callback(val, false));
@@ -1127,7 +1127,7 @@ int build_metadata_from_nif(ErlNifEnv *env, ERL_NIF_TERM metadata_term, struct A
             ErlNifBinary key_bytes, value_bytes;
             struct ArrowStringView key_view{};
             struct ArrowStringView value_view{};
-            if (enif_is_binary(env, metadata_key) && enif_inspect_binary(env, metadata_key, &key_bytes)) {
+            if (enif_inspect_iolist_as_binary(env, metadata_key, &key_bytes)) {
                 key_view.data = (const char *)key_bytes.data;
                 key_view.size_bytes = static_cast<int64_t>(key_bytes.size);
             } else {
@@ -1136,7 +1136,7 @@ int build_metadata_from_nif(ErlNifEnv *env, ERL_NIF_TERM metadata_term, struct A
                 snprintf(error_out->message, sizeof(error_out->message), "cannot get metadata key");
                 return kErrorBufferGetMetadataKey;
             }
-            if (enif_is_binary(env, metadata_value) && enif_inspect_binary(env, metadata_value, &value_bytes)) {
+            if (enif_inspect_iolist_as_binary(env, metadata_value, &value_bytes)) {
                 value_view.data = (const char *)value_bytes.data;
                 value_view.size_bytes = static_cast<int64_t>(value_bytes.size);
             } else {
@@ -1530,7 +1530,7 @@ int adbc_column_to_arrow_type_struct(ErlNifEnv *env, ERL_NIF_TERM values, struct
             NANOARROW_RETURN_NOT_OK(ArrowArrayInitFromSchema(child_i, schema_i, error_out));
             NANOARROW_RETURN_NOT_OK(ArrowArrayStartAppending(child_i));
             NANOARROW_RETURN_NOT_OK(ArrowArrayAppendDouble(child_i, f64));
-        } else if (enif_is_binary(env, head) && enif_inspect_binary(env, head, &bytes)) {
+        } else if (enif_inspect_iolist_as_binary(env, head, &bytes)) {
             auto type = NANOARROW_TYPE_STRING;
             if (bytes.size > INT32_MAX) {
                 type = NANOARROW_TYPE_LARGE_STRING;

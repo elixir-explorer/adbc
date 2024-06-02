@@ -791,6 +791,10 @@ static int on_load(ErlNifEnv *env, void **, ERL_NIF_TERM) {
     kAtomNaN = erlang::nif::atom(env, "nan");
     kAtomEndOfSeries = erlang::nif::atom(env, "end_of_series");
     kAtomStructKey = erlang::nif::atom(env, "__struct__");
+    kAtomValidity = erlang::nif::atom(env, "validity");
+    kAtomOffsets = erlang::nif::atom(env, "offsets");
+    kAtomSizes = erlang::nif::atom(env, "sizes");
+    kAtomValues = erlang::nif::atom(env, "values");
 
     kAtomDecimal = erlang::nif::atom(env, "decimal");
     kAtomFixedSizeBinary = erlang::nif::atom(env, "fixed_size_binary");
@@ -850,6 +854,8 @@ static int on_load(ErlNifEnv *env, void **, ERL_NIF_TERM) {
     kAdbcColumnTypeDate64 = erlang::nif::atom(env, "date64");
     kAdbcColumnTypeList = erlang::nif::atom(env, "list");
     kAdbcColumnTypeLargeList = erlang::nif::atom(env, "large_list");
+    kAdbcColumnTypeListView = erlang::nif::atom(env, "list_view");
+    kAdbcColumnTypeLargeListView = erlang::nif::atom(env, "large_list_view");
     kAdbcColumnTypeStruct = erlang::nif::atom(env, "struct");
     kAdbcColumnTypeMap = erlang::nif::atom(env, "map");
     kAdbcColumnTypeDenseUnion = erlang::nif::atom(env, "dense_union");

@@ -23,6 +23,15 @@ static ERL_NIF_TERM get_arrow_array_dense_union_children(ErlNifEnv *env, struct 
 static ERL_NIF_TERM get_arrow_array_sparse_union_children(ErlNifEnv *env, struct ArrowSchema * schema, struct ArrowArray * values, uint64_t level);
 static ERL_NIF_TERM get_arrow_array_sparse_union_children(ErlNifEnv *env, struct ArrowSchema * schema, struct ArrowArray * values, int64_t offset, int64_t count, uint64_t level);
 
+template <typename M> static ERL_NIF_TERM bit_boolean_from_buffer(ErlNifEnv *env, int64_t offset, int64_t count, const uint8_t * value_buffer, const M& value_to_nif) {
+    std::vector<ERL_NIF_TERM> values(count);
+    for (int64_t i = offset; i < offset + count; i++) {
+        uint8_t vbyte = value_buffer[i/8];
+        values[i - offset] = value_to_nif(env, vbyte & (1 << (i % 8)));
+    }
+    return enif_make_list_from_array(env, values.data(), (unsigned)values.size());
+}
+
 template <typename T, typename M> static ERL_NIF_TERM values_from_buffer(ErlNifEnv *env, int64_t offset, int64_t count, const uint8_t * validity_bitmap, const T * value_buffer, const M& value_to_nif) {
     std::vector<ERL_NIF_TERM> values(count);
     if (validity_bitmap == nullptr) {
@@ -542,6 +551,92 @@ ERL_NIF_TERM get_arrow_array_list_children(ErlNifEnv *env, struct ArrowSchema * 
 
 ERL_NIF_TERM get_arrow_array_list_children(ErlNifEnv *env, struct ArrowSchema * schema, struct ArrowArray * values, uint64_t level, ArrowType list_type, unsigned n_items) {
     return get_arrow_array_list_children(env, schema, values, 0, -1, level, list_type, n_items);
+}
+
+ERL_NIF_TERM get_arrow_array_list_view(ErlNifEnv *env, struct ArrowSchema * schema, struct ArrowArray * values, int64_t offset, int64_t count, uint64_t level, ArrowType list_type) {
+    ERL_NIF_TERM error{};
+    if (schema->children == nullptr) {
+        return erlang::nif::error(env, "invalid ArrowSchema (list view), schema->children == nullptr");
+    }
+    if (schema->n_children != 1) {
+        return erlang::nif::error(env, "invalid ArrowSchema (list view), schema->n_children != 1");
+    }
+    if (values->children == nullptr) {
+        return erlang::nif::error(env, "invalid ArrowArray (list view), values->children == nullptr");
+    }
+    if (values->n_children != 1) {
+        return erlang::nif::error(env, "invalid ArrowArray (list view), values->n_children != 1");
+    }
+    if (list_type != NANOARROW_TYPE_LIST && list_type != NANOARROW_TYPE_LARGE_LIST) {
+        return erlang::nif::error(env, "invalid ArrowArray (list view), internal error: unexpected list type");
+    }
+
+    constexpr int64_t bitmap_buffer_index = 0;
+    constexpr int64_t offsets_buffer_index = 1;
+    constexpr int64_t sizes_buffer_index = 2;
+    const uint8_t * bitmap_buffer = (const uint8_t *)values->buffers[bitmap_buffer_index];
+    const void * offsets_ptr = (const void *)values->buffers[offsets_buffer_index];
+    const void * sizes_ptr = (const void *)values->buffers[sizes_buffer_index];
+    bool items_nullable = (schema->flags & ARROW_FLAG_NULLABLE) || (values->null_count > 0);
+    if (items_nullable && bitmap_buffer == nullptr) {
+        return erlang::nif::error(env, "invalid ArrowArray (list view), items_nullable == true but bitmap_buffer == nullptr");
+    }
+    if (offsets_ptr == nullptr) return erlang::nif::error(env, "invalid ArrowArray (list view), offsets == nullptr");
+    if (sizes_ptr == nullptr) return erlang::nif::error(env, "invalid ArrowArray (list view), sizes == nullptr");
+
+    struct ArrowSchema * items_schema = schema->children[0];
+    struct ArrowArray * items_values = values->children[0];
+    if (strncmp("item", items_schema->name, 4) != 0) {
+        return erlang::nif::error(env, "invalid ArrowSchema (list), its single child is not named item");
+    }
+    if (count == -1) count = values->length;
+
+    auto bool_to_atom = [](ErlNifEnv *, bool b) -> ERL_NIF_TERM {
+        return b ? kAtomTrue : kAtomFalse;
+    };
+
+    std::vector<ERL_NIF_TERM> childrens;
+    ERL_NIF_TERM validity_term, offsets_term, sizes_term, values_term;
+    ERL_NIF_TERM children_type;
+    ERL_NIF_TERM children_metadata;
+    // according to the Arrow spec, the bitmap buffer is not required for the child values
+    // and this `buffer[0]` could be a random memory address, so we simply set it to nullptr here
+    items_values->buffers[0] = nullptr;
+    if (arrow_array_to_nif_term(env, items_schema, items_values, 0, -1, level + 1, childrens, children_type, children_metadata, error)) {
+        return error;
+    }
+    items_values->buffers[0] = bitmap_buffer;
+
+    if (childrens.size() == 1) {
+        values_term = childrens[0];
+    } else {
+        if (enif_is_identical(childrens[1], kAtomNil)) {
+            values_term = kAtomNil;
+        } else {
+            values_term = make_adbc_column(env, childrens[0], children_type, false, children_metadata, childrens[1]);
+        }
+    }
+
+    if (list_type == NANOARROW_TYPE_LIST) {
+        validity_term = bit_boolean_from_buffer(env, offset, count, (const uint8_t *)bitmap_buffer, bool_to_atom);
+        offsets_term = values_from_buffer(env, offset, count, NULL, (const int32_t *)offsets_ptr, enif_make_int);
+        sizes_term = values_from_buffer(env, offset, count, NULL, (const int32_t *)sizes_ptr, enif_make_int);
+    } else {
+        validity_term = bit_boolean_from_buffer(env, offset, count, (const uint8_t *)bitmap_buffer, bool_to_atom);
+        offsets_term = values_from_buffer(env, offset, count, NULL, (const int64_t *)offsets_ptr, enif_make_int64);
+        sizes_term = values_from_buffer(env, offset, count, NULL, (const int64_t *)sizes_ptr, enif_make_int64);
+    }
+    ERL_NIF_TERM list_view_keys[] = { kAtomValidity, kAtomOffsets, kAtomSizes, kAtomValues };
+    ERL_NIF_TERM list_view_values[] = { validity_term, offsets_term, sizes_term, values_term };
+    ERL_NIF_TERM map_out;
+    // only fail if there are duplicated keys
+    // so we don't need to check the return value
+    enif_make_map_from_arrays(env, list_view_keys, list_view_values, 4, &map_out);
+    return map_out;
+}
+
+ERL_NIF_TERM get_arrow_array_list_view(ErlNifEnv *env, struct ArrowSchema * schema, struct ArrowArray * values, uint64_t level, ArrowType list_type) {
+    return get_arrow_array_list_view(env, schema, values, 0, -1, level, list_type);
 }
 
 int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct ArrowArray * values, int64_t offset, int64_t count, int64_t level, std::vector<ERL_NIF_TERM> &out_terms, ERL_NIF_TERM &term_type, ERL_NIF_TERM &arrow_metadata, ERL_NIF_TERM &error, bool *end_of_series) {
@@ -1335,7 +1430,15 @@ int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct 
                 }
             }
         } else {
-            if (strncmp("+w:", format, 3) == 0) {
+            if (format_len == 3 && strncmp("+vl", format, 3) == 0) {
+                // NANOARROW_TYPE_LIST(VIEW)
+                term_type = kAdbcColumnTypeListView;
+                children_term = get_arrow_array_list_view(env, schema, values, offset, count, level, NANOARROW_TYPE_LIST);
+            } else if (format_len == 3 && strncmp("+vL", format, 3) == 0) {
+                // NANOARROW_TYPE_LARGE_LIST(VIEW)
+                term_type = kAdbcColumnTypeLargeListView;
+                children_term = get_arrow_array_list_view(env, schema, values, offset, count, level, NANOARROW_TYPE_LARGE_LIST);
+            } else if (strncmp("+w:", format, 3) == 0) {
                 // NANOARROW_TYPE_FIXED_SIZE_LIST
                 unsigned n_items = 0;
                 for (size_t i = 3; i < format_len; i++) {

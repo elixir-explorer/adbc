@@ -72,16 +72,31 @@ defmodule Adbc.Column do
           {:interval, :month}
           | {:interval, :day_time}
           | {:interval, :month_day_nano}
+  @list_view_types [
+    :list_view,
+    :large_list_view
+  ]
+  @type list_view_data_t :: %{
+          validity: [boolean()],
+          offsets: [non_neg_integer()],
+          sizes: [non_neg_integer()],
+          values: %Adbc.Column{}
+        }
   @type data_type ::
           :boolean
           | signed_integer
           | unsigned_integer
           | floating
-          | decimal_t
-          | :string
-          | :large_string
+          | :list
+          | :large_list
+          | :list_view
+          | :large_list_view
+          | {:fixed_size_list, i32()}
           | :binary
           | :large_binary
+          | :string
+          | :large_string
+          | decimal_t
           | {:fixed_size_binary, non_neg_integer()}
           | :date32
           | :date64
@@ -89,13 +104,13 @@ defmodule Adbc.Column do
           | timestamp_t
           | duration_t
           | interval_t
-
-  @spec column(data_type(), list, Keyword.t()) :: %Adbc.Column{}
+  @spec column(data_type(), list() | list_view_data_t(), Keyword.t()) :: %Adbc.Column{}
   def column(type, data, opts \\ [])
-      when (is_atom(type) or is_tuple(type)) and is_list(data) and is_list(opts) do
+      when (is_atom(type) or is_tuple(type)) and
+             (is_list(data) or (type in @list_view_types and is_map(data))) and is_list(opts) do
     name = opts[:name]
     nullable = opts[:nullable] || false
-    metadata = opts[:metadata]
+    metadata = opts[:metadata] || %{}
 
     %Adbc.Column{
       name: name,
@@ -1066,9 +1081,116 @@ defmodule Adbc.Column do
   * `:nullable` - A boolean value indicating whether the column is nullable
   * `:metadata` - A map of metadata
   """
-  @spec fixed_size_list([%Adbc.Column{} | nil], [i32()], Keyword.t()) ::
+  @spec fixed_size_list([%Adbc.Column{} | nil], i32(), Keyword.t()) ::
           %Adbc.Column{}
   def fixed_size_list(data, fixed_size, opts \\ []) when is_list(data) do
     column({:fixed_size_list, fixed_size}, data, opts)
   end
+
+  @doc """
+  Convert a list view to a list.
+
+  ## Examples
+
+      iex> list_view = %Adbc.Column{
+      ...>   name: nil,
+      ...>   type: :list_view,
+      ...>   nullable: true,
+      ...>   metadata: %{},
+      ...>   data: %{
+      ...>     values: %Adbc.Column{
+      ...>       name: "item",
+      ...>       type: :i32,
+      ...>       nullable: false,
+      ...>       metadata: nil,
+      ...>       data: [0, -127, 127, 50, 12, -7, 25]
+      ...>     },
+      ...>     validity: [true, false, true, true, true],
+      ...>     offsets: [4, 7, 0, 0, 3],
+      ...>     sizes: [3, 0, 4, 0, 2]
+      ...>   }
+      ...> }
+      %Adbc.Column{
+        name: nil,
+        type: :list_view,
+        nullable: true,
+        metadata: %{},
+        data: %{
+          offsets: [4, 7, 0, 0, 3],
+          sizes: [3, 0, 4, 0, 2],
+          validity: [true, false, true, true, true],
+          values: %Adbc.Column{
+            name: "item",
+            type: :i32,
+            nullable: false,
+            metadata: nil,
+            data: [0, -127, 127, 50, 12, -7, 25]
+          }
+        }
+      }
+      iex> Adbc.Column.list_view_to_list(list_view)
+      %Adbc.Column{
+        name: nil,
+        type: :list,
+        nullable: true,
+        metadata: %{},
+        data: [
+          %Adbc.Column{
+            name: "item",
+            type: :i32,
+            nullable: false,
+            metadata: nil,
+            data: [12, -7, 25]
+          },
+          nil,
+          %Adbc.Column{
+            name: "item",
+            type: :i32,
+            nullable: false,
+            metadata: nil,
+            data: [0, -127, 127, 50]
+          },
+          %Adbc.Column{
+            name: "item",
+            type: :i32,
+            nullable: false,
+            metadata: nil,
+            data: []
+          },
+          %Adbc.Column{
+            name: "item",
+            type: :i32,
+            nullable: false,
+            metadata: nil,
+            data: ~c"2\f"
+          }
+        ]
+      }
+  """
+  @spec list_view_to_list(%Adbc.Column{data: map()}) :: %Adbc.Column{}
+  def list_view_to_list(
+        column = %Adbc.Column{
+          type: type,
+          data: %{
+            validity: validity,
+            offsets: offsets,
+            sizes: sizes,
+            values: values = %Adbc.Column{}
+          }
+        }
+      )
+      when type in @list_view_types and is_list(validity) and is_list(offsets) and is_list(sizes) do
+    new_data =
+      Enum.map(Enum.zip([offsets, sizes, validity]), fn {offset, size, valid} ->
+        if valid do
+          %{values | data: Enum.map(Enum.slice(values.data, offset, size), &Adbc.Column.list_view_to_list/1)}
+        else
+          nil
+        end
+      end)
+
+    %{column | data: new_data, type: :list}
+  end
+
+  def list_view_to_list(v), do: v
 end

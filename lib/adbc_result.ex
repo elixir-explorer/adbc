@@ -27,6 +27,10 @@ defmodule Adbc.Result do
     end)
   end
 
+  def list_view_to_list(%Adbc.Result{data: data}) do
+    Enum.map(data, &list_to_map/1)
+  end
+
   defp list_to_map(%Adbc.Column{name: name, type: type, data: data}) do
     case type do
       :list ->

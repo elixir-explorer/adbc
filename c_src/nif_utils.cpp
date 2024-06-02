@@ -120,15 +120,17 @@ int get(ErlNifEnv *env, ERL_NIF_TERM term, std::string &var) {
     int ret = enif_get_list_length(env, term, &len);
 
     if (!ret) {
+        // iodata
         ErlNifBinary bin;
-        ret = enif_inspect_binary(env, term, &bin);
+        ret = enif_inspect_iolist_as_binary(env, term, &bin);
         if (!ret) {
             return 0;
         }
-        var = std::string((const char *) bin.data, bin.size);
+        var = std::string((const char *)bin.data, bin.size);
         return ret;
     }
 
+    // charlist
     var.resize(len + 1);
     ret = enif_get_string(env, term, &*(var.begin()), var.size(), ERL_NIF_LATIN1);
 
@@ -136,7 +138,6 @@ int get(ErlNifEnv *env, ERL_NIF_TERM term, std::string &var) {
         var.resize(ret - 1);
     } else if (ret == 0) {
         var.resize(0);
-    } else {
     }
 
     return ret;
@@ -420,7 +421,7 @@ int get_list(ErlNifEnv *env, ERL_NIF_TERM list, std::vector<ErlNifBinary> &var) 
 
     while (enif_get_list_cell(env, list, &head, &tail)) {
         ErlNifBinary elem;
-        if (!enif_inspect_binary(env, head, &elem)) {
+        if (!enif_inspect_iolist_as_binary(env, head, &elem)) {
             return 0;
         }
 

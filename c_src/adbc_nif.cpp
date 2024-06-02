@@ -161,7 +161,7 @@ static ERL_NIF_TERM adbc_set_option(ErlNifEnv *env, const ERL_NIF_TERM argv[], S
             code = set_string(&resource->val, key.c_str(), value.c_str(), &adbc_error);
         } else {
             ErlNifBinary bin;
-            ERL_NIF_TERM ret = enif_inspect_binary(env, argv[3], &bin);
+            int ret = enif_inspect_iolist_as_binary(env, argv[3], &bin);
             if (!ret) {
                 return enif_make_badarg(env);
             }

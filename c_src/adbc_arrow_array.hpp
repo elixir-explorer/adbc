@@ -427,101 +427,19 @@ ERL_NIF_TERM get_arrow_array_list_children(ErlNifEnv *env, struct ArrowSchema * 
     }
 
     std::vector<ERL_NIF_TERM> children;
-    if (items_values->n_children > 0) {
-        if (offset < 0 || offset >= items_values->n_children) {
-            return erlang::nif::error(env, "invalid offset for ArrowArray (list), offset < 0 || offset >= items_values->n_children");
-        }
-        if (count == -1) count = items_values->n_children;
-        if ((offset + count) > items_values->n_children) {
-            return erlang::nif::error(env, "invalid offset for ArrowArray (list), (offset + count) > items_values->n_children");
-        }
-        children.resize(count);
-        bool items_nullable = (items_schema->flags & ARROW_FLAG_NULLABLE) || (items_values->null_count > 0);
-        for (int64_t child_i = offset; child_i < offset + count; child_i++) {
-            if (bitmap_buffer && items_nullable) {
-                uint8_t vbyte = bitmap_buffer[child_i / 8];
-                if (!(vbyte & (1 << (child_i % 8)))) {
-                    children[child_i - offset] = kAtomNil;
-                    continue;
-                }
-            }
-            struct ArrowSchema * item_schema = items_schema->children[child_i];
-            struct ArrowArray * item_values = items_values->children[child_i];
+    if (list_type == NANOARROW_TYPE_LIST || list_type == NANOARROW_TYPE_LARGE_LIST) {
+        constexpr int64_t offset_buffer_index = 1;
+        const void * offsets_ptr = (const void *)values->buffers[offset_buffer_index];
+        if (offsets_ptr == nullptr) return erlang::nif::error(env, "invalid ArrowArray (list), offsets == nullptr");
+        if (count == -1) count = values->length;
+        bool items_nullable = (schema->flags & ARROW_FLAG_NULLABLE) || (values->null_count > 0);
 
-            std::vector<ERL_NIF_TERM> childrens;
-            ERL_NIF_TERM item_type;
-            ERL_NIF_TERM item_metadata;
-            if (arrow_array_to_nif_term(env, item_schema, item_values, level + 1, childrens, item_type, item_metadata, error) == 1) {
-                return error;
-            }
-
-            if (childrens.size() == 1) {
-                children[child_i - offset] = childrens[0];
-            } else {
-                bool children_nullable = (item_schema->flags & ARROW_FLAG_NULLABLE) || (item_values->null_count > 0);
-                if (enif_is_identical(childrens[1], kAtomNil)) {
-                    children[child_i - offset] = kAtomNil;
-                } else {
-                    children[child_i - offset] = make_adbc_column(env, childrens[0], item_type, children_nullable, item_metadata, childrens[1]);
-                }
-            }
-        }
-        return enif_make_list_from_array(env, children.data(), (unsigned)children.size());
-    } else {
-        if (list_type == NANOARROW_TYPE_LIST || list_type == NANOARROW_TYPE_LARGE_LIST) {
-            constexpr int64_t offset_buffer_index = 1;
-            const void * offsets_ptr = (const void *)values->buffers[offset_buffer_index];
-            if (offsets_ptr == nullptr) return erlang::nif::error(env, "invalid ArrowArray (list), offsets == nullptr");
-            if (count == -1) count = values->length;
-            bool items_nullable = (schema->flags & ARROW_FLAG_NULLABLE) || (values->null_count > 0);
-
-            int has_error = 0;
-            auto get_list_children_with_offsets = [&](auto offsets) -> void {
-                for (int64_t i = offset; i < offset + count; i++) {
-                    if (bitmap_buffer && items_nullable) {
-                        uint8_t vbyte = bitmap_buffer[i / 8];
-                        if (!(vbyte & (1 << (i % 8)))) {
-                            children.emplace_back(kAtomNil);
-                            continue;
-                        }
-                    }
-
-                    std::vector<ERL_NIF_TERM> childrens;
-                    ERL_NIF_TERM children_type;
-                    ERL_NIF_TERM children_metadata;
-                    if (arrow_array_to_nif_term(env, items_schema, items_values, offsets[i], offsets[i+1] - offsets[i], level + 1, childrens, children_type, children_metadata, error) == 1) {
-                        has_error = 1;
-                        return;
-                    }
-
-                    if (childrens.size() == 1) {
-                        children.emplace_back(childrens[0]);
-                    } else {
-                        bool children_nullable = (schema->flags & ARROW_FLAG_NULLABLE) || (values->null_count > 0);
-                        if (enif_is_identical(childrens[1], kAtomNil)) {
-                            children.emplace_back(kAtomNil);
-                        } else {
-                            children.emplace_back(make_adbc_column(env, childrens[0], children_type, children_nullable, children_metadata, childrens[1]));
-                        }
-                    }
-                }
-            };
-
-            if (list_type == NANOARROW_TYPE_LIST) {
-                get_list_children_with_offsets((const int32_t *)offsets_ptr);
-                if (has_error) return error;
-            } else if (list_type == NANOARROW_TYPE_LARGE_LIST) {
-                get_list_children_with_offsets((const int64_t *)offsets_ptr);
-                if (has_error) return error;
-            }
-        } else {
-            // NANOARROW_TYPE_FIXED_SIZE_LIST
-            if (count == -1) count = values->length;
-            bool items_nullable = (schema->flags & ARROW_FLAG_NULLABLE) || (values->null_count > 0);
-            for (int64_t child_i = offset; child_i < offset + count; child_i++) {
+        int has_error = 0;
+        auto get_list_children_with_offsets = [&](auto offsets) -> void {
+            for (int64_t i = offset; i < offset + count; i++) {
                 if (bitmap_buffer && items_nullable) {
-                    uint8_t vbyte = bitmap_buffer[child_i / 8];
-                    if (!(vbyte & (1 << (child_i % 8)))) {
+                    uint8_t vbyte = bitmap_buffer[i / 8];
+                    if (!(vbyte & (1 << (i % 8)))) {
                         children.emplace_back(kAtomNil);
                         continue;
                     }
@@ -530,9 +448,11 @@ ERL_NIF_TERM get_arrow_array_list_children(ErlNifEnv *env, struct ArrowSchema * 
                 std::vector<ERL_NIF_TERM> childrens;
                 ERL_NIF_TERM children_type;
                 ERL_NIF_TERM children_metadata;
-                if (arrow_array_to_nif_term(env, items_schema, items_values, child_i * n_items, n_items, level + 1, childrens, children_type, children_metadata, error)) {
-                    return error;
+                if (arrow_array_to_nif_term(env, items_schema, items_values, offsets[i], offsets[i+1] - offsets[i], level + 1, childrens, children_type, children_metadata, error) == 1) {
+                    has_error = 1;
+                    return;
                 }
+
                 if (childrens.size() == 1) {
                     children.emplace_back(childrens[0]);
                 } else {
@@ -544,9 +464,47 @@ ERL_NIF_TERM get_arrow_array_list_children(ErlNifEnv *env, struct ArrowSchema * 
                     }
                 }
             }
+        };
+
+        if (list_type == NANOARROW_TYPE_LIST) {
+            get_list_children_with_offsets((const int32_t *)offsets_ptr);
+            if (has_error) return error;
+        } else if (list_type == NANOARROW_TYPE_LARGE_LIST) {
+            get_list_children_with_offsets((const int64_t *)offsets_ptr);
+            if (has_error) return error;
         }
-        return enif_make_list_from_array(env, children.data(), (unsigned)children.size());
+    } else {
+        // NANOARROW_TYPE_FIXED_SIZE_LIST
+        if (count == -1) count = values->length;
+        bool items_nullable = (schema->flags & ARROW_FLAG_NULLABLE) || (values->null_count > 0);
+        for (int64_t child_i = offset; child_i < offset + count; child_i++) {
+            if (bitmap_buffer && items_nullable) {
+                uint8_t vbyte = bitmap_buffer[child_i / 8];
+                if (!(vbyte & (1 << (child_i % 8)))) {
+                    children.emplace_back(kAtomNil);
+                    continue;
+                }
+            }
+
+            std::vector<ERL_NIF_TERM> childrens;
+            ERL_NIF_TERM children_type;
+            ERL_NIF_TERM children_metadata;
+            if (arrow_array_to_nif_term(env, items_schema, items_values, child_i * n_items, n_items, level + 1, childrens, children_type, children_metadata, error)) {
+                return error;
+            }
+            if (childrens.size() == 1) {
+                children.emplace_back(childrens[0]);
+            } else {
+                bool children_nullable = (schema->flags & ARROW_FLAG_NULLABLE) || (values->null_count > 0);
+                if (enif_is_identical(childrens[1], kAtomNil)) {
+                    children.emplace_back(kAtomNil);
+                } else {
+                    children.emplace_back(make_adbc_column(env, childrens[0], children_type, children_nullable, children_metadata, childrens[1]));
+                }
+            }
+        }
     }
+    return enif_make_list_from_array(env, children.data(), (unsigned)children.size());
 }
 
 ERL_NIF_TERM get_arrow_array_list_children(ErlNifEnv *env, struct ArrowSchema * schema, struct ArrowArray * values, uint64_t level, ArrowType list_type, unsigned n_items) {

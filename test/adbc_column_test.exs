@@ -248,4 +248,158 @@ defmodule Adbc.Column.Test do
       end
     end
   end
+
+  describe "list view" do
+    test "nested list view to list" do
+      list_view = %Adbc.Column{
+        name: nil,
+        type: :list_view,
+        nullable: true,
+        metadata: %{},
+        data: %{
+          values: %Adbc.Column{
+            name: "item",
+            type: :i32,
+            nullable: false,
+            metadata: nil,
+            data: [0, -127, 127, 50, 12, -7, 25]
+          },
+          validity: [true, false, true, true, true],
+          offsets: [4, 7, 0, 0, 3],
+          sizes: [3, 0, 4, 0, 2]
+        }
+      }
+
+      assert %Adbc.Column{
+               name: nil,
+               type: :list,
+               nullable: true,
+               metadata: %{},
+               data: [
+                 inner1 = %Adbc.Column{
+                   name: "item",
+                   type: :i32,
+                   nullable: false,
+                   metadata: nil,
+                   data: [12, -7, 25]
+                 },
+                 _inner2 = nil,
+                 inner3 = %Adbc.Column{
+                   name: "item",
+                   type: :i32,
+                   nullable: false,
+                   metadata: nil,
+                   data: [0, -127, 127, 50]
+                 },
+                 inner4 = %Adbc.Column{
+                   name: "item",
+                   type: :i32,
+                   nullable: false,
+                   metadata: nil,
+                   data: []
+                 },
+                 inner5 = %Adbc.Column{
+                   name: "item",
+                   type: :i32,
+                   nullable: false,
+                   metadata: nil,
+                   data: ~c"2\f"
+                 }
+               ]
+             } = Adbc.Column.list_view_to_list(list_view)
+
+      nested_list_view = %Adbc.Column{
+        name: nil,
+        type: :list_view,
+        nullable: true,
+        metadata: %{},
+        data: %{
+          values: list_view,
+          validity: [true, false, true, true, true],
+          offsets: [2, 5, 0, 0, 3],
+          sizes: [2, 0, 1, 0, 2]
+        }
+      }
+
+      assert %Adbc.Column{
+               data: [
+                 # offsets=2, sizes=2
+                 # => [inner3, inner4]
+                 %Adbc.Column{
+                   metadata: %{},
+                   name: nil,
+                   nullable: true,
+                   type: :list,
+                   data: [
+                     ^inner3 = %Adbc.Column{
+                       name: "item",
+                       type: :i32,
+                       nullable: false,
+                       metadata: nil,
+                       data: [0, -127, 127, 50]
+                     },
+                     ^inner4 = %Adbc.Column{
+                       name: "item",
+                       type: :i32,
+                       nullable: false,
+                       metadata: nil,
+                       data: []
+                     }
+                   ]
+                 },
+                 # offsets=5, sizes=0
+                 # => nil
+                 nil,
+                 # offsets=0, sizes=1
+                 # => inner1
+                 %Adbc.Column{
+                   metadata: %{},
+                   name: nil,
+                   nullable: true,
+                   type: :list,
+                   data: [
+                     ^inner1 = %Adbc.Column{
+                       name: "item",
+                       type: :i32,
+                       nullable: false,
+                       metadata: nil,
+                       data: [12, -7, 25]
+                     }
+                   ]
+                 },
+                 # offsets=0, sizes=0
+                 # => []
+                 %Adbc.Column{data: [], metadata: %{}, name: nil, nullable: true, type: :list},
+                 # offsets=3, sizes=2
+                 # => [inner4, inner5]
+                 %Adbc.Column{
+                   data: [
+                     ^inner4 = %Adbc.Column{
+                       name: "item",
+                       type: :i32,
+                       nullable: false,
+                       metadata: nil,
+                       data: []
+                     },
+                     ^inner5 = %Adbc.Column{
+                       name: "item",
+                       type: :i32,
+                       nullable: false,
+                       metadata: nil,
+                       data: ~c"2\f"
+                     }
+                   ],
+                   metadata: %{},
+                   name: nil,
+                   nullable: true,
+                   type: :list
+                 }
+               ],
+               metadata: %{},
+               name: nil,
+               nullable: true,
+               type: :list
+             } = Adbc.Column.list_view_to_list(nested_list_view)
+    end
+  end
 end

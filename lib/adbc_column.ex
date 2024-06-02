@@ -1180,16 +1180,31 @@ defmodule Adbc.Column do
         }
       )
       when type in @list_view_types and is_list(validity) and is_list(offsets) and is_list(sizes) do
+    values =
+      if values.type in @list_view_types do
+        Adbc.Column.list_view_to_list(values)
+      else
+        values
+      end
+
     new_data =
       Enum.map(Enum.zip([offsets, sizes, validity]), fn {offset, size, valid} ->
         if valid do
-          %{values | data: Enum.map(Enum.slice(values.data, offset, size), &Adbc.Column.list_view_to_list/1)}
+          %{
+            values
+            | data:
+                Enum.map(Enum.slice(values.data, offset, size), &Adbc.Column.list_view_to_list/1)
+          }
         else
           nil
         end
       end)
 
     %{column | data: new_data, type: :list}
+  end
+
+  def list_view_to_list(column = %Adbc.Column{data: data}) when is_list(data) do
+    %{column | data: Enum.map(data, &Adbc.Column.list_view_to_list/1)}
   end
 
   def list_view_to_list(v), do: v

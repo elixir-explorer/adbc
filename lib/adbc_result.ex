@@ -18,8 +18,9 @@ defmodule Adbc.Result do
   @doc """
   Returns a map of columns as a result.
   """
-  def to_map(%Adbc.Result{data: data}) do
-    Map.new(data, fn %Adbc.Column{name: name, type: type, data: data} ->
+  def to_map(result=%Adbc.Result{}) do
+    result = list_view_to_list(result)
+    Map.new(result.data, fn %Adbc.Column{name: name, type: type, data: data} ->
       case type do
         :list -> {name, Enum.map(data, &list_to_map/1)}
         _ -> {name, data}
@@ -27,8 +28,12 @@ defmodule Adbc.Result do
     end)
   end
 
-  def list_view_to_list(%Adbc.Result{data: data}) do
-    Enum.map(data, &list_to_map/1)
+  @doc """
+  Convert any list view in the result set to normal lists.
+  """
+  @spec list_view_to_list(%Adbc.Result{}) :: %Adbc.Result{}
+  def list_view_to_list(result = %Adbc.Result{data: data}) when is_list(data) do
+    %{result | data: Enum.map(data, &Adbc.Column.list_view_to_list/1)}
   end
 
   defp list_to_map(%Adbc.Column{name: name, type: type, data: data}) do

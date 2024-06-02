@@ -13,6 +13,29 @@ static ERL_NIF_TERM kAtomNegInfinity;
 static ERL_NIF_TERM kAtomNaN;
 static ERL_NIF_TERM kAtomEndOfSeries;
 static ERL_NIF_TERM kAtomStructKey;
+// for the data field in list views and large list views
+// %Adbc.Column{
+//   name: "sample_list_view",
+//   type: :list_view,
+//   nullable: true,
+//   metadata: %{},
+//   data: %{
+//     validity: [true, false, true, true, true],
+//     offsets: [4, 7, 0, 0, 3],
+//     sizes: [3, 0, 4, 0, 2],
+//     values: %Adbc.Column{
+//       name: "sample_list",
+//       type: :i32,
+//       nullable: false,
+//       metadata: %{},
+//       data: [0, -127, 127, 50, 12, -7, 25]
+//     }
+//   }
+// }
+static ERL_NIF_TERM kAtomValidity;
+static ERL_NIF_TERM kAtomOffsets;
+static ERL_NIF_TERM kAtomSizes;
+static ERL_NIF_TERM kAtomValues;
 
 static ERL_NIF_TERM kAtomDecimal;
 static ERL_NIF_TERM kAtomFixedSizeBinary;
@@ -86,6 +109,8 @@ static ERL_NIF_TERM kAdbcColumnTypeDate64;
 #define kAdbcColumnTypeIntervalMonthDayNano enif_make_tuple2(env, kAtomInterval, kAtomMonthDayNano)
 static ERL_NIF_TERM kAdbcColumnTypeList;
 static ERL_NIF_TERM kAdbcColumnTypeLargeList;
+static ERL_NIF_TERM kAdbcColumnTypeListView;
+static ERL_NIF_TERM kAdbcColumnTypeLargeListView;
 #define kAdbcColumnTypeFixedSizeList(n_items) enif_make_tuple2(env, kAtomFixedSizeBinary, enif_make_int64(env, n_items))
 static ERL_NIF_TERM kAdbcColumnTypeStruct;
 static ERL_NIF_TERM kAdbcColumnTypeMap;

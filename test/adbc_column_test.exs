@@ -1,5 +1,6 @@
 defmodule Adbc.Column.Test do
   use ExUnit.Case
+  doctest Adbc.Column
 
   describe "decimals" do
     test "integers" do
@@ -11,7 +12,7 @@ defmodule Adbc.Column.Test do
 
       assert %Adbc.Column{
                data: [decimal_data, value_data],
-               metadata: nil,
+               metadata: %{},
                name: nil,
                nullable: false,
                type: {:decimal, ^bitwidth, ^precision, ^scale}
@@ -27,7 +28,7 @@ defmodule Adbc.Column.Test do
 
       assert %Adbc.Column{
                data: [decimal_data, value_data],
-               metadata: nil,
+               metadata: %{},
                name: nil,
                nullable: false,
                type: {:decimal, ^bitwidth, ^precision, ^scale}
@@ -53,7 +54,7 @@ defmodule Adbc.Column.Test do
 
       assert %Adbc.Column{
                data: [data],
-               metadata: nil,
+               metadata: %{},
                name: nil,
                nullable: false,
                type: {:decimal, ^bitwidth, ^precision, ^scale}
@@ -66,7 +67,7 @@ defmodule Adbc.Column.Test do
 
       assert %Adbc.Column{
                data: [data],
-               metadata: nil,
+               metadata: %{},
                name: nil,
                nullable: false,
                type: {:decimal, ^bitwidth, ^precision, ^scale}
@@ -111,7 +112,7 @@ defmodule Adbc.Column.Test do
 
       assert %Adbc.Column{
                data: [decimal_data, value_data],
-               metadata: nil,
+               metadata: %{},
                name: nil,
                nullable: false,
                type: {:decimal, ^bitwidth, ^precision, ^scale}
@@ -127,7 +128,7 @@ defmodule Adbc.Column.Test do
 
       assert %Adbc.Column{
                data: [decimal_data, value_data],
-               metadata: nil,
+               metadata: %{},
                name: nil,
                nullable: false,
                type: {:decimal, ^bitwidth, ^precision, ^scale}
@@ -166,7 +167,7 @@ defmodule Adbc.Column.Test do
 
       assert %Adbc.Column{
                data: [data],
-               metadata: nil,
+               metadata: %{},
                name: nil,
                nullable: false,
                type: {:decimal, ^bitwidth, ^precision, ^scale}
@@ -179,7 +180,7 @@ defmodule Adbc.Column.Test do
 
       assert %Adbc.Column{
                data: [data],
-               metadata: nil,
+               metadata: %{},
                name: nil,
                nullable: false,
                type: {:decimal, ^bitwidth, ^precision, ^scale}

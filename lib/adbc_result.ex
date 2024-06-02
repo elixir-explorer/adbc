@@ -18,9 +18,8 @@ defmodule Adbc.Result do
   @doc """
   Returns a map of columns as a result.
   """
-  def to_map(result=%Adbc.Result{}) do
-    result = list_view_to_list(result)
-    Map.new(result.data, fn %Adbc.Column{name: name, type: type, data: data} ->
+  def to_map(result = %Adbc.Result{}) do
+    Map.new(list_view_to_list(result).data, fn %Adbc.Column{name: name, type: type, data: data} ->
       case type do
         :list -> {name, Enum.map(data, &list_to_map/1)}
         _ -> {name, data}

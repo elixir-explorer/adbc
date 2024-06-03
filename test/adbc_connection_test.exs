@@ -120,29 +120,8 @@ defmodule Adbc.Connection.Test do
   describe "get_objects" do
     test "get all objects from a connection", %{db: db} do
       conn = start_supervised!({Connection, database: db})
-
-      {:ok,
-       results = %Adbc.Result{
-         num_rows: nil,
-         data: [
-           %Adbc.Column{
-             name: "catalog_name",
-             type: :string,
-             nullable: true,
-             metadata: nil,
-             data: []
-           },
-           %Adbc.Column{
-             name: "catalog_db_schemas",
-             type: :list,
-             nullable: true,
-             metadata: nil,
-             data: []
-           }
-         ]
-       }} = Connection.get_objects(conn, 0)
-
-      assert %{"catalog_db_schemas" => [], "catalog_name" => []} = Adbc.Result.to_map(results)
+      {:ok, results = %Adbc.Result{num_rows: nil, data: []}} = Connection.get_objects(conn, 0)
+      assert %{} == Adbc.Result.to_map(results)
     end
   end
 

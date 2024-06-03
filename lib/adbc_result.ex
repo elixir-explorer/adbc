@@ -46,6 +46,9 @@ defmodule Adbc.Result do
           {name, list}
         end
 
+      :struct ->
+        Enum.map(data, &list_to_map/1)
+
       _ ->
         if name == "item" do
           data

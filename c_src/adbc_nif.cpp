@@ -519,15 +519,15 @@ static ERL_NIF_TERM adbc_arrow_array_stream_next(ErlNifEnv *env, int argc, const
         if (out.release) out.release(&out);
         return error;
     }
+    if (end_of_series) {
+        if (out.release) {
+            out.release(&out);
+        }
+        return kAtomEndOfSeries;
+    }
 
     if (out_terms.size() == 1) {
         ret = out_terms[0];
-        if (end_of_series) {
-            if (out.release) {
-                out.release(&out);
-            }
-            return kAtomEndOfSeries;
-        }
     } else {
         ret = enif_make_tuple2(env, out_terms[0], out_terms[1]);
     }

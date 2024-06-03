@@ -18,7 +18,7 @@ static ERL_NIF_TERM kAtomStructKey;
 //   name: "sample_list_view",
 //   type: :list_view,
 //   nullable: true,
-//   metadata: %{},
+//   metadata: nil,
 //   data: %{
 //     validity: [true, false, true, true, true],
 //     offsets: [4, 7, 0, 0, 3],
@@ -27,7 +27,7 @@ static ERL_NIF_TERM kAtomStructKey;
 //       name: "sample_list",
 //       type: :i32,
 //       nullable: false,
-//       metadata: %{},
+//       metadata: nil,
 //       data: [0, -127, 127, 50, 12, -7, 25]
 //     }
 //   }

@@ -8,7 +8,7 @@ defmodule Adbc.Column do
   defstruct name: nil,
             type: nil,
             nullable: false,
-            metadata: %{},
+            metadata: nil,
             data: nil
 
   @type i8 :: -128..127
@@ -98,6 +98,7 @@ defmodule Adbc.Column do
           | :large_string
           | decimal_t
           | {:fixed_size_binary, non_neg_integer()}
+          | :struct
           | :date32
           | :date64
           | time_t
@@ -110,7 +111,7 @@ defmodule Adbc.Column do
              (is_list(data) or (type in @list_view_types and is_map(data))) and is_list(opts) do
     name = opts[:name]
     nullable = opts[:nullable] || false
-    metadata = opts[:metadata] || %{}
+    metadata = opts[:metadata] || nil
 
     %Adbc.Column{
       name: name,
@@ -165,7 +166,7 @@ defmodule Adbc.Column do
         name: nil,
         type: :boolean,
         nullable: false,
-        metadata: %{},
+        metadata: nil,
         data: [true, false, true]
       }
 
@@ -196,7 +197,7 @@ defmodule Adbc.Column do
         name: nil,
         type: :u8,
         nullable: false,
-        metadata: %{},
+        metadata: nil,
         data: [1, 2, 3]
       }
 
@@ -227,7 +228,7 @@ defmodule Adbc.Column do
         name: nil,
         type: :u16,
         nullable: false,
-        metadata: %{},
+        metadata: nil,
         data: [1, 2, 3]
       }
 
@@ -258,7 +259,7 @@ defmodule Adbc.Column do
         name: nil,
         type: :u32,
         nullable: false,
-        metadata: %{},
+        metadata: nil,
         data: [1, 2, 3]
       }
 
@@ -289,7 +290,7 @@ defmodule Adbc.Column do
         name: nil,
         type: :u32,
         nullable: false,
-        metadata: %{},
+        metadata: nil,
         data: [1, 2, 3]
       }
 
@@ -320,7 +321,7 @@ defmodule Adbc.Column do
         name: nil,
         type: :i8,
         nullable: false,
-        metadata: %{},
+        metadata: nil,
         data: [1, 2, 3]
       }
 
@@ -351,7 +352,7 @@ defmodule Adbc.Column do
         name: nil,
         type: :i16,
         nullable: false,
-        metadata: %{},
+        metadata: nil,
         data: [1, 2, 3]
       }
 
@@ -382,7 +383,7 @@ defmodule Adbc.Column do
         name: nil,
         type: :i32,
         nullable: false,
-        metadata: %{},
+        metadata: nil,
         data: [1, 2, 3]
       }
 
@@ -413,7 +414,7 @@ defmodule Adbc.Column do
         name: nil,
         type: :i64,
         nullable: false,
-        metadata: %{},
+        metadata: nil,
         data: [1, 2, 3]
       }
 
@@ -444,7 +445,7 @@ defmodule Adbc.Column do
         name: nil,
         type: :f16,
         nullable: false,
-        metadata: %{},
+        metadata: nil,
         data: [1.0, 2.0, 3.0]
       }
 
@@ -475,7 +476,7 @@ defmodule Adbc.Column do
         name: nil,
         type: :f32,
         nullable: false,
-        metadata: %{},
+        metadata: nil,
         data: [1.0, 2.0, 3.0]
       }
 
@@ -506,7 +507,7 @@ defmodule Adbc.Column do
         name: nil,
         type: :f64,
         nullable: false,
-        metadata: %{},
+        metadata: nil,
         data: [1.0, 2.0, 3.0]
       }
 
@@ -646,7 +647,7 @@ defmodule Adbc.Column do
         name: nil,
         type: :string,
         nullable: false,
-        metadata: %{},
+        metadata: nil,
         data: ["a", "ab", "abc"]
       }
 
@@ -679,7 +680,7 @@ defmodule Adbc.Column do
         name: nil,
         type: :large_string,
         nullable: false,
-        metadata: %{},
+        metadata: nil,
         data: ["a", "ab", "abc"]
       }
 
@@ -710,7 +711,7 @@ defmodule Adbc.Column do
         name: nil,
         type: :binary,
         nullable: false,
-        metadata: %{},
+        metadata: nil,
         data: [<<0>>, <<1>>, <<2>>]
       }
 
@@ -743,7 +744,7 @@ defmodule Adbc.Column do
         name: nil,
         type: :large_binary,
         nullable: false,
-        metadata: %{},
+        metadata: nil,
         data: [<<0>>, <<1>>, <<2>>]
       }
 
@@ -777,7 +778,7 @@ defmodule Adbc.Column do
         name: nil,
         type: {:fixed_size_binary, 1},
         nullable: false,
-        metadata: %{},
+        metadata: nil,
         data: [<<0>>, <<1>>, <<2>>]
       }
 
@@ -1096,7 +1097,7 @@ defmodule Adbc.Column do
       ...>   name: nil,
       ...>   type: :list_view,
       ...>   nullable: true,
-      ...>   metadata: %{},
+      ...>   metadata: nil,
       ...>   data: %{
       ...>     values: %Adbc.Column{
       ...>       name: "item",
@@ -1114,7 +1115,7 @@ defmodule Adbc.Column do
         name: nil,
         type: :list_view,
         nullable: true,
-        metadata: %{},
+        metadata: nil,
         data: %{
           offsets: [4, 7, 0, 0, 3],
           sizes: [3, 0, 4, 0, 2],
@@ -1133,7 +1134,7 @@ defmodule Adbc.Column do
         name: nil,
         type: :list,
         nullable: true,
-        metadata: %{},
+        metadata: nil,
         data: [
           %Adbc.Column{
             name: "item",

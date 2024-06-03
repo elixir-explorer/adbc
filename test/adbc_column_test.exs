@@ -12,7 +12,7 @@ defmodule Adbc.Column.Test do
 
       assert %Adbc.Column{
                data: [decimal_data, value_data],
-               metadata: %{},
+               metadata: nil,
                name: nil,
                nullable: false,
                type: {:decimal, ^bitwidth, ^precision, ^scale}
@@ -28,7 +28,7 @@ defmodule Adbc.Column.Test do
 
       assert %Adbc.Column{
                data: [decimal_data, value_data],
-               metadata: %{},
+               metadata: nil,
                name: nil,
                nullable: false,
                type: {:decimal, ^bitwidth, ^precision, ^scale}
@@ -54,7 +54,7 @@ defmodule Adbc.Column.Test do
 
       assert %Adbc.Column{
                data: [data],
-               metadata: %{},
+               metadata: nil,
                name: nil,
                nullable: false,
                type: {:decimal, ^bitwidth, ^precision, ^scale}
@@ -67,7 +67,7 @@ defmodule Adbc.Column.Test do
 
       assert %Adbc.Column{
                data: [data],
-               metadata: %{},
+               metadata: nil,
                name: nil,
                nullable: false,
                type: {:decimal, ^bitwidth, ^precision, ^scale}
@@ -112,7 +112,7 @@ defmodule Adbc.Column.Test do
 
       assert %Adbc.Column{
                data: [decimal_data, value_data],
-               metadata: %{},
+               metadata: nil,
                name: nil,
                nullable: false,
                type: {:decimal, ^bitwidth, ^precision, ^scale}
@@ -128,7 +128,7 @@ defmodule Adbc.Column.Test do
 
       assert %Adbc.Column{
                data: [decimal_data, value_data],
-               metadata: %{},
+               metadata: nil,
                name: nil,
                nullable: false,
                type: {:decimal, ^bitwidth, ^precision, ^scale}
@@ -167,7 +167,7 @@ defmodule Adbc.Column.Test do
 
       assert %Adbc.Column{
                data: [data],
-               metadata: %{},
+               metadata: nil,
                name: nil,
                nullable: false,
                type: {:decimal, ^bitwidth, ^precision, ^scale}
@@ -180,7 +180,7 @@ defmodule Adbc.Column.Test do
 
       assert %Adbc.Column{
                data: [data],
-               metadata: %{},
+               metadata: nil,
                name: nil,
                nullable: false,
                type: {:decimal, ^bitwidth, ^precision, ^scale}
@@ -255,7 +255,7 @@ defmodule Adbc.Column.Test do
         name: nil,
         type: :list_view,
         nullable: true,
-        metadata: %{},
+        metadata: nil,
         data: %{
           values: %Adbc.Column{
             name: "item",
@@ -274,7 +274,7 @@ defmodule Adbc.Column.Test do
                name: nil,
                type: :list,
                nullable: true,
-               metadata: %{},
+               metadata: nil,
                data: [
                  inner1 = %Adbc.Column{
                    name: "item",
@@ -312,7 +312,7 @@ defmodule Adbc.Column.Test do
         name: nil,
         type: :list_view,
         nullable: true,
-        metadata: %{},
+        metadata: nil,
         data: %{
           values: list_view,
           validity: [true, false, true, true, true],
@@ -326,7 +326,7 @@ defmodule Adbc.Column.Test do
                  # offsets=2, sizes=2
                  # => [inner3, inner4]
                  %Adbc.Column{
-                   metadata: %{},
+                   metadata: nil,
                    name: nil,
                    nullable: true,
                    type: :list,
@@ -353,7 +353,7 @@ defmodule Adbc.Column.Test do
                  # offsets=0, sizes=1
                  # => inner1
                  %Adbc.Column{
-                   metadata: %{},
+                   metadata: nil,
                    name: nil,
                    nullable: true,
                    type: :list,
@@ -369,7 +369,7 @@ defmodule Adbc.Column.Test do
                  },
                  # offsets=0, sizes=0
                  # => []
-                 %Adbc.Column{data: [], metadata: %{}, name: nil, nullable: true, type: :list},
+                 %Adbc.Column{data: [], metadata: nil, name: nil, nullable: true, type: :list},
                  # offsets=3, sizes=2
                  # => [inner4, inner5]
                  %Adbc.Column{
@@ -389,13 +389,13 @@ defmodule Adbc.Column.Test do
                        data: ~c"2\f"
                      }
                    ],
-                   metadata: %{},
+                   metadata: nil,
                    name: nil,
                    nullable: true,
                    type: :list
                  }
                ],
-               metadata: %{},
+               metadata: nil,
                name: nil,
                nullable: true,
                type: :list

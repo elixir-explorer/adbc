@@ -1317,19 +1317,17 @@ int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct 
                 } else {
                     format_processed = false;
                 }
-            }
-
-            // timestamps can have extra timezone information
-            // so it's length can be 3 or more
-            // and `format_processed` must be false at this point
-            // but we don't need to check for `format_processed`
-            // because `format_processed == true` implies `format[1] != 's'`
-            if (format[1] == 's') {
+            } else if (format_len >= 4 && format[1] == 's' && format[3] == ':') {
+                // according to the arrow spec:
+                //   The timezone string is appended as-is after the colon character :, 
+                //   without any quotes. If the timezone is empty, the colon : must still be included.
+                // so the format length for timestamps must be >= 4
+            
                 // possible format strings:
-                // tss - timestamp [seconds]
-                // tsm - timestamp [milliseconds]
-                // tsu - timestamp [microseconds]
-                // tsn - timestamp [nanoseconds]
+                // tss: - timestamp [seconds]
+                // tsm: - timestamp [milliseconds]
+                // tsu: - timestamp [microseconds]
+                // tsn: - timestamp [nanoseconds]
                 //
                 // if there're any timezone infomation
                 // it should be in the format like `tsu:timezone`
@@ -1424,6 +1422,8 @@ int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct 
                         }
                     );
                 }
+            } else {
+                format_processed = false;
             }
         } else {
             if (format_len == 3 && strncmp("+vl", format, 3) == 0) {

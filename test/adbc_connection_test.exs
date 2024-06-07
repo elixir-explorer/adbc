@@ -98,7 +98,7 @@ defmodule Adbc.Connection.Test do
                    }
                  ]
                }
-             } == Connection.get_info(conn, [0])
+             } = Connection.get_info(conn, [0])
     end
   end
 
@@ -337,7 +337,7 @@ defmodule Adbc.Connection.Test do
                  },
                  %Adbc.Column{name: "bool", type: :i64, nullable: true, metadata: nil, data: [1]}
                ]
-             } ==
+             } =
                Connection.query!(conn, "SELECT 123 as num, true as bool", [],
                  "adbc.sqlite.query.batch_rows": 1
                )
@@ -356,7 +356,7 @@ defmodule Adbc.Connection.Test do
                    data: [579]
                  }
                ]
-             } ==
+             } =
                Connection.query!(conn, "SELECT 123 + ? as num", [456],
                  "adbc.sqlite.query.batch_rows": 10
                )

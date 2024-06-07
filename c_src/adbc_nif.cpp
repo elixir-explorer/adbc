@@ -795,6 +795,9 @@ static int on_load(ErlNifEnv *env, void **, ERL_NIF_TERM) {
     kAtomOffsets = erlang::nif::atom(env, "offsets");
     kAtomSizes = erlang::nif::atom(env, "sizes");
     kAtomValues = erlang::nif::atom(env, "values");
+    kAtomRunEnds = erlang::nif::atom(env, "run_ends");
+    kAtomOffset = erlang::nif::atom(env, "offset");
+    kAtomLength = erlang::nif::atom(env, "length");
 
     kAtomDecimal = erlang::nif::atom(env, "decimal");
     kAtomFixedSizeBinary = erlang::nif::atom(env, "fixed_size_binary");
@@ -860,6 +863,7 @@ static int on_load(ErlNifEnv *env, void **, ERL_NIF_TERM) {
     kAdbcColumnTypeMap = erlang::nif::atom(env, "map");
     kAdbcColumnTypeDenseUnion = erlang::nif::atom(env, "dense_union");
     kAdbcColumnTypeSparseUnion = erlang::nif::atom(env, "sparse_union");
+    kAdbcColumnTypeRunEndEncoded = erlang::nif::atom(env, "run_end_encoded");
 
     return 0;
 }

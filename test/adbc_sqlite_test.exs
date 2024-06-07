@@ -289,7 +289,7 @@ defmodule Adbc.SQLite.Test do
                 }
               ],
               num_rows: nil
-            }} ==
+            }} =
              Connection.query(conn, "SELECT ? AS I64, ? AS F64", [
                Adbc.Column.i64([1, 2]),
                Adbc.Column.f64([3.3, 4.4])

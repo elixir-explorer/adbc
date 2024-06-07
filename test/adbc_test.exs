@@ -268,8 +268,12 @@ defmodule AdbcTest do
     end
 
     test "decimal128", %{conn: conn} do
-      assert {
-               :ok,
+      d1 = Decimal.new("1.2345678912345678912345678912345678912")
+      d2 = Decimal.new("-1.2345678912345678912345678912345678912")
+      d5 = Decimal.new("9876543210987654321098765432109876543.2")
+      d6 = Decimal.new("-9876543210987654321098765432109876543.2")
+      d7 = Decimal.new("1E-37")
+      assert {:ok,
                %Adbc.Result{
                  data: [
                    %Adbc.Column{
@@ -277,14 +281,14 @@ defmodule AdbcTest do
                      type: {:decimal, 128, 38, 37},
                      nullable: true,
                      metadata: nil,
-                     data: [Decimal.new("1.2345678912345678912345678912345678912")]
+                     data: [^d1]
                    },
                    %Adbc.Column{
                      name: "d2",
                      type: {:decimal, 128, 38, 37},
                      nullable: true,
                      metadata: nil,
-                     data: [Decimal.new("-1.2345678912345678912345678912345678912")]
+                     data: [^d2]
                    },
                    %Adbc.Column{
                      name: "d3",
@@ -305,26 +309,26 @@ defmodule AdbcTest do
                      type: {:decimal, 128, 38, 1},
                      nullable: true,
                      metadata: nil,
-                     data: [Decimal.new("9876543210987654321098765432109876543.2")]
+                     data: [^d5]
                    },
                    %Adbc.Column{
                      name: "d6",
                      type: {:decimal, 128, 38, 1},
                      nullable: true,
                      metadata: nil,
-                     data: [Decimal.new("-9876543210987654321098765432109876543.2")]
+                     data: [^d6]
                    },
                    %Adbc.Column{
                      name: "d7",
                      type: {:decimal, 128, 38, 37},
                      nullable: true,
                      metadata: nil,
-                     data: [Decimal.new("1E-37")]
+                     data: [^d7]
                    }
                  ],
                  num_rows: 0
                }
-             } ==
+             } =
                Adbc.Connection.query(
                  conn,
                  """

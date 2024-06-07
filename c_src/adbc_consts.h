@@ -36,6 +36,9 @@ static ERL_NIF_TERM kAtomValidity;
 static ERL_NIF_TERM kAtomOffsets;
 static ERL_NIF_TERM kAtomSizes;
 static ERL_NIF_TERM kAtomValues;
+static ERL_NIF_TERM kAtomRunEnds;
+static ERL_NIF_TERM kAtomOffset;
+static ERL_NIF_TERM kAtomLength;
 
 static ERL_NIF_TERM kAtomDecimal;
 static ERL_NIF_TERM kAtomFixedSizeBinary;
@@ -116,6 +119,7 @@ static ERL_NIF_TERM kAdbcColumnTypeStruct;
 static ERL_NIF_TERM kAdbcColumnTypeMap;
 static ERL_NIF_TERM kAdbcColumnTypeDenseUnion;
 static ERL_NIF_TERM kAdbcColumnTypeSparseUnion;
+static ERL_NIF_TERM kAdbcColumnTypeRunEndEncoded;
 
 // error codes
 constexpr int kErrorBufferIsNotAMap = 1;

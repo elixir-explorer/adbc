@@ -5,11 +5,10 @@ defmodule Adbc.Column do
   `Adbc.Column` corresponds to a column in the table. It contains the column's name, type, and
   data. The data is a list of values of the column's data type.
   """
-  defstruct name: nil,
-            type: nil,
-            nullable: false,
-            metadata: nil,
-            data: nil
+  @enforce_keys [:name, :type, :nullable, :data]
+  defstruct [:name, :type, :nullable, :metadata, :data, :length, :offset]
+
+  import Bitwise
 
   @type i8 :: -128..127
   @type u8 :: 0..255
@@ -82,6 +81,7 @@ defmodule Adbc.Column do
           sizes: [non_neg_integer()],
           values: %Adbc.Column{}
         }
+  @valid_run_end_types [:i16, :i32, :i64]
   @type data_type ::
           :boolean
           | signed_integer
@@ -105,6 +105,7 @@ defmodule Adbc.Column do
           | timestamp_t
           | duration_t
           | interval_t
+          | :run_end_encoded
   @spec column(data_type(), list() | list_view_data_t(), Keyword.t()) :: %Adbc.Column{}
   def column(type, data, opts \\ [])
       when (is_atom(type) or is_tuple(type)) and
@@ -1129,7 +1130,7 @@ defmodule Adbc.Column do
           }
         }
       }
-      iex> Adbc.Column.list_view_to_list(list_view)
+      iex> Adbc.Column.to_list(list_view)
       %Adbc.Column{
         name: nil,
         type: :list,
@@ -1168,8 +1169,8 @@ defmodule Adbc.Column do
         ]
       }
   """
-  @spec list_view_to_list(%Adbc.Column{data: map()}) :: %Adbc.Column{}
-  def list_view_to_list(
+  @spec to_list(%Adbc.Column{data: map()}) :: %Adbc.Column{}
+  def to_list(
         column = %Adbc.Column{
           type: type,
           data: %{
@@ -1183,7 +1184,7 @@ defmodule Adbc.Column do
       when type in @list_view_types and is_list(validity) and is_list(offsets) and is_list(sizes) do
     values =
       if values.type in @list_view_types do
-        Adbc.Column.list_view_to_list(values)
+        Adbc.Column.to_list(values)
       else
         values
       end
@@ -1193,8 +1194,7 @@ defmodule Adbc.Column do
         if valid do
           %{
             values
-            | data:
-                Enum.map(Enum.slice(values.data, offset, size), &Adbc.Column.list_view_to_list/1)
+            | data: Enum.map(Enum.slice(values.data, offset, size), &Adbc.Column.to_list/1)
           }
         else
           nil
@@ -1204,9 +1204,94 @@ defmodule Adbc.Column do
     %{column | data: new_data, type: :list}
   end
 
-  def list_view_to_list(column = %Adbc.Column{data: data}) when is_list(data) do
-    %{column | data: Enum.map(data, &Adbc.Column.list_view_to_list/1)}
+  def to_list(
+        column = %Adbc.Column{
+          type: :run_end_encoded,
+          data: %{
+            run_ends: run_ends = %Adbc.Column{type: run_end_type},
+            values: values
+          },
+          length: length,
+          offset: offset
+        }
+      )
+      when is_integer(offset) and offset >= 0 and is_integer(length) and length >= 1 do
+    values = Adbc.Column.to_list(values)
+
+    max_allowed_length =
+      case run_end_type do
+        :i16 ->
+          1 <<< 16
+
+        :i32 ->
+          1 <<< 32
+
+        :i64 ->
+          1 <<< 64
+
+        _ ->
+          raise Adbc.Error,
+                "Invalid run end type: #{inspect(run_end_type)}, expected one of #{inspect(@valid_run_end_types)}"
+      end
+
+    if offset + length > max_allowed_length do
+      raise Adbc.Error,
+            "Run end data exceeds maximum allowed length: #{length} + #{offset} > #{max_allowed_length}"
+    end
+
+    run_end_len = Enum.count(run_ends.data)
+
+    {run_end_start_index, values_start_index, encoded} =
+      case Enum.drop_while(run_ends.data, &(&1 < offset)) do
+        [] ->
+          raise Adbc.Error,
+                "Last run end is #{hd(Enum.reverse(run_ends.data))} but it should >= #{offset + length} (offset: #{offset}, length: #{length})"
+
+        encoded = [run_end_start_index | _] ->
+          values_start_index = run_end_len - Enum.count(encoded)
+
+          if run_end_start_index == offset do
+            {run_end_start_index, values_start_index, encoded}
+          else
+            {offset, values_start_index, encoded}
+          end
+      end
+
+    if offset + length > hd(Enum.reverse(run_ends.data)) do
+      raise Adbc.Error,
+            "Last run end is #{hd(Enum.reverse(run_ends.data))} but it should >= #{offset + length} (offset: #{offset}, length: #{length})"
+    end
+
+    {_, _, decoded} =
+      Enum.reduce(encoded, {run_end_start_index, values_start_index, []}, fn run_end,
+                                                                             {index, value_index,
+                                                                              acc} ->
+        real_end =
+          if run_end > offset + length do
+            offset + length
+          else
+            run_end
+          end
+
+        if is_map(values.data) do
+          {run_end, value_index + 1, List.duplicate(to_list(values), real_end - index) ++ acc}
+        else
+          {run_end, value_index + 1,
+           List.duplicate(Enum.at(values.data, value_index), real_end - index) ++ acc}
+        end
+      end)
+
+    %Adbc.Column{
+      name: column.name,
+      type: values.type,
+      nullable: column.nullable,
+      data: Enum.reverse(decoded)
+    }
   end
 
-  def list_view_to_list(v), do: v
+  def to_list(column = %Adbc.Column{data: data}) when is_list(data) do
+    %{column | data: Enum.map(data, &Adbc.Column.to_list/1)}
+  end
+
+  def to_list(v), do: v
 end

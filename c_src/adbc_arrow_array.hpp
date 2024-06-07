@@ -185,7 +185,7 @@ int get_arrow_array_children_as_list(ErlNifEnv *env, struct ArrowSchema * schema
             if (enif_is_identical(childrens[1], kAtomNil)) {
                 children[child_i] = kAtomNil;
             } else {
-                children[child_i] = make_adbc_column(env, childrens[0], child_type, nullable, child_metadata, childrens[1]);
+                children[child_i] = make_adbc_column(env, schema, values, childrens[0], child_type, nullable, child_metadata, childrens[1]);
             }
         }
     }
@@ -228,7 +228,7 @@ int get_arrow_struct(ErlNifEnv *env, struct ArrowSchema * schema, struct ArrowAr
             if (enif_is_identical(childrens[1], kAtomNil)) {
                 children[child_i] = kAtomNil;
             } else {
-                children[child_i] = make_adbc_column(env, childrens[0], child_type, nullable, child_metadata, childrens[1]);
+                children[child_i] = make_adbc_column(env, schema, values, childrens[0], child_type, nullable, child_metadata, childrens[1]);
             }
         }
     }
@@ -437,6 +437,55 @@ ERL_NIF_TERM get_arrow_array_sparse_union_children(ErlNifEnv *env, struct ArrowS
     return get_arrow_array_sparse_union_children(env, schema, values, 0, -1, level);
 }
 
+ERL_NIF_TERM get_arrow_run_end_encoded(ErlNifEnv *env, struct ArrowSchema * schema, struct ArrowArray * values, int64_t offset, int64_t count, uint64_t level) {
+    ERL_NIF_TERM error{};
+    if (schema->n_children != 2 || values->n_children != 2) {
+        return erlang::nif::error(env, "invalid ArrowSchema (run_end_encoded), schema->n_children != 2 || values->n_children != 2");
+    }
+    if (schema->children == nullptr || values->children == nullptr) {
+        return erlang::nif::error(env, "invalid ArrowArray (run_end_encoded), schema->children == nullptr || values->children == nullptr");
+    }
+    if (strncmp("run_ends", schema->children[0]->name, 8) != 0) {
+        return erlang::nif::error(env, "invalid ArrowSchema (run_end_encoded), its first child is not named run_ends");
+    }
+    if (strncmp("values", schema->children[1]->name, 6) != 0) {
+        return erlang::nif::error(env, "invalid ArrowSchema (run_end_encoded), its second child is not named values");
+    }
+
+    std::vector<ERL_NIF_TERM> children(2);
+    for (int64_t child_i = 0; child_i < 2; child_i++) {
+        std::vector<ERL_NIF_TERM> childrens;
+        ERL_NIF_TERM child_type;
+        ERL_NIF_TERM child_metadata;
+        if (arrow_array_to_nif_term(env, schema->children[child_i], values->children[child_i], 0, -1, level + 1, childrens, child_type, child_metadata, error) == 1) {
+            return 1;
+        }
+
+        if (childrens.size() == 1) {
+            children[child_i] = childrens[0];
+        } else {
+            bool nullable = child_i == 1 && ((schema->children[child_i]->flags & ARROW_FLAG_NULLABLE) || (values->children[child_i]->null_count > 0));
+            if (enif_is_identical(childrens[1], kAtomNil)) {
+                children[child_i] = kAtomNil;
+            } else {
+                children[child_i] = make_adbc_column(env, schema, values, childrens[0], child_type, nullable, child_metadata, childrens[1]);
+            }
+        }
+    }
+    
+    ERL_NIF_TERM run_ends_keys[] = { kAtomRunEnds, kAtomValues };
+    ERL_NIF_TERM run_ends_values[] = { children[0], children[1] };
+    ERL_NIF_TERM run_ends_data;
+    // only fail if there are duplicated keys
+    // so we don't need to check the return value
+    enif_make_map_from_arrays(env, run_ends_keys, run_ends_values, 2, &run_ends_data);
+    return run_ends_data;
+}
+
+ERL_NIF_TERM get_arrow_run_end_encoded(ErlNifEnv *env, struct ArrowSchema * schema, struct ArrowArray * values, uint64_t level) {
+    return get_arrow_run_end_encoded(env, schema, values, 0, -1, level);
+}
+
 ERL_NIF_TERM get_arrow_array_list_children(ErlNifEnv *env, struct ArrowSchema * schema, struct ArrowArray * values, int64_t offset, int64_t count, uint64_t level, ArrowType list_type, unsigned n_items) {
     ERL_NIF_TERM error{};
     if (schema->children == nullptr) {
@@ -497,7 +546,7 @@ ERL_NIF_TERM get_arrow_array_list_children(ErlNifEnv *env, struct ArrowSchema * 
                     if (enif_is_identical(childrens[1], kAtomNil)) {
                         children.emplace_back(kAtomNil);
                     } else {
-                        children.emplace_back(make_adbc_column(env, childrens[0], children_type, children_nullable, children_metadata, childrens[1]));
+                        children.emplace_back(make_adbc_column(env, schema, values, childrens[0], children_type, children_nullable, children_metadata, childrens[1]));
                     }
                 }
             }
@@ -536,7 +585,7 @@ ERL_NIF_TERM get_arrow_array_list_children(ErlNifEnv *env, struct ArrowSchema * 
                 if (enif_is_identical(childrens[1], kAtomNil)) {
                     children.emplace_back(kAtomNil);
                 } else {
-                    children.emplace_back(make_adbc_column(env, childrens[0], children_type, children_nullable, children_metadata, childrens[1]));
+                    children.emplace_back(make_adbc_column(env, schema, values, childrens[0], children_type, children_nullable, children_metadata, childrens[1]));
                 }
             }
         }
@@ -608,7 +657,7 @@ ERL_NIF_TERM get_arrow_array_list_view(ErlNifEnv *env, struct ArrowSchema * sche
         if (enif_is_identical(childrens[1], kAtomNil)) {
             values_term = kAtomNil;
         } else {
-            values_term = make_adbc_column(env, childrens[0], children_type, false, children_metadata, childrens[1]);
+            values_term = make_adbc_column(env, schema, values, childrens[0], children_type, false, children_metadata, childrens[1]);
         }
     }
 
@@ -1007,6 +1056,11 @@ int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct 
                 return 1;
             }
             children_term = enif_make_list_from_array(env, children.data(), (unsigned)children.size());
+        } else if (strncmp("+r", format, 2) == 0) {
+            // NANOARROW_TYPE_RUN_END_ENCODED (maybe in nanoarrow v0.6.0)
+            // https://github.com/apache/arrow-nanoarrow/pull/507
+            term_type = kAdbcColumnTypeRunEndEncoded;
+            children_term = get_arrow_run_end_encoded(env, schema, values, offset, count, level);
         } else if (strncmp("+m", format, 2) == 0) {
             // NANOARROW_TYPE_MAP
             term_type = kAdbcColumnTypeMap;

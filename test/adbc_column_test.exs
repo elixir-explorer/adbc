@@ -306,7 +306,7 @@ defmodule Adbc.Column.Test do
                    data: ~c"2\f"
                  }
                ]
-             } = Adbc.Column.list_view_to_list(list_view)
+             } = Adbc.Column.to_list(list_view)
 
       nested_list_view = %Adbc.Column{
         name: nil,
@@ -399,7 +399,162 @@ defmodule Adbc.Column.Test do
                name: nil,
                nullable: true,
                type: :list
-             } = Adbc.Column.list_view_to_list(nested_list_view)
+             } = Adbc.Column.to_list(nested_list_view)
+    end
+  end
+
+  describe "run-end encoded array" do
+    test "run-end encoded array to list" do
+      # in this test case we construct a run-end encoded array
+      # with logical length = 7 and offset = 0
+      # and the values are float32s
+      #
+      # the virtual big array:
+      #   type: :f32
+      #   [1.0, 1.0, 1.0, 1.0, null, null, 2.0]
+      #    ^                               ^
+      #    |- offset = 0                   |- length = 7
+      #
+      # run-end encoded array:
+      #   run_ends<:i32>: [4, 6, 7]
+      #   values<:f32>: [1.0, null, 2.0]
+      run_end_array = %Adbc.Column{
+        name: "sample_run_end_encoded_array",
+        type: :run_end_encoded,
+        nullable: false,
+        metadata: nil,
+        length: 7,
+        offset: 0,
+        data: %{
+          values: %Adbc.Column{
+            name: "values",
+            type: :f32,
+            nullable: true,
+            metadata: nil,
+            data: [1.0, nil, 2.0]
+          },
+          run_ends: %Adbc.Column{
+            name: "run_ends",
+            type: :i32,
+            nullable: false,
+            metadata: nil,
+            data: [4, 6, 7]
+          }
+        }
+      }
+
+      assert %Adbc.Column{
+               data: [1.0, 1.0, 1.0, 1.0, nil, nil, 2.0],
+               metadata: nil,
+               name: "sample_run_end_encoded_array",
+               nullable: false,
+               type: :f32
+             } == Adbc.Column.to_list(run_end_array)
+
+      # change logical length = 6 and offset = 1
+      #  [1.0, 1.0, 1.0, 1.0, null, null, 2.0]
+      #        ^                          ^
+      #        |- offset = 1              |- length = 6
+      assert %Adbc.Column{
+               data: [1.0, 1.0, 1.0, nil, nil, 2.0],
+               metadata: nil,
+               name: "sample_run_end_encoded_array",
+               nullable: false,
+               type: :f32
+             } == Adbc.Column.to_list(%{run_end_array | offset: 1, length: 6})
+
+      # change logical length = 7 and offset = 1
+      #  [1.0, 1.0, 1.0, 1.0, null, null, 2.0]
+      #        ^                               ^
+      #        |- offset = 1                   |- length = 7
+      assert_raise Adbc.Error,
+                   "Last run end is 7 but it should >= 8 (offset: 1, length: 7)",
+                   fn ->
+                     Adbc.Column.to_list(%{run_end_array | offset: 1, length: 7})
+                   end
+
+      # change logical length = 8 and offset = 0
+      #  [1.0, 1.0, 1.0, 1.0, null, null, 2.0]
+      #  ^                                     ^
+      #  |- offset = 0                         |- length = 8
+      assert_raise Adbc.Error,
+                   "Last run end is 7 but it should >= 8 (offset: 0, length: 8)",
+                   fn ->
+                     Adbc.Column.to_list(%{run_end_array | offset: 0, length: 8})
+                   end
+    end
+
+    test "nested run-end encoded arrays to list" do
+      # in this test case we construct a nested run-end encoded array
+      #
+      # run-end encoded array: `[1, 2, 2]`
+      #   <offset = 2, length = 3>
+      #   run_ends<:i32>: [2, 4, 7]
+      #   values: `[1, 1, 2]`
+      #     {
+      #         <offset = 2, length=3>
+      #         run_ends<:i32>: [4, 6],
+      #         values<:i32>: [1, 2]
+      #     }
+      inner_run_end_array = %Adbc.Column{
+        name: "inner_run_end_encoded_array",
+        type: :run_end_encoded,
+        nullable: true,
+        metadata: nil,
+        length: 3,
+        offset: 2,
+        data: %{
+          run_ends: %Adbc.Column{
+            name: "run_ends",
+            type: :i32,
+            nullable: false,
+            metadata: nil,
+            data: [4, 6]
+          },
+          values: %Adbc.Column{
+            name: "values",
+            type: :i32,
+            nullable: false,
+            metadata: nil,
+            data: [1, 2]
+          }
+        }
+      }
+
+      assert %Adbc.Column{
+               name: "inner_run_end_encoded_array",
+               type: :i32,
+               nullable: true,
+               metadata: nil,
+               data: [1, 1, 2]
+             } == Adbc.Column.to_list(inner_run_end_array)
+
+      run_end_array = %Adbc.Column{
+        name: "sample_run_end_encoded_array",
+        type: :run_end_encoded,
+        nullable: false,
+        metadata: nil,
+        length: 3,
+        offset: 3,
+        data: %{
+          run_ends: %Adbc.Column{
+            name: "run_ends",
+            type: :i32,
+            nullable: false,
+            metadata: nil,
+            data: [2, 4, 7]
+          },
+          values: inner_run_end_array
+        }
+      }
+
+      assert %Adbc.Column{
+               data: [1, 2, 2],
+               metadata: nil,
+               name: "sample_run_end_encoded_array",
+               nullable: false,
+               type: :i32
+             } == Adbc.Column.to_list(run_end_array)
     end
   end
 end

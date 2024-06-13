@@ -1,5 +1,13 @@
 # CHANGELOG
 
+## v0.4.2
+
+#### Added
+* Added support for run-end encoded array
+
+#### Fix
+* Include `CMakeLists.txt` in package files
+
 ## v0.4.1
 
 #### Fix

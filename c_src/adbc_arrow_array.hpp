@@ -282,14 +282,16 @@ int get_arrow_dictionary(ErlNifEnv *env,
         return 1;
     }
 
+    bool index_nullable = index_schema->flags & ARROW_FLAG_NULLABLE || index_array->null_count > 0;
+    bool value_nullable = value_schema->flags & ARROW_FLAG_NULLABLE || value_array->null_count > 0;
     ERL_NIF_TERM data;
     ERL_NIF_TERM data_keys[] = {
         kAtomKey,
         kAtomValue
     };
     ERL_NIF_TERM data_values[] = {
-        make_adbc_column(env, index_schema, index_array, keys[0], index_type, false, index_metadata, keys[1]),
-        make_adbc_column(env, value_schema, value_array, values[0], value_type, false, value_metadata, values[1])
+        make_adbc_column(env, index_schema, index_array, keys[0], index_type, index_nullable, index_metadata, keys[1]),
+        make_adbc_column(env, value_schema, value_array, values[0], value_type, value_nullable, value_metadata, values[1])
     };
     enif_make_map_from_arrays(env, data_keys, data_values, (unsigned)(sizeof(data_keys)/sizeof(data_keys[0])), &data);
     children.push_back(data);
@@ -724,7 +726,8 @@ ERL_NIF_TERM get_arrow_array_list_view(ErlNifEnv *env, struct ArrowSchema * sche
         if (enif_is_identical(childrens[1], kAtomNil)) {
             values_term = kAtomNil;
         } else {
-            values_term = make_adbc_column(env, schema, values, childrens[0], children_type, false, children_metadata, childrens[1]);
+            bool nullable = items_schema->flags & ARROW_FLAG_NULLABLE || items_values->null_count > 0;
+            values_term = make_adbc_column(env, schema, values, childrens[0], children_type, nullable, children_metadata, childrens[1]);
         }
     }
 

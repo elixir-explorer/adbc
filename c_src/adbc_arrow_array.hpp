@@ -10,8 +10,8 @@
 #include <erl_nif.h>
 #include "adbc_half_float.hpp"
 
-static int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct ArrowArray * values, uint64_t level, std::vector<ERL_NIF_TERM> &out_terms, ERL_NIF_TERM &value_type, ERL_NIF_TERM &metadata, ERL_NIF_TERM &error, bool *end_of_series = nullptr);
-static int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct ArrowArray * values, int64_t offset, int64_t count, int64_t level, std::vector<ERL_NIF_TERM> &out_terms, ERL_NIF_TERM &value_type, ERL_NIF_TERM &metadata, ERL_NIF_TERM &error, bool *end_of_series = nullptr);
+static int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct ArrowArray * values, uint64_t level, std::vector<ERL_NIF_TERM> &out_terms, ERL_NIF_TERM &value_type, ERL_NIF_TERM &metadata, ERL_NIF_TERM &error, bool *end_of_series = nullptr, bool skip_dictionary_check = false);
+static int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct ArrowArray * values, int64_t offset, int64_t count, int64_t level, std::vector<ERL_NIF_TERM> &out_terms, ERL_NIF_TERM &value_type, ERL_NIF_TERM &metadata, ERL_NIF_TERM &error, bool *end_of_series = nullptr, bool skip_dictionary_check = false);
 static int get_arrow_array_children_as_list(ErlNifEnv *env, struct ArrowSchema * schema, struct ArrowArray * values, uint64_t level, std::vector<ERL_NIF_TERM> &children, ERL_NIF_TERM &error);
 static int get_arrow_array_children_as_list(ErlNifEnv *env, struct ArrowSchema * schema, struct ArrowArray * values, int64_t offset, int64_t count, uint64_t level, std::vector<ERL_NIF_TERM> &children, ERL_NIF_TERM &error);
 static int get_arrow_struct(ErlNifEnv *env, struct ArrowSchema * schema, struct ArrowArray * values, uint64_t level, std::vector<ERL_NIF_TERM> &children, ERL_NIF_TERM &error);
@@ -32,6 +32,35 @@ template <typename M> static ERL_NIF_TERM bit_boolean_from_buffer(ErlNifEnv *env
         values[i - offset] = value_to_nif(env, vbyte & (1 << (i % 8)));
     }
     return enif_make_list_from_array(env, values.data(), (unsigned)values.size());
+}
+
+static ERL_NIF_TERM boolean_values_from_buffer(ErlNifEnv *env, int64_t offset, int64_t count, const uint8_t * validity_bitmap, const bool * value_buffer) {
+    std::vector<ERL_NIF_TERM> values(count);
+    if (validity_bitmap == nullptr) {
+        for (int64_t i = offset; i < offset + count; i++) {
+            uint8_t dbyte = value_buffer[i/8];
+            bool boolean_val = dbyte & (1 << (i % 8));
+            values[i - offset] = boolean_val ? kAtomTrue : kAtomFalse;
+        }
+    } else {
+        for (int64_t i = offset; i < offset + count; i++) {
+            uint8_t vbyte = validity_bitmap[i/8];
+            uint8_t mask = 1 << (i % 8);
+            if (vbyte & mask) {
+                uint8_t dbyte = value_buffer[i/8];
+                bool boolean_val = dbyte & mask;
+                values[i - offset] = boolean_val ? kAtomTrue : kAtomFalse;
+            } else {
+                values[i - offset] = kAtomNil;
+            }
+        }
+    }
+
+    return enif_make_list_from_array(env, values.data(), (unsigned)values.size());
+}
+
+static ERL_NIF_TERM boolean_values_from_buffer(ErlNifEnv *env, int64_t length, const uint8_t * validity_bitmap, const bool * value_buffer) {
+    return boolean_values_from_buffer(env, 0, length, validity_bitmap, value_buffer);
 }
 
 template <typename T, typename M> static ERL_NIF_TERM values_from_buffer(ErlNifEnv *env, int64_t offset, int64_t count, const uint8_t * validity_bitmap, const T * value_buffer, const M& value_to_nif) {
@@ -237,6 +266,43 @@ int get_arrow_struct(ErlNifEnv *env, struct ArrowSchema * schema, struct ArrowAr
 
 int get_arrow_struct(ErlNifEnv *env, struct ArrowSchema * schema, struct ArrowArray * values, uint64_t level, std::vector<ERL_NIF_TERM> &children, ERL_NIF_TERM &error) {
     return get_arrow_struct(env, schema, values, 0, -1, level, children, error);
+}
+
+int get_arrow_dictionary(ErlNifEnv *env, 
+    struct ArrowSchema * index_schema, struct ArrowArray * index_array,
+    struct ArrowSchema * value_schema, struct ArrowArray * value_array,
+    int64_t offset, int64_t count, uint64_t level, std::vector<ERL_NIF_TERM> &children, ERL_NIF_TERM &error) {
+    std::vector<ERL_NIF_TERM> keys, values;
+    ERL_NIF_TERM index_type, index_metadata;
+    ERL_NIF_TERM value_type, value_metadata;
+    if (arrow_array_to_nif_term(env, index_schema, index_array, offset, count, level + 1, keys, index_type, index_metadata, error, nullptr, true) == 1) {
+        return 1;
+    }
+    if (arrow_array_to_nif_term(env, value_schema, value_array, offset, count, level + 1, values, value_type, value_metadata, error, nullptr, false) == 1) {
+        return 1;
+    }
+
+    bool index_nullable = index_schema->flags & ARROW_FLAG_NULLABLE || index_array->null_count > 0;
+    bool value_nullable = value_schema->flags & ARROW_FLAG_NULLABLE || value_array->null_count > 0;
+    ERL_NIF_TERM data;
+    ERL_NIF_TERM data_keys[] = {
+        kAtomKey,
+        kAtomValue
+    };
+    ERL_NIF_TERM data_values[] = {
+        make_adbc_column(env, index_schema, index_array, keys[0], index_type, index_nullable, index_metadata, keys[1]),
+        make_adbc_column(env, value_schema, value_array, values[0], value_type, value_nullable, value_metadata, values[1])
+    };
+    enif_make_map_from_arrays(env, data_keys, data_values, (unsigned)(sizeof(data_keys)/sizeof(data_keys[0])), &data);
+    children.push_back(data);
+    return 0;
+}
+
+int get_arrow_dictionary(ErlNifEnv *env, 
+    struct ArrowSchema * index_schema, struct ArrowArray * index_array,
+    struct ArrowSchema * value_schema, struct ArrowArray * value_array,
+    uint64_t level, std::vector<ERL_NIF_TERM> &children, ERL_NIF_TERM &error) {
+    return get_arrow_dictionary(env, index_schema, index_array, value_schema, value_array, 0, -1, level, children, error);
 }
 
 ERL_NIF_TERM get_arrow_array_map_children(ErlNifEnv *env, struct ArrowSchema * schema, struct ArrowArray * values, int64_t offset, int64_t count, uint64_t level) {
@@ -518,6 +584,7 @@ ERL_NIF_TERM get_arrow_array_list_children(ErlNifEnv *env, struct ArrowSchema * 
         const void * offsets_ptr = (const void *)values->buffers[offset_buffer_index];
         if (offsets_ptr == nullptr) return erlang::nif::error(env, "invalid ArrowArray (list), offsets == nullptr");
         if (count == -1) count = values->length;
+        if (count > values->length) count = values->length - offset;
         bool items_nullable = (schema->flags & ARROW_FLAG_NULLABLE) || (values->null_count > 0);
 
         int has_error = 0;
@@ -562,6 +629,7 @@ ERL_NIF_TERM get_arrow_array_list_children(ErlNifEnv *env, struct ArrowSchema * 
     } else {
         // NANOARROW_TYPE_FIXED_SIZE_LIST
         if (count == -1) count = values->length;
+        if (count > values->length) count = values->length - offset;
         bool items_nullable = (schema->flags & ARROW_FLAG_NULLABLE) || (values->null_count > 0);
         for (int64_t child_i = offset; child_i < offset + count; child_i++) {
             if (bitmap_buffer && items_nullable) {
@@ -634,6 +702,7 @@ ERL_NIF_TERM get_arrow_array_list_view(ErlNifEnv *env, struct ArrowSchema * sche
         return erlang::nif::error(env, "invalid ArrowSchema (list), its single child is not named item");
     }
     if (count == -1) count = values->length;
+    if (count > values->length) count = values->length - offset;
 
     auto bool_to_atom = [](ErlNifEnv *, bool b) -> ERL_NIF_TERM {
         return b ? kAtomTrue : kAtomFalse;
@@ -657,7 +726,8 @@ ERL_NIF_TERM get_arrow_array_list_view(ErlNifEnv *env, struct ArrowSchema * sche
         if (enif_is_identical(childrens[1], kAtomNil)) {
             values_term = kAtomNil;
         } else {
-            values_term = make_adbc_column(env, schema, values, childrens[0], children_type, false, children_metadata, childrens[1]);
+            bool nullable = items_schema->flags & ARROW_FLAG_NULLABLE || items_values->null_count > 0;
+            values_term = make_adbc_column(env, schema, values, childrens[0], children_type, nullable, children_metadata, childrens[1]);
         }
     }
 
@@ -683,7 +753,7 @@ ERL_NIF_TERM get_arrow_array_list_view(ErlNifEnv *env, struct ArrowSchema * sche
     return get_arrow_array_list_view(env, schema, values, 0, -1, level, list_type);
 }
 
-int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct ArrowArray * values, int64_t offset, int64_t count, int64_t level, std::vector<ERL_NIF_TERM> &out_terms, ERL_NIF_TERM &term_type, ERL_NIF_TERM &arrow_metadata, ERL_NIF_TERM &error, bool *end_of_series) {
+int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct ArrowArray * values, int64_t offset, int64_t count, int64_t level, std::vector<ERL_NIF_TERM> &out_terms, ERL_NIF_TERM &term_type, ERL_NIF_TERM &arrow_metadata, ERL_NIF_TERM &error, bool *end_of_series, bool skip_dictionary_check) {
     if (schema == nullptr) {
         error = erlang::nif::error(env, "invalid ArrowSchema (nullptr) when invoking next");
         return 1;
@@ -733,12 +803,44 @@ int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct 
         }
     }
 
+    if (!skip_dictionary_check) {
+        if (schema->dictionary != nullptr && values->dictionary != nullptr) {
+            printf("schema->dictionary != nullptr && values->dictionary != nullptr\n");
+            // NANOARROW_TYPE_DICTIONARY
+            //
+            // For dictionary-encoded arrays, the ArrowSchema.format string 
+            // encodes the index type. The dictionary value type can be read 
+            // from the ArrowSchema.dictionary structure.
+            //
+            // The same holds for ArrowArray structure: while the parent 
+            // structure points to the index data, the ArrowArray.dictionary 
+            // points to the dictionary values array.
+            term_type = kAdbcColumnTypeDictionary;
+
+            if (get_arrow_dictionary(env, schema, values, schema->dictionary, values->dictionary, offset, count, level, children, error) == 1) {
+                return 1;
+            }
+            out_terms.emplace_back(erlang::nif::make_binary(env, name));
+            out_terms.emplace_back(children[0]);
+            return 0;
+        }
+        if (schema->dictionary != nullptr && values->dictionary == nullptr) {
+            error = erlang::nif::error(env, "invalid ArrowArray (dictionary), values->dictionary == nullptr");
+            return 1;
+        }
+        if (schema->dictionary == nullptr && values->dictionary != nullptr) {
+            error = erlang::nif::error(env, "invalid ArrowArray (dictionary), schema->dictionary == nullptr");
+            return 1;
+        }
+    }
+    
     bool is_struct = false;
     bool format_processed = true;
     if (format_len == 1) {
         if (format[0] == 'n') {
             term_type = kAtomNil;
             if (count == -1) count = values->length;
+            if (count > values->length) count = values->length - offset;
             std::vector<ERL_NIF_TERM> nils(count);
             for (int64_t i = offset; i < offset + count; i++) {
                 nils.push_back(kAtomNil);
@@ -749,6 +851,7 @@ int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct 
             using value_type = int64_t;
             term_type = kAdbcColumnTypeI64;
             if (count == -1) count = values->length;
+            if (count > values->length) count = values->length - offset;
             if (values->n_buffers != 2) {
                 error = erlang::nif::error(env, "invalid n_buffers value for ArrowArray (format=l), values->n_buffers != 2");
                 return 1;
@@ -766,6 +869,7 @@ int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct 
             using value_type = int8_t;
             term_type = kAdbcColumnTypeI8;
             if (count == -1) count = values->length;
+            if (count > values->length) count = values->length - offset;
             if (values->n_buffers != 2) {
                 error = erlang::nif::error(env, "invalid n_buffers value for ArrowArray (format=c), values->n_buffers != 2");
                 return 1;
@@ -783,6 +887,7 @@ int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct 
             using value_type = int16_t;
             term_type = kAdbcColumnTypeI16;
             if (count == -1) count = values->length;
+            if (count > values->length) count = values->length - offset;
             if (values->n_buffers != 2) {
                 error = erlang::nif::error(env, "invalid n_buffers value for ArrowArray (format=s), values->n_buffers != 2");
                 return 1;
@@ -800,6 +905,7 @@ int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct 
             using value_type = int32_t;
             term_type = kAdbcColumnTypeI32;
             if (count == -1) count = values->length;
+            if (count > values->length) count = values->length - offset;
             if (values->n_buffers != 2) {
                 error = erlang::nif::error(env, "invalid n_buffers value for ArrowArray (format=i), values->n_buffers != 2");
                 return 1;
@@ -817,6 +923,7 @@ int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct 
             using value_type = uint64_t;
             term_type = kAdbcColumnTypeU64;
             if (count == -1) count = values->length;
+            if (count > values->length) count = values->length - offset;
             if (values->n_buffers != 2) {
                 error = erlang::nif::error(env, "invalid n_buffers value for ArrowArray (format=L), values->n_buffers != 2");
                 return 1;
@@ -834,6 +941,7 @@ int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct 
             using value_type = uint8_t;
             term_type = kAdbcColumnTypeU8;
             if (count == -1) count = values->length;
+            if (count > values->length) count = values->length - offset;
             if (values->n_buffers != 2) {
                 error = erlang::nif::error(env, "invalid n_buffers value for ArrowArray (format=C), values->n_buffers != 2");
                 return 1;
@@ -851,6 +959,7 @@ int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct 
             using value_type = uint16_t;
             term_type = kAdbcColumnTypeU16;
             if (count == -1) count = values->length;
+            if (count > values->length) count = values->length - offset;
             if (values->n_buffers != 2) {
                 error = erlang::nif::error(env, "invalid n_buffers value for ArrowArray (format=S), values->n_buffers != 2");
                 return 1;
@@ -868,6 +977,7 @@ int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct 
             using value_type = uint32_t;
             term_type = kAdbcColumnTypeU32;
             if (count == -1) count = values->length;
+            if (count > values->length) count = values->length - offset;
             if (values->n_buffers != 2) {
                 error = erlang::nif::error(env, "invalid n_buffers value for ArrowArray (format=I), values->n_buffers != 2");
                 return 1;
@@ -885,6 +995,7 @@ int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct 
             using value_type = uint16_t;
             term_type = kAdbcColumnTypeF16;
             if (count == -1) count = values->length;
+            if (count > values->length) count = values->length - offset;
             if (values->n_buffers != 2) {
                 error = erlang::nif::error(env, "invalid n_buffers value for ArrowArray (format=e), values->n_buffers != 2");
                 return 1;
@@ -915,6 +1026,7 @@ int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct 
             using value_type = float;
             term_type = kAdbcColumnTypeF32;
             if (count == -1) count = values->length;
+            if (count > values->length) count = values->length - offset;
             if (values->n_buffers != 2) {
                 error = erlang::nif::error(env, "invalid n_buffers value for ArrowArray (format=f), values->n_buffers != 2");
                 return 1;
@@ -944,6 +1056,7 @@ int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct 
             using value_type = double;
             term_type = kAdbcColumnTypeF64;
             if (count == -1) count = values->length;
+            if (count > values->length) count = values->length - offset;
             if (values->n_buffers != 2) {
                 error = erlang::nif::error(env, "invalid n_buffers value for ArrowArray (format=g), values->n_buffers != 2");
                 return 1;
@@ -973,22 +1086,17 @@ int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct 
             using value_type = bool;
             term_type = kAdbcColumnTypeBool;
             if (count == -1) count = values->length;
+            if (count > values->length) count = values->length - offset;
             if (values->n_buffers != 2) {
                 error = erlang::nif::error(env, "invalid n_buffers value for ArrowArray (format=b), values->n_buffers != 2");
                 return 1;
             }
-            current_term = values_from_buffer(
+            current_term = boolean_values_from_buffer(
                 env,
                 offset,
                 count,
                 (const uint8_t *)values->buffers[bitmap_buffer_index],
-                (const value_type *)values->buffers[data_buffer_index],
-                [](ErlNifEnv *env, bool val) -> ERL_NIF_TERM {
-                    if (val) {
-                        return kAtomTrue;
-                    }
-                    return kAtomFalse;
-                }
+                (const value_type *)values->buffers[data_buffer_index]
             );
         } else if (format[0] == 'u' || format[0] == 'z') {
             // NANOARROW_TYPE_BINARY
@@ -1001,6 +1109,7 @@ int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct 
             offset_buffer_index = 1;
             data_buffer_index = 2;
             if (count == -1) count = values->length;
+            if (count > values->length) count = values->length - offset;
             if (values->n_buffers != 3) {
                 error = erlang::nif::error(env, "invalid n_buffers value for ArrowArray (format=u or format=z), values->n_buffers != 3");
                 return 1;
@@ -1027,6 +1136,7 @@ int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct 
             offset_buffer_index = 1;
             data_buffer_index = 2;
             if (count == -1) count = values->length;
+            if (count > values->length) count = values->length - offset;
             if (values->n_buffers != 3) {
                 error = erlang::nif::error(env, "invalid n_buffers value for ArrowArray (format=U or format=Z), values->n_buffers != 3");
                 return 1;
@@ -1052,6 +1162,7 @@ int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct 
             term_type = kAdbcColumnTypeStruct;
 
             if (count == -1) count = values->length;
+            if (count > values->length) count = values->length - offset;
             if (get_arrow_struct(env, schema, values, offset, count, level, children, error) == 1) {
                 return 1;
             }
@@ -1126,6 +1237,7 @@ int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct 
                             using value_type = uint32_t;
                             term_type = kAdbcColumnTypeDate32;
                             if (count == -1) count = values->length;
+                            if (count > values->length) count = values->length - offset;
                             if (values->n_buffers != 2) {
                                 error = erlang::nif::error(env, "invalid n_buffers value for ArrowArray (format=tdD), values->n_buffers != 2");
                                 return 1;
@@ -1142,6 +1254,7 @@ int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct 
                             using value_type = uint64_t;
                             term_type = kAdbcColumnTypeDate64;
                             if (count == -1) count = values->length;
+                            if (count > values->length) count = values->length - offset;
                             if (values->n_buffers != 2) {
                                 error = erlang::nif::error(env, "invalid n_buffers value for ArrowArray (format=tdm), values->n_buffers != 2");
                                 return 1;
@@ -1199,6 +1312,7 @@ int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct 
                     if (format_processed) {
                         using value_type = uint64_t;
                         if (count == -1) count = values->length;
+                        if (count > values->length) count = values->length - offset;
                         if (values->n_buffers != 2) {
                             error = erlang::nif::error(env, "invalid n_buffers value for ArrowArray (format=tt), values->n_buffers != 2");
                             return 1;
@@ -1272,6 +1386,7 @@ int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct 
                     if (format_processed) {
                         using value_type = int64_t;
                         if (count == -1) count = values->length;
+                        if (count > values->length) count = values->length - offset;
                         if (values->n_buffers != 2) {
                             error = erlang::nif::error(env, "invalid n_buffers value for ArrowArray (format=tD), values->n_buffers != 2");
                             return 1;
@@ -1311,6 +1426,7 @@ int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct 
                         if (format[2] == 'M') {
                             using value_type = int32_t;
                             if (count == -1) count = values->length;
+                            if (count > values->length) count = values->length - offset;
                             if (values->n_buffers != 2) {
                                 error = erlang::nif::error(env, "invalid n_buffers value for ArrowArray (format=tiM), values->n_buffers != 2");
                                 return 1;
@@ -1327,6 +1443,7 @@ int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct 
                         } else if (format[2] == 'D') {
                             using value_type = int64_t;
                             if (count == -1) count = values->length;
+                            if (count > values->length) count = values->length - offset;
                             if (values->n_buffers != 2) {
                                 error = erlang::nif::error(env, "invalid n_buffers value for ArrowArray (format=tiD), values->n_buffers != 2");
                                 return 1;
@@ -1349,6 +1466,7 @@ int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct 
                                 int64_t data[2];
                             };
                             if (count == -1) count = values->length;
+                            if (count > values->length) count = values->length - offset;
                             if (values->n_buffers != 2) {
                                 error = erlang::nif::error(env, "invalid n_buffers value for ArrowArray (format=tin), values->n_buffers != 2");
                                 return 1;
@@ -1425,6 +1543,7 @@ int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct 
                     
                     using value_type = int64_t;
                     if (count == -1) count = values->length;
+                    if (count > values->length) count = values->length - offset;
                     if (values->n_buffers != 2) {
                         error = erlang::nif::error(env, "invalid n_buffers value for ArrowArray (format=ts), values->n_buffers != 2");
                         return 1;
@@ -1499,6 +1618,7 @@ int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct 
             } else if (strncmp("w:", format, 2) == 0) {
                 // NANOARROW_TYPE_FIXED_SIZE_BINARY
                 if (count == -1) count = values->length;
+                if (count > values->length) count = values->length - offset;
                 if (values->n_buffers != 2) {
                     snprintf(err_msg_buf, 255, "invalid n_buffers value for ArrowArray (format=%s), values->n_buffers != 2", schema->format);
                     error = erlang::nif::error(env, erlang::nif::make_binary(env, err_msg_buf));
@@ -1557,6 +1677,7 @@ int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct 
                 if (format_processed) {
                     term_type = kAdbcColumnTypeDecimal(bits, precision, scale);
                     if (count == -1) count = values->length;
+                    if (count > values->length) count = values->length - offset;
                     if (values->n_buffers != 2) {
                         snprintf(err_msg_buf, 255, "invalid n_buffers value for ArrowArray (format=%s), values->n_buffers != 2", schema->format);
                         error = erlang::nif::error(env, erlang::nif::make_binary(env, err_msg_buf));
@@ -1615,8 +1736,8 @@ int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct 
     return 0;
 }
 
-int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct ArrowArray * values, uint64_t level, std::vector<ERL_NIF_TERM> &out_terms, ERL_NIF_TERM &out_type, ERL_NIF_TERM &metadata, ERL_NIF_TERM &error, bool *end_of_series) {
-    return arrow_array_to_nif_term(env, schema, values, 0, -1, level, out_terms, out_type, metadata, error, end_of_series);
+int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct ArrowArray * values, uint64_t level, std::vector<ERL_NIF_TERM> &out_terms, ERL_NIF_TERM &out_type, ERL_NIF_TERM &metadata, ERL_NIF_TERM &error, bool *end_of_series, bool skip_dictionary_check) {
+    return arrow_array_to_nif_term(env, schema, values, 0, -1, level, out_terms, out_type, metadata, error, end_of_series, skip_dictionary_check);
 }
 
 #endif  // ADBC_ARROW_ARRAY_HPP

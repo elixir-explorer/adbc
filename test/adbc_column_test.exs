@@ -557,4 +557,32 @@ defmodule Adbc.Column.Test do
              } == Adbc.Column.to_list(run_end_array)
     end
   end
+
+  describe "dictionary" do
+    test "to list" do
+      # type: VarBinary
+      # ['foo', 'bar', 'foo', 'bar', null, 'baz']
+      #
+      # In dictionary-encoded form, this could appear as:
+      # data VarBinary (dictionary-encoded)
+      #    index_type: Int32
+      #    values: [0, 1, 0, 1, null, 2]
+      #
+      # dictionary
+      #    type: VarBinary
+      #    values: ['foo', 'bar', 'baz']
+      key = Adbc.Column.i32([0, 1, 0, 1, nil, 2], name: "key", nullable: true)
+      value = Adbc.Column.string(["foo", "bar", "baz"], name: "value", nullable: false)
+      dict = Adbc.Column.dictionary(key, value)
+
+      assert %Adbc.Column{
+               name: nil,
+               type: :string,
+               nullable: false,
+               metadata: nil,
+               data: ["foo", "bar", "foo", "bar", nil, "baz"]
+             } =
+               Adbc.Column.to_list(dict)
+    end
+  end
 end

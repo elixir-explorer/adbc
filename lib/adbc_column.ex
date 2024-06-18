@@ -82,6 +82,10 @@ defmodule Adbc.Column do
           values: %Adbc.Column{}
         }
   @valid_run_end_types [:i16, :i32, :i64]
+  @type dictionary_data_t :: %{
+          key: %Adbc.Column{},
+          value: %Adbc.Column{}
+        }
   @type data_type ::
           :boolean
           | signed_integer
@@ -106,10 +110,13 @@ defmodule Adbc.Column do
           | duration_t
           | interval_t
           | :run_end_encoded
-  @spec column(data_type(), list() | list_view_data_t(), Keyword.t()) :: %Adbc.Column{}
+          | :dictionary
+  @spec column(data_type(), list() | list_view_data_t() | dictionary_data_t(), Keyword.t()) ::
+          %Adbc.Column{}
   def column(type, data, opts \\ [])
       when (is_atom(type) or is_tuple(type)) and
-             (is_list(data) or (type in @list_view_types and is_map(data))) and is_list(opts) do
+             (is_list(data) or (type in @list_view_types and is_map(data)) or
+                (type == :dictionary and is_map(data))) and is_list(opts) do
     name = opts[:name]
     nullable = opts[:nullable] || false
     metadata = opts[:metadata] || nil
@@ -785,7 +792,8 @@ defmodule Adbc.Column do
 
   """
   @spec fixed_size_binary([iodata() | nil], non_neg_integer(), Keyword.t()) :: %Adbc.Column{}
-  def fixed_size_binary(data, nbytes, opts \\ []) when is_list(data) and is_list(opts) do
+  def fixed_size_binary(data, nbytes, opts \\ [])
+      when is_list(data) and is_integer(nbytes) and is_list(opts) do
     column({:fixed_size_binary, nbytes}, data, opts)
   end
 
@@ -1090,7 +1098,57 @@ defmodule Adbc.Column do
   end
 
   @doc """
-  Convert a list view to a list.
+  Construct an array using dictionary encoding.
+
+  Dictionary encoding is a data representation technique to represent values by integers
+  referencing a dictionary usually consisting of unique values. It can be effective when
+  you have data with many repeated values.
+
+  Any array can be dictionary-encoded. The dictionary is stored as an optional property
+  of an array. When a field is dictionary encoded, the values are represented by an array
+  of non-negative integers representing the index of the value in the dictionary. The memory
+  layout for a dictionary-encoded array is the same as that of a primitive integer layout.
+  The dictionary is handled as a separate columnar array with its own respective layout.
+
+  As an example, you could have the following data:
+
+  ```elixir
+  Adbc.Column.string(["foo", "bar", "foo", "bar", nil, "baz"], nullable: true)
+  ```
+
+  In dictionary-encoded form, this could appear as:
+
+  ```elixir
+  Adbc.Column.dictionary(
+    Adbc.Column.string(["foo", "bar", "baz"], nullable: true),
+    Adbc.Column.i32([0, 1, 0, 1, nil, 2], nullable: true)
+  )
+  ```
+
+  ## Arguments
+
+  * `data`: a list, each element of which can be one of the following:
+    - `nil`
+    - `Adbc.Column`
+
+    Note that each `Adbc.Column` in the list should have the same type.
+
+  * `opts`: A keyword list of options
+
+  ## Options
+
+  * `:name` - The name of the column
+  * `:nullable` - A boolean value indicating whether the column is nullable
+  * `:metadata` - A map of metadata
+  """
+  @spec dictionary(%Adbc.Column{}, %Adbc.Column{}, Keyword.t()) :: %Adbc.Column{}
+  def dictionary(key = %Adbc.Column{type: index_type}, value = %Adbc.Column{}, opts \\ [])
+      when index_type in [:i8, :u8, :i16, :u16, :i32, :u32, :i64, :u64] do
+    column(:dictionary, %{key: key, value: value}, opts)
+  end
+
+  @doc """
+  Convert a list view, run-end encoding array or a dictionary to a list.
 
   ## Examples
 
@@ -1285,8 +1343,24 @@ defmodule Adbc.Column do
       name: column.name,
       type: values.type,
       nullable: column.nullable,
-      data: Enum.reverse(decoded)
+      data: Enum.reverse(decoded),
+      metadata: nil
     }
+  end
+
+  def to_list(column = %Adbc.Column{data: %{key: key, value: value}, type: :dictionary}) do
+    value = to_list(value)
+
+    column_data =
+      Enum.map(key.data, fn
+        index when is_integer(index) ->
+          Enum.at(value.data, index)
+
+        nil ->
+          nil
+      end)
+
+    %{column | data: column_data, type: value.type}
   end
 
   def to_list(column = %Adbc.Column{data: data}) when is_list(data) do

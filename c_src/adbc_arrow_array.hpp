@@ -34,6 +34,35 @@ template <typename M> static ERL_NIF_TERM bit_boolean_from_buffer(ErlNifEnv *env
     return enif_make_list_from_array(env, values.data(), (unsigned)values.size());
 }
 
+static ERL_NIF_TERM boolean_values_from_buffer(ErlNifEnv *env, int64_t offset, int64_t count, const uint8_t * validity_bitmap, const bool * value_buffer) {
+    std::vector<ERL_NIF_TERM> values(count);
+    if (validity_bitmap == nullptr) {
+        for (int64_t i = offset; i < offset + count; i++) {
+            uint8_t dbyte = value_buffer[i/8];
+            bool boolean_val = dbyte & (1 << (i % 8));
+            values[i - offset] = boolean_val ? kAtomTrue : kAtomFalse;
+        }
+    } else {
+        for (int64_t i = offset; i < offset + count; i++) {
+            uint8_t vbyte = validity_bitmap[i/8];
+            uint8_t mask = 1 << (i % 8);
+            if (vbyte & mask) {
+                uint8_t dbyte = value_buffer[i/8];
+                bool boolean_val = dbyte & mask;
+                values[i - offset] = boolean_val ? kAtomTrue : kAtomFalse;
+            } else {
+                values[i - offset] = kAtomNil;
+            }
+        }
+    }
+
+    return enif_make_list_from_array(env, values.data(), (unsigned)values.size());
+}
+
+static ERL_NIF_TERM boolean_values_from_buffer(ErlNifEnv *env, int64_t length, const uint8_t * validity_bitmap, const bool * value_buffer) {
+    return boolean_values_from_buffer(env, 0, length, validity_bitmap, value_buffer);
+}
+
 template <typename T, typename M> static ERL_NIF_TERM values_from_buffer(ErlNifEnv *env, int64_t offset, int64_t count, const uint8_t * validity_bitmap, const T * value_buffer, const M& value_to_nif) {
     std::vector<ERL_NIF_TERM> values(count);
     if (validity_bitmap == nullptr) {
@@ -1043,18 +1072,12 @@ int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct 
                 error = erlang::nif::error(env, "invalid n_buffers value for ArrowArray (format=b), values->n_buffers != 2");
                 return 1;
             }
-            current_term = values_from_buffer(
+            current_term = boolean_values_from_buffer(
                 env,
                 offset,
                 count,
                 (const uint8_t *)values->buffers[bitmap_buffer_index],
-                (const value_type *)values->buffers[data_buffer_index],
-                [](ErlNifEnv *env, bool val) -> ERL_NIF_TERM {
-                    if (val) {
-                        return kAtomTrue;
-                    }
-                    return kAtomFalse;
-                }
+                (const value_type *)values->buffers[data_buffer_index]
             );
         } else if (format[0] == 'u' || format[0] == 'z') {
             // NANOARROW_TYPE_BINARY

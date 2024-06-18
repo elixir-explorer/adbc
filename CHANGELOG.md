@@ -1,5 +1,22 @@
 # CHANGELOG
 
+## v0.5.0
+
+#### Breaking changes
+* Signed integer types and functions are now renamed from `s{8,16,32,64}` to `i{8,16,32,64}`
+
+#### Changes
+* Updated to ADBC library 12.
+
+#### Fix
+* Boolean arrays are now correctly parsed.
+
+#### Added
+* Added support for dictionary encoded array
+
+#### Fix
+* Include `CMakeLists.txt` in package files
+
 ## v0.4.2
 
 #### Added

@@ -156,7 +156,7 @@ defmodule Adbc.Connection.Test do
                 data: [
                   %Adbc.Column{
                     name: "num",
-                    type: :i64,
+                    type: :s64,
                     nullable: true,
                     metadata: nil,
                     data: [123]
@@ -170,14 +170,14 @@ defmodule Adbc.Connection.Test do
                 data: [
                   %Adbc.Column{
                     name: "num",
-                    type: :i64,
+                    type: :s64,
                     nullable: true,
                     metadata: nil,
                     data: [123]
                   },
                   %Adbc.Column{
                     name: "bool",
-                    type: :i64,
+                    type: :s64,
                     nullable: true,
                     metadata: nil,
                     data: [1]
@@ -194,7 +194,7 @@ defmodule Adbc.Connection.Test do
                 data: [
                   %Adbc.Column{
                     name: "num",
-                    type: :i64,
+                    type: :s64,
                     nullable: true,
                     metadata: nil,
                     data: [579]
@@ -219,7 +219,7 @@ defmodule Adbc.Connection.Test do
                 data: [
                   %Adbc.Column{
                     name: "num",
-                    type: :i64,
+                    type: :s64,
                     nullable: true,
                     metadata: nil,
                     data: [579]
@@ -239,7 +239,7 @@ defmodule Adbc.Connection.Test do
                 data: [
                   %Adbc.Column{
                     name: "num",
-                    type: :i64,
+                    type: :s64,
                     nullable: true,
                     metadata: nil,
                     data: [579]
@@ -253,7 +253,7 @@ defmodule Adbc.Connection.Test do
                 data: [
                   %Adbc.Column{
                     name: "num",
-                    type: :i64,
+                    type: :s64,
                     nullable: true,
                     metadata: nil,
                     data: [1456]
@@ -272,7 +272,7 @@ defmodule Adbc.Connection.Test do
                data: [
                  %Adbc.Column{
                    name: "num",
-                   type: :i64,
+                   type: :s64,
                    nullable: true,
                    metadata: nil,
                    data: [123]
@@ -285,12 +285,12 @@ defmodule Adbc.Connection.Test do
                data: [
                  %Adbc.Column{
                    name: "num",
-                   type: :i64,
+                   type: :s64,
                    nullable: true,
                    metadata: nil,
                    data: [123]
                  },
-                 %Adbc.Column{name: "bool", type: :i64, nullable: true, metadata: nil, data: [1]}
+                 %Adbc.Column{name: "bool", type: :s64, nullable: true, metadata: nil, data: [1]}
                ]
              } =
                Connection.query!(conn, "SELECT 123 as num, true as bool")
@@ -303,7 +303,7 @@ defmodule Adbc.Connection.Test do
                data: [
                  %Adbc.Column{
                    name: "num",
-                   type: :i64,
+                   type: :s64,
                    nullable: true,
                    metadata: nil,
                    data: [579]
@@ -330,12 +330,12 @@ defmodule Adbc.Connection.Test do
                data: [
                  %Adbc.Column{
                    name: "num",
-                   type: :i64,
+                   type: :s64,
                    nullable: true,
                    metadata: nil,
                    data: [123]
                  },
-                 %Adbc.Column{name: "bool", type: :i64, nullable: true, metadata: nil, data: [1]}
+                 %Adbc.Column{name: "bool", type: :s64, nullable: true, metadata: nil, data: [1]}
                ]
              } =
                Connection.query!(conn, "SELECT 123 as num, true as bool", [],
@@ -350,7 +350,7 @@ defmodule Adbc.Connection.Test do
                data: [
                  %Adbc.Column{
                    name: "num",
-                   type: :i64,
+                   type: :s64,
                    nullable: true,
                    metadata: nil,
                    data: [579]

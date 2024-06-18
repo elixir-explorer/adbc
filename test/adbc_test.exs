@@ -37,7 +37,7 @@ defmodule AdbcTest do
                 data: [
                   %Adbc.Column{
                     name: "num",
-                    type: :i32,
+                    type: :s32,
                     nullable: true,
                     metadata: nil,
                     data: [123]
@@ -59,7 +59,7 @@ defmodule AdbcTest do
                     data: [
                       %Adbc.Column{
                         name: "item",
-                        type: :i32,
+                        type: :s32,
                         nullable: true,
                         metadata: nil,
                         data: [1, 2, 3]
@@ -83,7 +83,7 @@ defmodule AdbcTest do
                     data: [
                       %Adbc.Column{
                         name: "item",
-                        type: :i32,
+                        type: :s32,
                         nullable: true,
                         metadata: nil,
                         data: [1, 2, 3, nil, 5]
@@ -123,7 +123,7 @@ defmodule AdbcTest do
                     data: [
                       %Adbc.Column{
                         name: "item",
-                        type: :i32,
+                        type: :s32,
                         nullable: true,
                         metadata: nil,
                         data: [1, 2, 3, nil, 5, 6, nil, 7, nil, 9]

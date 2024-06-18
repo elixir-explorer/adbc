@@ -10,19 +10,19 @@ defmodule Adbc.Column do
 
   import Bitwise
 
-  @type i8 :: -128..127
+  @type s8 :: -128..127
   @type u8 :: 0..255
-  @type i16 :: -32768..32767
+  @type s16 :: -32768..32767
   @type u16 :: 0..65535
-  @type i32 :: -2_147_483_648..2_147_483_647
+  @type s32 :: -2_147_483_648..2_147_483_647
   @type u32 :: 0..4_294_967_295
-  @type i64 :: -9_223_372_036_854_775_808..9_223_372_036_854_775_807
+  @type s64 :: -9_223_372_036_854_775_808..9_223_372_036_854_775_807
   @type u64 :: 0..18_446_744_073_709_551_615
   @type signed_integer ::
-          :i8
-          | :i16
-          | :i32
-          | :i64
+          :s8
+          | :s16
+          | :s32
+          | :s64
   @type unsigned_integer ::
           :u8
           | :u16
@@ -60,9 +60,9 @@ defmodule Adbc.Column do
           | {:duration, :milliseconds}
           | {:duration, :microseconds}
           | {:duration, :nanoseconds}
-  @type interval_month :: i32()
-  @type interval_day_time :: {i32(), i32()}
-  @type interval_month_day_nano :: {i32(), i32(), i64()}
+  @type interval_month :: s32()
+  @type interval_day_time :: {s32(), s32()}
+  @type interval_month_day_nano :: {s32(), s32(), s64()}
   @type interval_unit ::
           :month
           | :day_time
@@ -81,7 +81,7 @@ defmodule Adbc.Column do
           sizes: [non_neg_integer()],
           values: %Adbc.Column{}
         }
-  @valid_run_end_types [:i16, :i32, :i64]
+  @valid_run_end_types [:s16, :s32, :s64]
   @type dictionary_data_t :: %{
           key: %Adbc.Column{},
           value: %Adbc.Column{}
@@ -95,7 +95,7 @@ defmodule Adbc.Column do
           | :large_list
           | :list_view
           | :large_list_view
-          | {:fixed_size_list, i32()}
+          | {:fixed_size_list, s32()}
           | :binary
           | :large_binary
           | :string
@@ -324,19 +324,19 @@ defmodule Adbc.Column do
 
   ## Examples
 
-      iex> Adbc.Column.i8([1, 2, 3])
+      iex> Adbc.Column.s8([1, 2, 3])
       %Adbc.Column{
         name: nil,
-        type: :i8,
+        type: :s8,
         nullable: false,
         metadata: nil,
         data: [1, 2, 3]
       }
 
   """
-  @spec i8([i8() | nil], Keyword.t()) :: %Adbc.Column{}
-  def i8(data, opts \\ []) when is_list(data) and is_list(opts) do
-    column(:i8, data, opts)
+  @spec s8([s8() | nil], Keyword.t()) :: %Adbc.Column{}
+  def s8(data, opts \\ []) when is_list(data) and is_list(opts) do
+    column(:s8, data, opts)
   end
 
   @doc """
@@ -355,19 +355,19 @@ defmodule Adbc.Column do
 
   ## Examples
 
-      iex> Adbc.Column.i16([1, 2, 3])
+      iex> Adbc.Column.s16([1, 2, 3])
       %Adbc.Column{
         name: nil,
-        type: :i16,
+        type: :s16,
         nullable: false,
         metadata: nil,
         data: [1, 2, 3]
       }
 
   """
-  @spec i16([i16() | nil], Keyword.t()) :: %Adbc.Column{}
-  def i16(data, opts \\ []) when is_list(data) and is_list(opts) do
-    column(:i16, data, opts)
+  @spec s16([s16() | nil], Keyword.t()) :: %Adbc.Column{}
+  def s16(data, opts \\ []) when is_list(data) and is_list(opts) do
+    column(:s16, data, opts)
   end
 
   @doc """
@@ -386,19 +386,19 @@ defmodule Adbc.Column do
 
   ## Examples
 
-      iex> Adbc.Column.i32([1, 2, 3])
+      iex> Adbc.Column.s32([1, 2, 3])
       %Adbc.Column{
         name: nil,
-        type: :i32,
+        type: :s32,
         nullable: false,
         metadata: nil,
         data: [1, 2, 3]
       }
 
   """
-  @spec i32([i32() | nil], Keyword.t()) :: %Adbc.Column{}
-  def i32(data, opts \\ []) when is_list(data) and is_list(opts) do
-    column(:i32, data, opts)
+  @spec s32([s32() | nil], Keyword.t()) :: %Adbc.Column{}
+  def s32(data, opts \\ []) when is_list(data) and is_list(opts) do
+    column(:s32, data, opts)
   end
 
   @doc """
@@ -417,19 +417,19 @@ defmodule Adbc.Column do
 
   ## Examples
 
-      iex> Adbc.Column.i64([1, 2, 3])
+      iex> Adbc.Column.s64([1, 2, 3])
       %Adbc.Column{
         name: nil,
-        type: :i64,
+        type: :s64,
         nullable: false,
         metadata: nil,
         data: [1, 2, 3]
       }
 
   """
-  @spec i64([i64() | nil], Keyword.t()) :: %Adbc.Column{}
-  def i64(data, opts \\ []) when is_list(data) and is_list(opts) do
-    column(:i64, data, opts)
+  @spec s64([s64() | nil], Keyword.t()) :: %Adbc.Column{}
+  def s64(data, opts \\ []) when is_list(data) and is_list(opts) do
+    column(:s64, data, opts)
   end
 
   @doc """
@@ -812,7 +812,7 @@ defmodule Adbc.Column do
   * `:nullable` - A boolean value indicating whether the column is nullable
   * `:metadata` - A map of metadata
   """
-  @spec date32([Date.t() | i32() | nil], Keyword.t()) :: %Adbc.Column{}
+  @spec date32([Date.t() | s32() | nil], Keyword.t()) :: %Adbc.Column{}
   def date32(data, opts \\ []) when is_list(data) and is_list(opts) do
     column(:date32, data, opts)
   end
@@ -832,7 +832,7 @@ defmodule Adbc.Column do
   * `:nullable` - A boolean value indicating whether the column is nullable
   * `:metadata` - A map of metadata
   """
-  @spec date64([Date.t() | i64() | nil], Keyword.t()) :: %Adbc.Column{}
+  @spec date64([Date.t() | s64() | nil], Keyword.t()) :: %Adbc.Column{}
   def date64(data, opts \\ []) when is_list(data) and is_list(opts) do
     column(:date64, data, opts)
   end
@@ -864,7 +864,7 @@ defmodule Adbc.Column do
   * `:nullable` - A boolean value indicating whether the column is nullable
   * `:metadata` - A map of metadata
   """
-  @spec time([Time.t() | nil] | [i64() | nil], time_unit(), Keyword.t()) :: %Adbc.Column{}
+  @spec time([Time.t() | nil] | [s64() | nil], time_unit(), Keyword.t()) :: %Adbc.Column{}
   def time(data, unit, opts \\ [])
 
   def time(data, :seconds, opts) when is_list(data) and is_list(opts) do
@@ -908,7 +908,7 @@ defmodule Adbc.Column do
   * `:nullable` - A boolean value indicating whether the column is nullable
   * `:metadata` - A map of metadata
   """
-  @spec timestamp([NaiveDateTime.t() | nil] | [i64() | nil], time_unit(), String.t(), Keyword.t()) ::
+  @spec timestamp([NaiveDateTime.t() | nil] | [s64() | nil], time_unit(), String.t(), Keyword.t()) ::
           %Adbc.Column{}
   def timestamp(data, unit, timezone, opts \\ [])
 
@@ -953,7 +953,7 @@ defmodule Adbc.Column do
   * `:nullable` - A boolean value indicating whether the column is nullable
   * `:metadata` - A map of metadata
   """
-  @spec duration([i64() | nil], time_unit(), Keyword.t()) :: %Adbc.Column{}
+  @spec duration([s64() | nil], time_unit(), Keyword.t()) :: %Adbc.Column{}
   def duration(data, unit, opts \\ [])
 
   def duration(data, :seconds, opts) when is_list(data) and is_list(opts) do
@@ -1091,7 +1091,7 @@ defmodule Adbc.Column do
   * `:nullable` - A boolean value indicating whether the column is nullable
   * `:metadata` - A map of metadata
   """
-  @spec fixed_size_list([%Adbc.Column{} | nil], i32(), Keyword.t()) ::
+  @spec fixed_size_list([%Adbc.Column{} | nil], s32(), Keyword.t()) ::
           %Adbc.Column{}
   def fixed_size_list(data, fixed_size, opts \\ []) when is_list(data) do
     column({:fixed_size_list, fixed_size}, data, opts)
@@ -1121,7 +1121,7 @@ defmodule Adbc.Column do
   ```elixir
   Adbc.Column.dictionary(
     Adbc.Column.string(["foo", "bar", "baz"], nullable: true),
-    Adbc.Column.i32([0, 1, 0, 1, nil, 2], nullable: true)
+    Adbc.Column.s32([0, 1, 0, 1, nil, 2], nullable: true)
   )
   ```
 
@@ -1143,7 +1143,7 @@ defmodule Adbc.Column do
   """
   @spec dictionary(%Adbc.Column{}, %Adbc.Column{}, Keyword.t()) :: %Adbc.Column{}
   def dictionary(key = %Adbc.Column{type: index_type}, value = %Adbc.Column{}, opts \\ [])
-      when index_type in [:i8, :u8, :i16, :u16, :i32, :u32, :i64, :u64] do
+      when index_type in [:s8, :u8, :s16, :u16, :s32, :u32, :s64, :u64] do
     column(:dictionary, %{key: key, value: value}, opts)
   end
 
@@ -1160,7 +1160,7 @@ defmodule Adbc.Column do
       ...>   data: %{
       ...>     values: %Adbc.Column{
       ...>       name: "item",
-      ...>       type: :i32,
+      ...>       type: :s32,
       ...>       nullable: false,
       ...>       metadata: nil,
       ...>       data: [0, -127, 127, 50, 12, -7, 25]
@@ -1181,7 +1181,7 @@ defmodule Adbc.Column do
           validity: [true, false, true, true, true],
           values: %Adbc.Column{
             name: "item",
-            type: :i32,
+            type: :s32,
             nullable: false,
             metadata: nil,
             data: [0, -127, 127, 50, 12, -7, 25]
@@ -1197,7 +1197,7 @@ defmodule Adbc.Column do
         data: [
           %Adbc.Column{
             name: "item",
-            type: :i32,
+            type: :s32,
             nullable: false,
             metadata: nil,
             data: [12, -7, 25]
@@ -1205,21 +1205,21 @@ defmodule Adbc.Column do
           nil,
           %Adbc.Column{
             name: "item",
-            type: :i32,
+            type: :s32,
             nullable: false,
             metadata: nil,
             data: [0, -127, 127, 50]
           },
           %Adbc.Column{
             name: "item",
-            type: :i32,
+            type: :s32,
             nullable: false,
             metadata: nil,
             data: []
           },
           %Adbc.Column{
             name: "item",
-            type: :i32,
+            type: :s32,
             nullable: false,
             metadata: nil,
             data: ~c"2\f"
@@ -1278,13 +1278,13 @@ defmodule Adbc.Column do
 
     max_allowed_length =
       case run_end_type do
-        :i16 ->
+        :s16 ->
           1 <<< 16
 
-        :i32 ->
+        :s32 ->
           1 <<< 32
 
-        :i64 ->
+        :s64 ->
           1 <<< 64
 
         _ ->

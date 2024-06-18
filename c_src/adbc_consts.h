@@ -27,7 +27,7 @@ static ERL_NIF_TERM kAtomStructKey;
 //     sizes: [3, 0, 4, 0, 2],
 //     values: %Adbc.Column{
 //       name: "sample_list",
-//       type: :i32,
+//       type: :s32,
 //       nullable: false,
 //       metadata: nil,
 //       data: [0, -127, 127, 50, 12, -7, 25]
@@ -82,13 +82,13 @@ static ERL_NIF_TERM kAtomDataKey;
 
 // https://arrow.apache.org/docs/format/CDataInterface.html
 static ERL_NIF_TERM kAdbcColumnTypeBool;
-static ERL_NIF_TERM kAdbcColumnTypeI8;
+static ERL_NIF_TERM kAdbcColumnTypeS8;
 static ERL_NIF_TERM kAdbcColumnTypeU8;
-static ERL_NIF_TERM kAdbcColumnTypeI16;
+static ERL_NIF_TERM kAdbcColumnTypeS16;
 static ERL_NIF_TERM kAdbcColumnTypeU16;
-static ERL_NIF_TERM kAdbcColumnTypeI32;
+static ERL_NIF_TERM kAdbcColumnTypeS32;
 static ERL_NIF_TERM kAdbcColumnTypeU32;
-static ERL_NIF_TERM kAdbcColumnTypeI64;
+static ERL_NIF_TERM kAdbcColumnTypeS64;
 static ERL_NIF_TERM kAdbcColumnTypeU64;
 static ERL_NIF_TERM kAdbcColumnTypeF16;
 static ERL_NIF_TERM kAdbcColumnTypeF32;

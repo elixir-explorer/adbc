@@ -786,6 +786,8 @@ static int on_load(ErlNifEnv *env, void **, ERL_NIF_TERM) {
     kAtomNil = erlang::nif::atom(env, "nil");
     kAtomTrue = erlang::nif::atom(env, "true");
     kAtomFalse = erlang::nif::atom(env, "false");
+    kAtomKey = erlang::nif::atom(env, "key");
+    kAtomValue = erlang::nif::atom(env, "value");
     kAtomInfinity = erlang::nif::atom(env, "infinity");
     kAtomNegInfinity = erlang::nif::atom(env, "neg_infinity");
     kAtomNaN = erlang::nif::atom(env, "nan");
@@ -864,6 +866,7 @@ static int on_load(ErlNifEnv *env, void **, ERL_NIF_TERM) {
     kAdbcColumnTypeDenseUnion = erlang::nif::atom(env, "dense_union");
     kAdbcColumnTypeSparseUnion = erlang::nif::atom(env, "sparse_union");
     kAdbcColumnTypeRunEndEncoded = erlang::nif::atom(env, "run_end_encoded");
+    kAdbcColumnTypeDictionary = erlang::nif::atom(env, "dictionary");
 
     return 0;
 }

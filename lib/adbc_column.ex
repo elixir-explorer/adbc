@@ -5,7 +5,7 @@ defmodule Adbc.Column do
   `Adbc.Column` corresponds to a column in the table. It contains the column's name, type, and
   data. The data is a list of values of the column's data type.
   """
-  @enforce_keys [:name, :type, :nullable, :data]
+  @enforce_keys [:name, :type, :nullable, :data, :metadata]
   defstruct [:name, :type, :nullable, :metadata, :data, :length, :offset]
 
   import Bitwise
@@ -106,10 +106,12 @@ defmodule Adbc.Column do
           | duration_t
           | interval_t
           | :run_end_encoded
+          | :dictionary
   @spec column(data_type(), list() | list_view_data_t(), Keyword.t()) :: %Adbc.Column{}
   def column(type, data, opts \\ [])
       when (is_atom(type) or is_tuple(type)) and
-             (is_list(data) or (type in @list_view_types and is_map(data))) and is_list(opts) do
+             (is_list(data) or (type in @list_view_types and is_map(data)) or
+                (type == :dictionary and is_map(data))) and is_list(opts) do
     name = opts[:name]
     nullable = opts[:nullable] || false
     metadata = opts[:metadata] || nil
@@ -1089,6 +1091,12 @@ defmodule Adbc.Column do
     column({:fixed_size_list, fixed_size}, data, opts)
   end
 
+  @spec dictionary(%Adbc.Column{}, %Adbc.Column{}, Keyword.t()) :: %Adbc.Column{}
+  def dictionary(key = %Adbc.Column{type: index_type}, value = %Adbc.Column{}, opts \\ [])
+      when index_type in [:i8, :u8, :i16, :u16, :i32, :u32, :i64, :u64] do
+    column(:dictionary, %{key: key, value: value}, opts)
+  end
+
   @doc """
   Convert a list view to a list.
 
@@ -1285,8 +1293,24 @@ defmodule Adbc.Column do
       name: column.name,
       type: values.type,
       nullable: column.nullable,
-      data: Enum.reverse(decoded)
+      data: Enum.reverse(decoded),
+      metadata: nil
     }
+  end
+
+  def to_list(column = %Adbc.Column{data: %{key: key, value: value}, type: :dictionary}) do
+    value = to_list(value)
+
+    column_data =
+      Enum.map(key.data, fn
+        index when is_integer(index) ->
+          Enum.at(value.data, index)
+
+        nil ->
+          nil
+      end)
+
+    %{column | data: column_data, type: value.type}
   end
 
   def to_list(column = %Adbc.Column{data: data}) when is_list(data) do

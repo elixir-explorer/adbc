@@ -8,6 +8,8 @@ static ERL_NIF_TERM kAtomAdbcError;
 static ERL_NIF_TERM kAtomNil;
 static ERL_NIF_TERM kAtomTrue;
 static ERL_NIF_TERM kAtomFalse;
+static ERL_NIF_TERM kAtomKey;
+static ERL_NIF_TERM kAtomValue;
 static ERL_NIF_TERM kAtomInfinity;
 static ERL_NIF_TERM kAtomNegInfinity;
 static ERL_NIF_TERM kAtomNaN;
@@ -120,6 +122,7 @@ static ERL_NIF_TERM kAdbcColumnTypeMap;
 static ERL_NIF_TERM kAdbcColumnTypeDenseUnion;
 static ERL_NIF_TERM kAdbcColumnTypeSparseUnion;
 static ERL_NIF_TERM kAdbcColumnTypeRunEndEncoded;
+static ERL_NIF_TERM kAdbcColumnTypeDictionary;
 
 // error codes
 constexpr int kErrorBufferIsNotAMap = 1;

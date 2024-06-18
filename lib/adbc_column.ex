@@ -5,7 +5,7 @@ defmodule Adbc.Column do
   `Adbc.Column` corresponds to a column in the table. It contains the column's name, type, and
   data. The data is a list of values of the column's data type.
   """
-  @enforce_keys [:name, :type, :nullable, :data, :metadata]
+  @enforce_keys [:name, :type, :nullable, :data]
   defstruct [:name, :type, :nullable, :metadata, :data, :length, :offset]
 
   import Bitwise
@@ -82,6 +82,10 @@ defmodule Adbc.Column do
           values: %Adbc.Column{}
         }
   @valid_run_end_types [:i16, :i32, :i64]
+  @type dictionary_data_t :: %{
+          key: %Adbc.Column{},
+          value: %Adbc.Column{}
+        }
   @type data_type ::
           :boolean
           | signed_integer
@@ -107,7 +111,8 @@ defmodule Adbc.Column do
           | interval_t
           | :run_end_encoded
           | :dictionary
-  @spec column(data_type(), list() | list_view_data_t(), Keyword.t()) :: %Adbc.Column{}
+  @spec column(data_type(), list() | list_view_data_t() | dictionary_data_t(), Keyword.t()) ::
+          %Adbc.Column{}
   def column(type, data, opts \\ [])
       when (is_atom(type) or is_tuple(type)) and
              (is_list(data) or (type in @list_view_types and is_map(data)) or
@@ -1091,6 +1096,50 @@ defmodule Adbc.Column do
     column({:fixed_size_list, fixed_size}, data, opts)
   end
 
+  @doc """
+  Construct an array using dictionary encoding.
+
+  Dictionary encoding is a data representation technique to represent values by integers
+  referencing a dictionary usually consisting of unique values. It can be effective when
+  you have data with many repeated values.
+
+  Any array can be dictionary-encoded. The dictionary is stored as an optional property
+  of an array. When a field is dictionary encoded, the values are represented by an array
+  of non-negative integers representing the index of the value in the dictionary. The memory
+  layout for a dictionary-encoded array is the same as that of a primitive integer layout.
+  The dictionary is handled as a separate columnar array with its own respective layout.
+
+  As an example, you could have the following data:
+
+  ```elixir
+  Adbc.Column.string(["foo", "bar", "foo", "bar", nil, "baz"], nullable: true)
+  ```
+
+  In dictionary-encoded form, this could appear as:
+
+  ```elixir
+  Adbc.Column.dictionary(
+    Adbc.Column.string(["foo", "bar", "baz"], nullable: true),
+    Adbc.Column.i32([0, 1, 0, 1, nil, 2], nullable: true)
+  )
+  ```
+
+  ## Arguments
+
+  * `data`: a list, each element of which can be one of the following:
+    - `nil`
+    - `Adbc.Column`
+
+    Note that each `Adbc.Column` in the list should have the same type.
+
+  * `opts`: A keyword list of options
+
+  ## Options
+
+  * `:name` - The name of the column
+  * `:nullable` - A boolean value indicating whether the column is nullable
+  * `:metadata` - A map of metadata
+  """
   @spec dictionary(%Adbc.Column{}, %Adbc.Column{}, Keyword.t()) :: %Adbc.Column{}
   def dictionary(key = %Adbc.Column{type: index_type}, value = %Adbc.Column{}, opts \\ [])
       when index_type in [:i8, :u8, :i16, :u16, :i32, :u32, :i64, :u64] do
@@ -1098,7 +1147,7 @@ defmodule Adbc.Column do
   end
 
   @doc """
-  Convert a list view to a list.
+  Convert a list view, run-end encoding array or a dictionary to a list.
 
   ## Examples
 

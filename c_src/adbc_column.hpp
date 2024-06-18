@@ -1116,19 +1116,19 @@ struct AdbcColumnType adbc_column_type_to_nanoarrow_type(ErlNifEnv *env, ERL_NIF
 
     if (enif_is_identical(type_term, kAdbcColumnTypeBool)) {
         ret.arrow_type = NANOARROW_TYPE_BOOL;
-    } else if (enif_is_identical(type_term, kAdbcColumnTypeI8)) {
+    } else if (enif_is_identical(type_term, kAdbcColumnTypeS8)) {
         ret.arrow_type = NANOARROW_TYPE_INT8;
     } else if (enif_is_identical(type_term, kAdbcColumnTypeU8)) {
         ret.arrow_type = NANOARROW_TYPE_UINT8;
-    } else if (enif_is_identical(type_term, kAdbcColumnTypeI16)) {
+    } else if (enif_is_identical(type_term, kAdbcColumnTypeS16)) {
         ret.arrow_type = NANOARROW_TYPE_INT16;
     } else if (enif_is_identical(type_term, kAdbcColumnTypeU16)) {
         ret.arrow_type = NANOARROW_TYPE_UINT16;
-    } else if (enif_is_identical(type_term, kAdbcColumnTypeI32)) {
+    } else if (enif_is_identical(type_term, kAdbcColumnTypeS32)) {
         ret.arrow_type = NANOARROW_TYPE_INT32;
     } else if (enif_is_identical(type_term, kAdbcColumnTypeU32)) {
         ret.arrow_type = NANOARROW_TYPE_UINT32;
-    } else if (enif_is_identical(type_term, kAdbcColumnTypeI64)) {
+    } else if (enif_is_identical(type_term, kAdbcColumnTypeS64)) {
         ret.arrow_type = NANOARROW_TYPE_INT64;
     } else if (enif_is_identical(type_term, kAdbcColumnTypeU64)) {
         ret.arrow_type = NANOARROW_TYPE_UINT64;

@@ -259,7 +259,7 @@ defmodule Adbc.Column.Test do
         data: %{
           values: %Adbc.Column{
             name: "item",
-            type: :i32,
+            type: :s32,
             nullable: false,
             metadata: nil,
             data: [0, -127, 127, 50, 12, -7, 25]
@@ -278,7 +278,7 @@ defmodule Adbc.Column.Test do
                data: [
                  inner1 = %Adbc.Column{
                    name: "item",
-                   type: :i32,
+                   type: :s32,
                    nullable: false,
                    metadata: nil,
                    data: [12, -7, 25]
@@ -286,21 +286,21 @@ defmodule Adbc.Column.Test do
                  _inner2 = nil,
                  inner3 = %Adbc.Column{
                    name: "item",
-                   type: :i32,
+                   type: :s32,
                    nullable: false,
                    metadata: nil,
                    data: [0, -127, 127, 50]
                  },
                  inner4 = %Adbc.Column{
                    name: "item",
-                   type: :i32,
+                   type: :s32,
                    nullable: false,
                    metadata: nil,
                    data: []
                  },
                  inner5 = %Adbc.Column{
                    name: "item",
-                   type: :i32,
+                   type: :s32,
                    nullable: false,
                    metadata: nil,
                    data: ~c"2\f"
@@ -333,14 +333,14 @@ defmodule Adbc.Column.Test do
                    data: [
                      ^inner3 = %Adbc.Column{
                        name: "item",
-                       type: :i32,
+                       type: :s32,
                        nullable: false,
                        metadata: nil,
                        data: [0, -127, 127, 50]
                      },
                      ^inner4 = %Adbc.Column{
                        name: "item",
-                       type: :i32,
+                       type: :s32,
                        nullable: false,
                        metadata: nil,
                        data: []
@@ -360,7 +360,7 @@ defmodule Adbc.Column.Test do
                    data: [
                      ^inner1 = %Adbc.Column{
                        name: "item",
-                       type: :i32,
+                       type: :s32,
                        nullable: false,
                        metadata: nil,
                        data: [12, -7, 25]
@@ -376,14 +376,14 @@ defmodule Adbc.Column.Test do
                    data: [
                      ^inner4 = %Adbc.Column{
                        name: "item",
-                       type: :i32,
+                       type: :s32,
                        nullable: false,
                        metadata: nil,
                        data: []
                      },
                      ^inner5 = %Adbc.Column{
                        name: "item",
-                       type: :i32,
+                       type: :s32,
                        nullable: false,
                        metadata: nil,
                        data: ~c"2\f"
@@ -416,7 +416,7 @@ defmodule Adbc.Column.Test do
       #    |- offset = 0                   |- length = 7
       #
       # run-end encoded array:
-      #   run_ends<:i32>: [4, 6, 7]
+      #   run_ends<:s32>: [4, 6, 7]
       #   values<:f32>: [1.0, null, 2.0]
       run_end_array = %Adbc.Column{
         name: "sample_run_end_encoded_array",
@@ -435,7 +435,7 @@ defmodule Adbc.Column.Test do
           },
           run_ends: %Adbc.Column{
             name: "run_ends",
-            type: :i32,
+            type: :s32,
             nullable: false,
             metadata: nil,
             data: [4, 6, 7]
@@ -489,12 +489,12 @@ defmodule Adbc.Column.Test do
       #
       # run-end encoded array: `[1, 2, 2]`
       #   <offset = 2, length = 3>
-      #   run_ends<:i32>: [2, 4, 7]
+      #   run_ends<:s32>: [2, 4, 7]
       #   values: `[1, 1, 2]`
       #     {
       #         <offset = 2, length=3>
-      #         run_ends<:i32>: [4, 6],
-      #         values<:i32>: [1, 2]
+      #         run_ends<:s32>: [4, 6],
+      #         values<:s32>: [1, 2]
       #     }
       inner_run_end_array = %Adbc.Column{
         name: "inner_run_end_encoded_array",
@@ -506,14 +506,14 @@ defmodule Adbc.Column.Test do
         data: %{
           run_ends: %Adbc.Column{
             name: "run_ends",
-            type: :i32,
+            type: :s32,
             nullable: false,
             metadata: nil,
             data: [4, 6]
           },
           values: %Adbc.Column{
             name: "values",
-            type: :i32,
+            type: :s32,
             nullable: false,
             metadata: nil,
             data: [1, 2]
@@ -523,7 +523,7 @@ defmodule Adbc.Column.Test do
 
       assert %Adbc.Column{
                name: "inner_run_end_encoded_array",
-               type: :i32,
+               type: :s32,
                nullable: true,
                metadata: nil,
                data: [1, 1, 2]
@@ -539,7 +539,7 @@ defmodule Adbc.Column.Test do
         data: %{
           run_ends: %Adbc.Column{
             name: "run_ends",
-            type: :i32,
+            type: :s32,
             nullable: false,
             metadata: nil,
             data: [2, 4, 7]
@@ -553,7 +553,7 @@ defmodule Adbc.Column.Test do
                metadata: nil,
                name: "sample_run_end_encoded_array",
                nullable: false,
-               type: :i32
+               type: :s32
              } == Adbc.Column.to_list(run_end_array)
     end
   end
@@ -571,7 +571,7 @@ defmodule Adbc.Column.Test do
       # dictionary
       #    type: VarBinary
       #    values: ['foo', 'bar', 'baz']
-      key = Adbc.Column.i32([0, 1, 0, 1, nil, 2], name: "key", nullable: true)
+      key = Adbc.Column.s32([0, 1, 0, 1, nil, 2], name: "key", nullable: true)
       value = Adbc.Column.string(["foo", "bar", "baz"], name: "value", nullable: false)
       dict = Adbc.Column.dictionary(key, value)
 

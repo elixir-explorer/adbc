@@ -805,7 +805,6 @@ int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct 
 
     if (!skip_dictionary_check) {
         if (schema->dictionary != nullptr && values->dictionary != nullptr) {
-            printf("schema->dictionary != nullptr && values->dictionary != nullptr\n");
             // NANOARROW_TYPE_DICTIONARY
             //
             // For dictionary-encoded arrays, the ArrowSchema.format string 
@@ -849,7 +848,7 @@ int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct 
         } else if (format[0] == 'l') {
             // NANOARROW_TYPE_INT64
             using value_type = int64_t;
-            term_type = kAdbcColumnTypeI64;
+            term_type = kAdbcColumnTypeS64;
             if (count == -1) count = values->length;
             if (count > values->length) count = values->length - offset;
             if (values->n_buffers != 2) {
@@ -867,7 +866,7 @@ int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct 
         } else if (format[0] == 'c') {
             // NANOARROW_TYPE_INT8
             using value_type = int8_t;
-            term_type = kAdbcColumnTypeI8;
+            term_type = kAdbcColumnTypeS8;
             if (count == -1) count = values->length;
             if (count > values->length) count = values->length - offset;
             if (values->n_buffers != 2) {
@@ -885,7 +884,7 @@ int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct 
         } else if (format[0] == 's') {
             // NANOARROW_TYPE_INT16
             using value_type = int16_t;
-            term_type = kAdbcColumnTypeI16;
+            term_type = kAdbcColumnTypeS16;
             if (count == -1) count = values->length;
             if (count > values->length) count = values->length - offset;
             if (values->n_buffers != 2) {
@@ -903,7 +902,7 @@ int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct 
         } else if (format[0] == 'i') {
             // NANOARROW_TYPE_INT32
             using value_type = int32_t;
-            term_type = kAdbcColumnTypeI32;
+            term_type = kAdbcColumnTypeS32;
             if (count == -1) count = values->length;
             if (count > values->length) count = values->length - offset;
             if (values->n_buffers != 2) {

@@ -79,15 +79,15 @@ defmodule Adbc.SQLite.Test do
     {:ok,
      list_result = %Adbc.Result{
        data: [
-         %Adbc.Column{name: "i1", type: :i64, nullable: true, metadata: nil, data: [1]},
-         %Adbc.Column{name: "i2", type: :i64, nullable: true, metadata: nil, data: [2]},
-         %Adbc.Column{name: "i3", type: :i64, nullable: true, metadata: nil, data: [3]},
-         %Adbc.Column{name: "i4", type: :i64, nullable: true, metadata: nil, data: [4]},
-         %Adbc.Column{name: "i5", type: :i64, nullable: true, metadata: nil, data: [5]},
-         %Adbc.Column{name: "i6", type: :i64, nullable: true, metadata: nil, data: [6]},
-         %Adbc.Column{name: "i7", type: :i64, nullable: true, metadata: nil, data: ~c"\a"},
-         %Adbc.Column{name: "i8", type: :i64, nullable: true, metadata: nil, data: ~c"\b"},
-         %Adbc.Column{name: "i9", type: :i64, nullable: true, metadata: nil, data: ~c"\t"},
+         %Adbc.Column{name: "i1", type: :s64, nullable: true, metadata: nil, data: [1]},
+         %Adbc.Column{name: "i2", type: :s64, nullable: true, metadata: nil, data: [2]},
+         %Adbc.Column{name: "i3", type: :s64, nullable: true, metadata: nil, data: [3]},
+         %Adbc.Column{name: "i4", type: :s64, nullable: true, metadata: nil, data: [4]},
+         %Adbc.Column{name: "i5", type: :s64, nullable: true, metadata: nil, data: [5]},
+         %Adbc.Column{name: "i6", type: :s64, nullable: true, metadata: nil, data: [6]},
+         %Adbc.Column{name: "i7", type: :s64, nullable: true, metadata: nil, data: ~c"\a"},
+         %Adbc.Column{name: "i8", type: :s64, nullable: true, metadata: nil, data: ~c"\b"},
+         %Adbc.Column{name: "i9", type: :s64, nullable: true, metadata: nil, data: ~c"\t"},
          %Adbc.Column{name: "t1", type: :string, nullable: true, metadata: nil, data: ["hello"]},
          %Adbc.Column{name: "t2", type: :string, nullable: true, metadata: nil, data: ["world"]},
          %Adbc.Column{
@@ -113,7 +113,7 @@ defmodule Adbc.SQLite.Test do
          %Adbc.Column{name: "r4", type: :f64, nullable: true, metadata: nil, data: [4.4]},
          %Adbc.Column{name: "n1", type: :f64, nullable: true, metadata: nil, data: [1.1]},
          %Adbc.Column{name: "n2", type: :f64, nullable: true, metadata: nil, data: [2.2]},
-         %Adbc.Column{name: "n3", type: :i64, nullable: true, metadata: nil, data: [1]},
+         %Adbc.Column{name: "n3", type: :s64, nullable: true, metadata: nil, data: [1]},
          %Adbc.Column{
            name: "n4",
            type: :string,
@@ -168,10 +168,10 @@ defmodule Adbc.SQLite.Test do
       VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       """,
       [
-        Adbc.Column.i8([1]),
-        Adbc.Column.i16([2]),
-        Adbc.Column.i32([3]),
-        Adbc.Column.i64([4]),
+        Adbc.Column.s8([1]),
+        Adbc.Column.s16([2]),
+        Adbc.Column.s32([3]),
+        Adbc.Column.s64([4]),
         Adbc.Column.u8([5]),
         Adbc.Column.u16([6]),
         Adbc.Column.u32([7]),
@@ -200,15 +200,15 @@ defmodule Adbc.SQLite.Test do
      %Adbc.Result{
        num_rows: nil,
        data: [
-         %Adbc.Column{name: "i1", type: :i64, nullable: true, metadata: nil, data: [1]},
-         %Adbc.Column{name: "i2", type: :i64, nullable: true, metadata: nil, data: [2]},
-         %Adbc.Column{name: "i3", type: :i64, nullable: true, metadata: nil, data: [3]},
-         %Adbc.Column{name: "i4", type: :i64, nullable: true, metadata: nil, data: [4]},
-         %Adbc.Column{name: "i5", type: :i64, nullable: true, metadata: nil, data: [5]},
-         %Adbc.Column{name: "i6", type: :i64, nullable: true, metadata: nil, data: [6]},
-         %Adbc.Column{name: "i7", type: :i64, nullable: true, metadata: nil, data: ~c"\a"},
-         %Adbc.Column{name: "i8", type: :i64, nullable: true, metadata: nil, data: ~c"\b"},
-         %Adbc.Column{name: "i9", type: :i64, nullable: true, metadata: nil, data: ~c"\t"},
+         %Adbc.Column{name: "i1", type: :s64, nullable: true, metadata: nil, data: [1]},
+         %Adbc.Column{name: "i2", type: :s64, nullable: true, metadata: nil, data: [2]},
+         %Adbc.Column{name: "i3", type: :s64, nullable: true, metadata: nil, data: [3]},
+         %Adbc.Column{name: "i4", type: :s64, nullable: true, metadata: nil, data: [4]},
+         %Adbc.Column{name: "i5", type: :s64, nullable: true, metadata: nil, data: [5]},
+         %Adbc.Column{name: "i6", type: :s64, nullable: true, metadata: nil, data: [6]},
+         %Adbc.Column{name: "i7", type: :s64, nullable: true, metadata: nil, data: ~c"\a"},
+         %Adbc.Column{name: "i8", type: :s64, nullable: true, metadata: nil, data: ~c"\b"},
+         %Adbc.Column{name: "i9", type: :s64, nullable: true, metadata: nil, data: ~c"\t"},
          %Adbc.Column{name: "t1", type: :string, nullable: true, metadata: nil, data: ["hello"]},
          %Adbc.Column{name: "t2", type: :string, nullable: true, metadata: nil, data: ["world"]},
          %Adbc.Column{
@@ -246,7 +246,7 @@ defmodule Adbc.SQLite.Test do
          %Adbc.Column{name: "r4", type: :f64, nullable: true, metadata: nil, data: [4.4]},
          %Adbc.Column{name: "n1", type: :f64, nullable: true, metadata: nil, data: [1.1]},
          %Adbc.Column{name: "n2", type: :f64, nullable: true, metadata: nil, data: [2.2]},
-         %Adbc.Column{name: "n3", type: :i64, nullable: true, metadata: nil, data: [1]},
+         %Adbc.Column{name: "n3", type: :s64, nullable: true, metadata: nil, data: [1]},
          %Adbc.Column{
            name: "n4",
            type: :string,
@@ -276,9 +276,9 @@ defmodule Adbc.SQLite.Test do
                 %Adbc.Column{
                   data: [1, 2],
                   metadata: nil,
-                  name: "I64",
+                  name: "S64",
                   nullable: true,
-                  type: :i64
+                  type: :s64
                 },
                 %Adbc.Column{
                   name: "F64",
@@ -290,8 +290,8 @@ defmodule Adbc.SQLite.Test do
               ],
               num_rows: nil
             }} =
-             Connection.query(conn, "SELECT ? AS I64, ? AS F64", [
-               Adbc.Column.i64([1, 2]),
+             Connection.query(conn, "SELECT ? AS S64, ? AS F64", [
+               Adbc.Column.s64([1, 2]),
                Adbc.Column.f64([3.3, 4.4])
              ])
   end

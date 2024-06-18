@@ -840,13 +840,13 @@ static int on_load(ErlNifEnv *env, void **, ERL_NIF_TERM) {
     kAtomDataKey = erlang::nif::atom(env, "data");
 
     kAdbcColumnTypeBool = erlang::nif::atom(env, "boolean");
-    kAdbcColumnTypeI8 = erlang::nif::atom(env, "i8");
+    kAdbcColumnTypeS8 = erlang::nif::atom(env, "s8");
     kAdbcColumnTypeU8 = erlang::nif::atom(env, "u8");
-    kAdbcColumnTypeI16 = erlang::nif::atom(env, "i16");
+    kAdbcColumnTypeS16 = erlang::nif::atom(env, "s16");
     kAdbcColumnTypeU16 = erlang::nif::atom(env, "u16");
-    kAdbcColumnTypeI32 = erlang::nif::atom(env, "i32");
+    kAdbcColumnTypeS32 = erlang::nif::atom(env, "s32");
     kAdbcColumnTypeU32 = erlang::nif::atom(env, "u32");
-    kAdbcColumnTypeI64 = erlang::nif::atom(env, "i64");
+    kAdbcColumnTypeS64 = erlang::nif::atom(env, "s64");
     kAdbcColumnTypeU64 = erlang::nif::atom(env, "u64");
     kAdbcColumnTypeF16 = erlang::nif::atom(env, "f16");
     kAdbcColumnTypeF32 = erlang::nif::atom(env, "f32");

@@ -359,7 +359,62 @@ int do_get_list_decimal(ErlNifEnv *env, ERL_NIF_TERM list, bool nullable, ArrowT
     return ret;
 }
 
-int get_list_string(ErlNifEnv *env, ERL_NIF_TERM list, bool nullable, const std::function<int(struct ArrowStringView val, bool is_nil)> &callback) {
+int do_get_dictionary(ErlNifEnv *env, ERL_NIF_TERM dict, bool nullable, struct ArrowArray* array_out, struct ArrowSchema* schema_out, struct ArrowError* error_out) {
+    ERL_NIF_TERM key_term, value_term;
+    if (!enif_get_map_value(env, dict, kAtomKey, &key_term)) {
+        return kErrorBufferGetMapValue;
+    }
+    if (!enif_get_map_value(env, dict, kAtomValue, &value_term)) {
+        return kErrorBufferGetMapValue;
+    }
+
+    struct AdbcColumnNifTerm keys, values;
+    int ret = AdbcColumnNifTerm::from_term(env, key_term, false, &keys);
+    if (ret != 0) return ret;
+    ret = AdbcColumnNifTerm::from_term(env, value_term, false, &values);
+    if (ret != 0) return ret;
+
+    struct AdbcColumnType key_type = adbc_column_type_to_nanoarrow_type(env, keys.type_term);
+    if (!key_type.valid) {
+        return 1;
+    }
+
+    // Although unsigned integers are not recommended by Arrow, they can still be used as keys
+    // See https://arrow.apache.org/docs/format/Columnar.html#dictionary-encoded-layout
+    if (key_type.arrow_type != NANOARROW_TYPE_INT8 &&
+        key_type.arrow_type != NANOARROW_TYPE_INT16 &&
+        key_type.arrow_type != NANOARROW_TYPE_INT32 &&
+        key_type.arrow_type != NANOARROW_TYPE_INT64 &&
+        key_type.arrow_type != NANOARROW_TYPE_UINT8 &&
+        key_type.arrow_type != NANOARROW_TYPE_UINT16 &&
+        key_type.arrow_type != NANOARROW_TYPE_UINT32 &&
+        key_type.arrow_type != NANOARROW_TYPE_UINT64) {
+        return 1;
+    }
+
+    ret = adbc_column_to_adbc_field(env, &keys, true, false, array_out, schema_out, error_out);
+    if (ret != 0) {
+        goto failed;
+    }
+
+    NANOARROW_RETURN_NOT_OK(ArrowSchemaAllocateDictionary(schema_out));
+    NANOARROW_RETURN_NOT_OK(ArrowArrayAllocateDictionary(array_out));
+
+    ret = adbc_column_to_adbc_field(env, &values, true, false, array_out->dictionary, schema_out->dictionary, error_out);
+    if (ret == 0) return ret;
+
+failed:
+    if (schema_out->release != nullptr) {
+        schema_out->release(schema_out);
+        schema_out->release = nullptr;
+    }
+    if (array_out->release != nullptr) {
+        array_out->release(array_out);
+        array_out->release = nullptr;
+    }
+    return ret;
+}
+
     ERL_NIF_TERM head, tail;
     tail = list;
     while (enif_get_list_cell(env, tail, &head, &tail)) {
@@ -1197,13 +1252,19 @@ int must_be_adbc_column(ErlNifEnv *env,
     if (!enif_get_map_value(env, adbc_column, kAtomDataKey, &data_term)) {
         return kErrorBufferGetMapValue;
     }
-    if (!enif_is_list(env, data_term)) {
-        return kErrorBufferDataIsNotAList;
-    }
 
-    if (n_items) {
-        if (!enif_get_list_length(env, data_term, n_items)) {
-            return kErrorBufferGetDataListLength;
+    if (enif_is_identical(type_term, kAdbcColumnTypeDictionary)) {
+        if (!enif_is_map(env, data_term)) {
+            return kErrorBufferDataIsNotAMap;
+        }
+    } else {
+        if (!enif_is_list(env, data_term)) {
+            return kErrorBufferDataIsNotAList;
+        }
+        if (n_items) {
+            if (!enif_get_list_length(env, data_term, n_items)) {
+                return kErrorBufferGetDataListLength;
+            }
         }
     }
 
@@ -1254,6 +1315,8 @@ struct AdbcColumnType adbc_column_type_to_nanoarrow_type(ErlNifEnv *env, ERL_NIF
         ret.arrow_type = NANOARROW_TYPE_LIST;
     } else if (enif_is_identical(type_term, kAdbcColumnTypeLargeList)) {
         ret.arrow_type = NANOARROW_TYPE_LARGE_LIST;
+    } else if (enif_is_identical(type_term, kAdbcColumnTypeDictionary)) {
+        ret.arrow_type = NANOARROW_TYPE_DICTIONARY;
     } else if (enif_is_tuple(env, type_term)) {
         if (enif_is_identical(type_term, kAdbcColumnTypeTime32Seconds)) {
             ret.arrow_type = NANOARROW_TYPE_TIME32;
@@ -1406,6 +1469,8 @@ int adbc_column_to_adbc_field(ErlNifEnv *env, struct AdbcColumnNifTerm * column,
         ArrowBufferReset(&metadata_buffer);
     }
 
+    schema_out->flags |= nullable ? ARROW_FLAG_NULLABLE : schema_out->flags;
+
     // Data types can be found here:
     // https://arrow.apache.org/docs/format/CDataInterface.html
     struct AdbcColumnType column_type = adbc_column_type_to_nanoarrow_type(env, column->type_term);
@@ -1474,6 +1539,8 @@ int adbc_column_to_adbc_field(ErlNifEnv *env, struct AdbcColumnNifTerm * column,
         ret = do_get_list_fixed_size_binary(env, data_term, nullable, column_type.arrow_type, column_type.fixed_size, array_out, schema_out, error_out);
     } else if (column_type.arrow_type == NANOARROW_TYPE_DECIMAL128 || column_type.arrow_type == NANOARROW_TYPE_DECIMAL256) {
         ret = do_get_list_decimal(env, data_term, nullable, column_type.arrow_type, column_type.bits, column_type.precision, column_type.scale, array_out, schema_out, error_out);
+    } else if (column_type.arrow_type == NANOARROW_TYPE_DICTIONARY) {
+        ret = do_get_dictionary(env, data_term, nullable, array_out, schema_out, error_out);
     }
 
     if (ret == kErrorBufferUnknownType) {
@@ -1489,9 +1556,14 @@ int adbc_column_to_adbc_field(ErlNifEnv *env, ERL_NIF_TERM adbc_column, bool all
         return ret;
     }
 
-    ret = adbc_column_to_adbc_field(env, &column, allow_nil, false, array_out, schema_out, error_out);
+    bool skip_init = false;
+    ret = adbc_column_to_adbc_field(env, &column, allow_nil, skip_init, array_out, schema_out, error_out);
     if (n_items) {
-        *n_items = column.n_items;
+        if (array_out->dictionary && schema_out->dictionary) {
+            *n_items = array_out->length;
+        } else {
+            *n_items = column.n_items;
+        }
     }
     return ret;
 }
@@ -1578,7 +1650,9 @@ int adbc_column_to_arrow_type_struct(ErlNifEnv *env, ERL_NIF_TERM values, struct
         } else if (enif_is_map(env, head)) {
             unsigned n_items = 0;
             int ret = adbc_column_to_adbc_field(env, head, false, child_i, schema_i, error_out, &n_items);
-            array_out->length = n_items;
+            if (array_out->length == 1 && n_items != 0) {
+                array_out->length = n_items;
+            }
             switch (ret)
             {
             case kErrorBufferIsNotAMap:
@@ -1591,6 +1665,9 @@ int adbc_column_to_arrow_type_struct(ErlNifEnv *env, ERL_NIF_TERM values, struct
             case kErrorBufferGetDataListLength:
             case kErrorBufferDataIsNotAList:
                 snprintf(error_out->message, sizeof(error_out->message), "Expected the `data` field of `Adbc.Column` to be a list of values.");
+                return 1;
+            case kErrorBufferDataIsNotAMap:
+                snprintf(error_out->message, sizeof(error_out->message), "Expected the `data` field of dictionary `Adbc.Column` to be a map.");
                 return 1;
             case kErrorBufferUnknownType:
             case kErrorBufferGetMetadataKey:

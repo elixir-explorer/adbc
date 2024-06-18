@@ -792,7 +792,8 @@ defmodule Adbc.Column do
 
   """
   @spec fixed_size_binary([iodata() | nil], non_neg_integer(), Keyword.t()) :: %Adbc.Column{}
-  def fixed_size_binary(data, nbytes, opts \\ []) when is_list(data) and is_list(opts) do
+  def fixed_size_binary(data, nbytes, opts \\ [])
+      when is_list(data) and is_integer(nbytes) and is_list(opts) do
     column({:fixed_size_binary, nbytes}, data, opts)
   end
 

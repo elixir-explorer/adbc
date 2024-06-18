@@ -130,10 +130,11 @@ constexpr int kErrorBufferGetDataListLength = 2;
 constexpr int kErrorBufferGetMapValue = 3;
 constexpr int kErrorBufferWrongStruct = 4;
 constexpr int kErrorBufferDataIsNotAList = 5;
-constexpr int kErrorBufferUnknownType = 6;
-constexpr int kErrorBufferGetMetadataKey = 7;
-constexpr int kErrorBufferGetMetadataValue = 8;
-constexpr int kErrorExpectedCalendarISO = 9;
-constexpr int kErrorInternalError = 10;
+constexpr int kErrorBufferDataIsNotAMap = 6;
+constexpr int kErrorBufferUnknownType = 7;
+constexpr int kErrorBufferGetMetadataKey = 8;
+constexpr int kErrorBufferGetMetadataValue = 9;
+constexpr int kErrorExpectedCalendarISO = 10;
+constexpr int kErrorInternalError = 11;
 
 #endif  // ADBC_CONSTS_H

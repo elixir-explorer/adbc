@@ -10,12 +10,10 @@
 
 #### Fix
 * Boolean arrays are now correctly parsed.
+* Include `CMakeLists.txt` in package files
 
 #### Added
 * Added support for dictionary encoded array
-
-#### Fix
-* Include `CMakeLists.txt` in package files
 
 ## v0.4.2
 

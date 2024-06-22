@@ -1,4 +1,5 @@
 #ifndef ADBC_ARROW_ARRAY_HPP
+#define ADBC_ARROW_ARRAY_HPP
 #pragma once
 
 #include <stdio.h>
@@ -9,6 +10,7 @@
 #include <adbc.h>
 #include <erl_nif.h>
 #include "adbc_half_float.hpp"
+#include "adbc_arrow_metadata.hpp"
 
 static int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct ArrowArray * values, uint64_t level, std::vector<ERL_NIF_TERM> &out_terms, ERL_NIF_TERM &value_type, ERL_NIF_TERM &metadata, ERL_NIF_TERM &error, bool *end_of_series = nullptr, bool skip_dictionary_check = false);
 static int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct ArrowArray * values, int64_t offset, int64_t count, int64_t level, std::vector<ERL_NIF_TERM> &out_terms, ERL_NIF_TERM &value_type, ERL_NIF_TERM &metadata, ERL_NIF_TERM &error, bool *end_of_series = nullptr, bool skip_dictionary_check = false);
@@ -779,29 +781,13 @@ int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct 
     }
 
     term_type = kAtomNil;
-    arrow_metadata = kAtomNil;
     std::vector<ERL_NIF_TERM> children;
 
     constexpr int64_t bitmap_buffer_index = 0;
     int64_t data_buffer_index = 1;
     int64_t offset_buffer_index = 2;
 
-    std::vector<ERL_NIF_TERM> metadata_keys, metadata_values;
-    if (schema->metadata) {
-        struct ArrowMetadataReader metadata_reader{};
-        struct ArrowStringView key;
-        struct ArrowStringView value;
-        if (ArrowMetadataReaderInit(&metadata_reader, schema->metadata) == NANOARROW_OK) {
-            while (ArrowMetadataReaderRead(&metadata_reader, &key, &value) == NANOARROW_OK) {
-                // printf("key: %.*s, value: %.*s\n", (int)key.size_bytes, key.data, (int)value.size_bytes, value.data);
-                metadata_keys.push_back(erlang::nif::make_binary(env, key.data, (size_t)key.size_bytes));
-                metadata_values.push_back(erlang::nif::make_binary(env, value.data, (size_t)value.size_bytes));
-            }
-            if (metadata_keys.size() > 0) {
-                enif_make_map_from_arrays(env, metadata_keys.data(), metadata_values.data(), (unsigned)metadata_keys.size(), &arrow_metadata);
-            }
-        }
-    }
+    NANOARROW_RETURN_NOT_OK(arrow_metadata_to_nif_term(env, schema->metadata, &arrow_metadata));
 
     if (!skip_dictionary_check) {
         if (schema->dictionary != nullptr && values->dictionary != nullptr) {

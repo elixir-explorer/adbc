@@ -493,6 +493,10 @@ static ERL_NIF_TERM adbc_arrow_array_stream_next(ErlNifEnv *env, int argc, const
         const char * reason = res->val.get_last_error(&res->val);
         return erlang::nif::error(env, reason ? reason : "unknown error");
     }
+    // if no error and the array is released, the stream has ended
+    if (out.release == nullptr) {
+        return kAtomEndOfSeries;
+    }
 
     if (res->private_data == nullptr) {
         res->private_data = enif_alloc(sizeof(struct ArrowSchema));
@@ -506,20 +510,13 @@ static ERL_NIF_TERM adbc_arrow_array_stream_next(ErlNifEnv *env, int argc, const
         }
     }
 
+    auto schema = (struct ArrowSchema *)res->private_data;
     std::vector<ERL_NIF_TERM> out_terms;
-    auto schema = (struct ArrowSchema*)res->private_data;
-    bool end_of_series = false;
     ERL_NIF_TERM out_type;
     ERL_NIF_TERM out_metadata;
-    if (arrow_array_to_nif_term(env, schema, &out, 0, out_terms, out_type, out_metadata, error, &end_of_series) == 1) {
+    if (arrow_array_to_nif_term(env, schema, &out, 0, out_terms, out_type, out_metadata, error) == 1) {
         if (out.release) out.release(&out);
         return error;
-    }
-    if (end_of_series) {
-        if (out.release) {
-            out.release(&out);
-        }
-        return kAtomEndOfSeries;
     }
 
     if (out_terms.size() == 1) {

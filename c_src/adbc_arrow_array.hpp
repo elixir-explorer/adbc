@@ -12,8 +12,8 @@
 #include "adbc_half_float.hpp"
 #include "adbc_arrow_metadata.hpp"
 
-static int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct ArrowArray * values, uint64_t level, std::vector<ERL_NIF_TERM> &out_terms, ERL_NIF_TERM &value_type, ERL_NIF_TERM &metadata, ERL_NIF_TERM &error, bool *end_of_series = nullptr, bool skip_dictionary_check = false);
-static int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct ArrowArray * values, int64_t offset, int64_t count, int64_t level, std::vector<ERL_NIF_TERM> &out_terms, ERL_NIF_TERM &value_type, ERL_NIF_TERM &metadata, ERL_NIF_TERM &error, bool *end_of_series = nullptr, bool skip_dictionary_check = false);
+static int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct ArrowArray * values, uint64_t level, std::vector<ERL_NIF_TERM> &out_terms, ERL_NIF_TERM &value_type, ERL_NIF_TERM &metadata, ERL_NIF_TERM &error, bool skip_dictionary_check = false);
+static int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct ArrowArray * values, int64_t offset, int64_t count, int64_t level, std::vector<ERL_NIF_TERM> &out_terms, ERL_NIF_TERM &value_type, ERL_NIF_TERM &metadata, ERL_NIF_TERM &error, bool skip_dictionary_check = false);
 static int get_arrow_array_children_as_list(ErlNifEnv *env, struct ArrowSchema * schema, struct ArrowArray * values, uint64_t level, std::vector<ERL_NIF_TERM> &children, ERL_NIF_TERM &error);
 static int get_arrow_array_children_as_list(ErlNifEnv *env, struct ArrowSchema * schema, struct ArrowArray * values, int64_t offset, int64_t count, uint64_t level, std::vector<ERL_NIF_TERM> &children, ERL_NIF_TERM &error);
 static int get_arrow_struct(ErlNifEnv *env, struct ArrowSchema * schema, struct ArrowArray * values, uint64_t level, std::vector<ERL_NIF_TERM> &children, ERL_NIF_TERM &error);
@@ -277,10 +277,10 @@ int get_arrow_dictionary(ErlNifEnv *env,
     std::vector<ERL_NIF_TERM> keys, values;
     ERL_NIF_TERM index_type, index_metadata;
     ERL_NIF_TERM value_type, value_metadata;
-    if (arrow_array_to_nif_term(env, index_schema, index_array, offset, count, level + 1, keys, index_type, index_metadata, error, nullptr, true) == 1) {
+    if (arrow_array_to_nif_term(env, index_schema, index_array, offset, count, level + 1, keys, index_type, index_metadata, error, true) == 1) {
         return 1;
     }
-    if (arrow_array_to_nif_term(env, value_schema, value_array, offset, count, level + 1, values, value_type, value_metadata, error, nullptr, false) == 1) {
+    if (arrow_array_to_nif_term(env, value_schema, value_array, offset, count, level + 1, values, value_type, value_metadata, error, false) == 1) {
         return 1;
     }
 
@@ -755,7 +755,7 @@ ERL_NIF_TERM get_arrow_array_list_view(ErlNifEnv *env, struct ArrowSchema * sche
     return get_arrow_array_list_view(env, schema, values, 0, -1, level, list_type);
 }
 
-int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct ArrowArray * values, int64_t offset, int64_t count, int64_t level, std::vector<ERL_NIF_TERM> &out_terms, ERL_NIF_TERM &term_type, ERL_NIF_TERM &arrow_metadata, ERL_NIF_TERM &error, bool *end_of_series, bool skip_dictionary_check) {
+int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct ArrowArray * values, int64_t offset, int64_t count, int64_t level, std::vector<ERL_NIF_TERM> &out_terms, ERL_NIF_TERM &term_type, ERL_NIF_TERM &arrow_metadata, ERL_NIF_TERM &error, bool skip_dictionary_check) {
     if (schema == nullptr) {
         error = erlang::nif::error(env, "invalid ArrowSchema (nullptr) when invoking next");
         return 1;
@@ -770,15 +770,6 @@ int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct 
     const char* name = schema->name ? schema->name : "";
     ERL_NIF_TERM current_term{}, children_term{};
     size_t format_len = strlen(format);
-
-    if (level == 0 && format_len == 2 && strncmp("+s", format, 2) == 0 && values->length == 0) {
-        if (end_of_series) {
-            *end_of_series = true;
-        }
-        out_terms.clear();
-        out_terms.emplace_back(kAtomEndOfSeries);
-        return 0;
-    }
 
     term_type = kAtomNil;
     std::vector<ERL_NIF_TERM> children;
@@ -1721,8 +1712,8 @@ int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct 
     return 0;
 }
 
-int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct ArrowArray * values, uint64_t level, std::vector<ERL_NIF_TERM> &out_terms, ERL_NIF_TERM &out_type, ERL_NIF_TERM &metadata, ERL_NIF_TERM &error, bool *end_of_series, bool skip_dictionary_check) {
-    return arrow_array_to_nif_term(env, schema, values, 0, -1, level, out_terms, out_type, metadata, error, end_of_series, skip_dictionary_check);
+int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct ArrowArray * values, uint64_t level, std::vector<ERL_NIF_TERM> &out_terms, ERL_NIF_TERM &out_type, ERL_NIF_TERM &metadata, ERL_NIF_TERM &error, bool skip_dictionary_check) {
+    return arrow_array_to_nif_term(env, schema, values, 0, -1, level, out_terms, out_type, metadata, error, skip_dictionary_check);
 }
 
 #endif  // ADBC_ARROW_ARRAY_HPP

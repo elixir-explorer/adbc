@@ -97,6 +97,35 @@ int AdbcColumnNifTerm::from_term(ErlNifEnv *env, ERL_NIF_TERM adbc_column, bool 
     return 0;
 }
 
+ERL_NIF_TERM make_adbc_column(ErlNifEnv *env, struct ArrowSchema * schema, ERL_NIF_TERM type_term, ERL_NIF_TERM metadata, bool with_data_key = false) {
+    ERL_NIF_TERM nullable_term = schema->flags & ARROW_FLAG_NULLABLE ? kAtomTrue : kAtomFalse;
+    ERL_NIF_TERM name_term = erlang::nif::make_binary(env, schema->name == nullptr ? "" : schema->name);
+
+    std::vector<ERL_NIF_TERM> keys = {
+        kAtomStructKey,
+        kAtomNameKey,
+        kAtomTypeKey,
+        kAtomNullableKey,
+        kAtomMetadataKey,
+    };
+    std::vector<ERL_NIF_TERM> values = {
+        kAtomAdbcColumnModule,
+        name_term,
+        type_term,
+        nullable_term,
+        metadata,
+    };
+
+    if (with_data_key) {
+        keys.emplace_back(kAtomDataKey);
+        values.emplace_back(kAtomNil);
+    }
+
+    ERL_NIF_TERM adbc_column;
+    enif_make_map_from_arrays(env, keys.data(), values.data(), (unsigned)values.size(), &adbc_column);
+    return adbc_column;
+}
+
 ERL_NIF_TERM make_adbc_column(ErlNifEnv *env, struct ArrowSchema * schema, struct ArrowArray * array, ERL_NIF_TERM name_term, ERL_NIF_TERM type_term, bool nullable, ERL_NIF_TERM metadata, ERL_NIF_TERM data) {
     ERL_NIF_TERM nullable_term = nullable ? kAtomTrue : kAtomFalse;
 
@@ -117,7 +146,7 @@ ERL_NIF_TERM make_adbc_column(ErlNifEnv *env, struct ArrowSchema * schema, struc
         data,
     };
 
-    if (enif_is_identical(type_term, kAdbcColumnTypeRunEndEncoded)) {
+    if (enif_is_identical(type_term, kAdbcColumnTypeRunEndEncoded) && array != nullptr) {
         keys.emplace_back(kAtomLength);
         values.emplace_back(enif_make_int64(env, array->length));
         keys.emplace_back(kAtomOffset);

@@ -517,10 +517,10 @@ ERL_NIF_TERM get_arrow_run_end_encoded(ErlNifEnv *env, struct ArrowSchema * sche
     if (schema->children == nullptr || values->children == nullptr) {
         return erlang::nif::error(env, "invalid ArrowArray (run_end_encoded), schema->children == nullptr || values->children == nullptr");
     }
-    if (strncmp("run_ends", schema->children[0]->name, 8) != 0) {
+    if (strcmp("run_ends", schema->children[0]->name) != 0) {
         return erlang::nif::error(env, "invalid ArrowSchema (run_end_encoded), its first child is not named run_ends");
     }
-    if (strncmp("values", schema->children[1]->name, 6) != 0) {
+    if (strcmp("values", schema->children[1]->name) != 0) {
         return erlang::nif::error(env, "invalid ArrowSchema (run_end_encoded), its second child is not named values");
     }
 
@@ -580,7 +580,7 @@ ERL_NIF_TERM get_arrow_array_list_children(ErlNifEnv *env, struct ArrowSchema * 
     const uint8_t * bitmap_buffer = (const uint8_t *)values->buffers[bitmap_buffer_index];
     struct ArrowSchema * items_schema = schema->children[0];
     struct ArrowArray * items_values = values->children[0];
-    if (strncmp("item", items_schema->name, 4) != 0) {
+    if (strcmp("item", items_schema->name) != 0) {
         return erlang::nif::error(env, "invalid ArrowSchema (list), its single child is not named item");
     }
 
@@ -704,7 +704,7 @@ ERL_NIF_TERM get_arrow_array_list_view(ErlNifEnv *env, struct ArrowSchema * sche
 
     struct ArrowSchema * items_schema = schema->children[0];
     struct ArrowArray * items_values = values->children[0];
-    if (strncmp("item", items_schema->name, 4) != 0) {
+    if (strcmp("item", items_schema->name) != 0) {
         return erlang::nif::error(env, "invalid ArrowSchema (list), its single child is not named item");
     }
     if (count == -1) count = values->length;

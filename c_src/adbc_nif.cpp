@@ -8,6 +8,7 @@
 #include "nif_utils.hpp"
 #include "adbc_consts.h"
 #include "adbc_column.hpp"
+#include "adbc_arrow_schema.hpp"
 #include "adbc_arrow_array.hpp"
 
 template<> ErlNifResourceType * NifRes<struct AdbcDatabase>::type = nullptr;
@@ -15,6 +16,7 @@ template<> ErlNifResourceType * NifRes<struct AdbcConnection>::type = nullptr;
 template<> ErlNifResourceType * NifRes<struct AdbcStatement>::type = nullptr;
 template<> ErlNifResourceType * NifRes<struct AdbcError>::type = nullptr;
 template<> ErlNifResourceType * NifRes<struct ArrowArrayStream>::type = nullptr;
+template<> ErlNifResourceType * NifRes<struct ArrowArrayStreamRecord>::type = nullptr;
 
 static ERL_NIF_TERM nif_error_from_adbc_error(ErlNifEnv *env, struct AdbcError * adbc_error) {
     char const* message = (adbc_error->message == nullptr) ? "unknown error" : adbc_error->message;
@@ -476,10 +478,14 @@ static ERL_NIF_TERM adbc_arrow_array_stream_get_pointer(ErlNifEnv *env, int argc
 
 static ERL_NIF_TERM adbc_arrow_array_stream_next(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
     using res_type = NifRes<struct ArrowArrayStream>;
-    ERL_NIF_TERM ret{};
+    using record_type = NifRes<struct ArrowArrayStreamRecord>;
     ERL_NIF_TERM error{};
 
     res_type * res = nullptr;
+    struct ArrowSchema * schema = nullptr;
+    std::vector<ERL_NIF_TERM> out_terms;
+    ERL_NIF_TERM record_data;
+
     if ((res = res_type::get_resource(env, argv[0], error)) == nullptr) {
         return error;
     }
@@ -487,50 +493,154 @@ static ERL_NIF_TERM adbc_arrow_array_stream_next(ErlNifEnv *env, int argc, const
         return enif_make_badarg(env);
     }
 
-    struct ArrowArray out{};
-    int code = res->val.get_next(&res->val, &out);
+    auto * record = record_type::allocate_resource(env, error);
+    if (record == nullptr) {
+        return error;
+    }
+    record->val.values = (struct ArrowArray *)enif_alloc(sizeof(struct ArrowArray));
+    if (record->val.values == nullptr) {
+        return erlang::nif::error(env, "out of memory");
+    }
+    int code = res->val.get_next(&res->val, record->val.values);
     if (code != 0) {
         const char * reason = res->val.get_last_error(&res->val);
-        return erlang::nif::error(env, reason ? reason : "unknown error");
+        return erlang::nif::error(env, reason ? reason : "unknown error: cannot get next record with record->val.values");
     }
     // if no error and the array is released, the stream has ended
-    if (out.release == nullptr) {
+    if (record->val.values->release == nullptr) {
+        enif_free(record->val.values);
+        record->val.values = nullptr;
         return kAtomEndOfSeries;
     }
 
     if (res->private_data == nullptr) {
+        const char * reason = nullptr;
         res->private_data = enif_alloc(sizeof(struct ArrowSchema));
-        memset(res->private_data, 0, sizeof(struct ArrowSchema));
-        code = res->val.get_schema(&res->val, (struct ArrowSchema *)res->private_data);
+        if (res->private_data != nullptr) {
+            memset(res->private_data, 0, sizeof(struct ArrowSchema));
+            code = res->val.get_schema(&res->val, (struct ArrowSchema *)res->private_data);
+        } else {
+            reason = "out of memory";
+        }
+
+        // if `res->private_data` was null, `code` will still be 0
         if (code != 0) {
-            const char * reason = res->val.get_last_error(&res->val);
+            reason = res->val.get_last_error(&res->val);
             enif_free(res->private_data);
             res->private_data = nullptr;
-            return erlang::nif::error(env, reason ? reason : "unknown error");
+        }
+
+        if (res->private_data == nullptr) {
+            error = erlang::nif::error(env, reason ? reason : "unknown error");
+            goto release_record_values;
         }
     }
+    schema = (struct ArrowSchema *)res->private_data;
 
-    auto schema = (struct ArrowSchema *)res->private_data;
-    std::vector<ERL_NIF_TERM> out_terms;
-    ERL_NIF_TERM out_type;
-    ERL_NIF_TERM out_metadata;
-    if (arrow_array_to_nif_term(env, schema, &out, 0, out_terms, out_type, out_metadata, error) == 1) {
-        if (out.release) out.release(&out);
-        return error;
+    record->val.schema = (struct ArrowSchema*)enif_alloc(sizeof(struct ArrowSchema));
+    if (record->val.schema == nullptr) {
+        error = erlang::nif::error(env, "out of memory");
+        goto release_private_data;
     }
 
-    if (out_terms.size() == 1) {
-        ret = out_terms[0];
+    memset(record->val.schema, 0, sizeof(struct ArrowSchema));
+    if (ArrowSchemaDeepCopy((struct ArrowSchema *)res->private_data, record->val.schema) != NANOARROW_OK) {
+        enif_free(record->val.schema);
+        record->val.schema = nullptr;
+        
+        error = erlang::nif::error(env, "cannot copy schema");
+        goto release_private_data;
+    }
+
+    record_data = record->make_resource(env);
+    if (arrow_schema_to_nif_term(env, schema, out_terms, error) != 0) {
+        // error is already set in arrow_schema_to_nif_term
+        goto release_record_schema;
+    }
+
+    return enif_make_tuple3(env, erlang::nif::ok(env), out_terms[0], record_data);
+
+release_record_schema:
+    if (record->val.schema->release) {
+        record->val.schema->release(record->val.schema);
+    }
+    enif_free(record->val.schema);
+    record->val.schema = nullptr;
+
+release_private_data:
+    if (schema && schema->release) {
+        schema->release(schema);
+        schema = nullptr;
+    }
+    enif_free(res->private_data);
+    res->private_data = nullptr;
+
+release_record_values:
+    // `record->val.values->release` cannot be null as we checked earlier
+    record->val.values->release(record->val.values);
+    enif_free(record->val.values);
+    record->val.values = nullptr;
+
+    return error;
+}
+
+static ERL_NIF_TERM adbc_column_materialize(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
+    using record_type = NifRes<struct ArrowArrayStreamRecord>;
+    record_type * res = nullptr;
+
+    std::vector<ERL_NIF_TERM> data_ref;
+    if (enif_is_ref(env, argv[0])) {
+        data_ref.emplace_back(argv[0]);
+    } else if (enif_is_list(env, argv[0])) {
+        unsigned int length;
+        ERL_NIF_TERM list = argv[0];
+        if (!enif_get_list_length(env, list, &length)) {
+            return enif_make_badarg(env);
+        }
+
+        ERL_NIF_TERM head, tail;
+        while (enif_get_list_cell(env, list, &head, &tail)) {
+            if (!enif_is_ref(env, head)) {
+                return enif_make_badarg(env);
+            }
+            data_ref.emplace_back(head);
+            list = tail;
+        }
     } else {
-        ret = enif_make_tuple2(env, out_terms[0], out_terms[1]);
+        return enif_make_badarg(env);
     }
 
-    if (out.release) {
-        out.release(&out);
-        return enif_make_tuple3(env, erlang::nif::ok(env), ret, enif_make_int64(env, 1));
-    } else {
-        return enif_make_tuple3(env, erlang::nif::ok(env), ret, enif_make_int64(env, 0));
+    std::vector<ERL_NIF_TERM> materialized;
+    ERL_NIF_TERM error{};
+    for (auto& ref : data_ref) {
+        if ((res = record_type::get_resource(env, ref, error)) == nullptr) {
+            return error;
+        }
+        if (res->val.schema == nullptr || res->val.values == nullptr) {
+            return enif_make_badarg(env);
+        }
+
+        std::vector<ERL_NIF_TERM> out_terms;
+        constexpr int level = 0;
+        ERL_NIF_TERM out_type;
+        ERL_NIF_TERM out_metadata;
+        if (arrow_array_to_nif_term(env, res->val.schema, res->val.values, level, out_terms, out_type, out_metadata, error) != 0) {
+            // schema and values will be release when the resource is GC'ed
+            return error;
+        }
+
+        ERL_NIF_TERM ret{};
+        if (out_terms.size() == 1) {
+            ret = out_terms[0];
+        } else {
+            ret = enif_make_tuple2(env, out_terms[0], out_terms[1]);
+        }
+
+        materialized.emplace_back(ret);
     }
+
+    ERL_NIF_TERM ret = enif_make_list_from_array(env, materialized.data(), materialized.size());
+    return erlang::nif::ok(env, ret);
 }
 
 static ERL_NIF_TERM adbc_arrow_array_stream_release(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
@@ -775,6 +885,13 @@ static int on_load(ErlNifEnv *env, void **, ERL_NIF_TERM) {
         res_type::type = rt;
     }
 
+    {
+        using res_type = NifRes<struct ArrowArrayStreamRecord>;
+        rt = enif_open_resource_type(env, "Elixir.Adbc.Nif", "NifResArrowArrayStreamRecord", destruct_arrow_array_stream_record, ERL_NIF_RT_CREATE, NULL);
+        if (!rt) return -1;
+        res_type::type = rt;
+    }
+
     kAtomAdbcError = erlang::nif::atom(env, "adbc_error");
     kAtomNil = erlang::nif::atom(env, "nil");
     kAtomTrue = erlang::nif::atom(env, "true");
@@ -861,6 +978,41 @@ static int on_load(ErlNifEnv *env, void **, ERL_NIF_TERM) {
     kAdbcColumnTypeRunEndEncoded = erlang::nif::atom(env, "run_end_encoded");
     kAdbcColumnTypeDictionary = erlang::nif::atom(env, "dictionary");
 
+    primitiveFormatMapping = {
+        {"n", kAtomNil},
+        {"b", kAdbcColumnTypeBool},
+        {"c", kAdbcColumnTypeS8},
+        {"C", kAdbcColumnTypeU8},
+        {"s", kAdbcColumnTypeS16},
+        {"S", kAdbcColumnTypeU16},
+        {"i", kAdbcColumnTypeS32},
+        {"I", kAdbcColumnTypeU32},
+        {"l", kAdbcColumnTypeS64},
+        {"L", kAdbcColumnTypeU64},
+        {"e", kAdbcColumnTypeF16},
+        {"f", kAdbcColumnTypeF32},
+        {"g", kAdbcColumnTypeF64},
+        {"z", kAdbcColumnTypeBinary},
+        {"Z", kAdbcColumnTypeLargeBinary},
+        // {"vz", kAdbcColumnTypeBinaryView}, // not implemented yet
+        {"u", kAdbcColumnTypeString},
+        {"U", kAdbcColumnTypeLargeString},
+        // {"vu", kAdbcColumnTypeStringView}, // not implemented yet
+        {"tdD", kAdbcColumnTypeDate32},
+        {"tdm", kAdbcColumnTypeDate64},
+        {"tts", kAdbcColumnTypeTime32Seconds},
+        {"ttm", kAdbcColumnTypeTime32Milliseconds},
+        {"ttu", kAdbcColumnTypeTime64Microseconds},
+        {"ttn", kAdbcColumnTypeTime64Nanoseconds},
+        {"tDs", kAdbcColumnTypeDurationSeconds},
+        {"tDm", kAdbcColumnTypeDurationMilliseconds},
+        {"tDu", kAdbcColumnTypeDurationMicroseconds},
+        {"tDn", kAdbcColumnTypeDurationNanoseconds},
+        {"tiM", kAdbcColumnTypeIntervalMonth},
+        {"tiD", kAdbcColumnTypeIntervalDayTime},
+        {"tin", kAdbcColumnTypeIntervalMonthDayNano},
+    };
+
     return 0;
 }
 
@@ -897,7 +1049,9 @@ static ErlNifFunc nif_functions[] = {
 
     {"adbc_arrow_array_stream_get_pointer", 1, adbc_arrow_array_stream_get_pointer, 0},
     {"adbc_arrow_array_stream_next", 1, adbc_arrow_array_stream_next, 0},
-    {"adbc_arrow_array_stream_release", 1, adbc_arrow_array_stream_release, 0}
+    {"adbc_arrow_array_stream_release", 1, adbc_arrow_array_stream_release, 0},
+
+    {"adbc_column_materialize", 1, adbc_column_materialize, 0},
 };
 
 ERL_NIF_INIT(Elixir.Adbc.Nif, nif_functions, on_load, on_reload, on_upgrade, NULL);

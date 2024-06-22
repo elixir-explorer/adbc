@@ -2,7 +2,10 @@
 #pragma once
 
 #include <erl_nif.h>
+#include <map>
+#include <string>
 
+static std::map<std::string, ERL_NIF_TERM> primitiveFormatMapping;
 // Atoms
 static ERL_NIF_TERM kAtomAdbcError;
 static ERL_NIF_TERM kAtomNil;

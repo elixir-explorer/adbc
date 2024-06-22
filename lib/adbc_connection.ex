@@ -396,8 +396,8 @@ defmodule Adbc.Connection do
 
   defp stream_results(reference, acc, num_rows) do
     case Adbc.Nif.adbc_arrow_array_stream_next(reference) do
-      {:ok, results, _done} ->
-        stream_results(reference, [results | acc], num_rows)
+      {:ok, result, data_ref} ->
+        stream_results(reference, [%{result | data: data_ref} | acc], num_rows)
 
       :end_of_series ->
         {:ok, %Adbc.Result{data: merge_columns(Enum.reverse(acc)), num_rows: num_rows}}
@@ -407,39 +407,15 @@ defmodule Adbc.Connection do
     end
   end
 
-  defp merge_columns([result]), do: handle_decimal(result)
+  defp merge_columns([]), do: []
 
-  defp merge_columns(chucked_results) do
-    Enum.zip_with(chucked_results, fn columns ->
-      Enum.reduce(columns, fn column, merged_column ->
-        column = handle_decimal(column)
-        %{merged_column | data: merged_column.data ++ column.data}
+  defp merge_columns(results) do
+    list_of_data =
+      Enum.map(results, fn %Adbc.Column{data: data} ->
+        data
       end)
-    end)
-  end
 
-  defp handle_decimal([column | rest]) do
-    [handle_decimal(column) | handle_decimal(rest)]
-  end
-
-  defp handle_decimal(%Adbc.Column{type: {:decimal, bits, _, scale}, data: decimal_data} = column) do
-    %{column | data: handle_decimal(decimal_data, bits, scale)}
-  end
-
-  defp handle_decimal(column) do
-    column
-  end
-
-  defp handle_decimal(decimal_data, bits, scale) do
-    Enum.map(decimal_data, fn data ->
-      <<decimal::signed-integer-size(bits)-little>> = data
-
-      if decimal < 0 do
-        Decimal.new(-1, -decimal, -scale)
-      else
-        Decimal.new(1, decimal, -scale)
-      end
-    end)
+    %{Enum.at(results, 0) | data: list_of_data}
   end
 
   ## Callbacks

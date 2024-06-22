@@ -7,6 +7,7 @@
 #include <memory>
 #include <type_traits>
 #include "nif_utils.hpp"
+#include "adbc_arrow_array_stream_record.hpp"
 
 // Only for debugging:
 #include <cstdio>
@@ -133,6 +134,27 @@ static void destruct_adbc_arrow_array_stream(ErlNifEnv *env, void *args) {
     }
     enif_free(schema);
     res->private_data = nullptr;
+  }
+}
+
+static void destruct_arrow_array_stream_record(ErlNifEnv *env, void *args) {
+  auto res = (NifRes<struct ArrowArrayStreamRecord> *)args;
+  if (res->val.schema) {
+    if (res->val.schema->release) {
+      res->val.schema->release(res->val.schema);
+      res->val.schema->release = nullptr;
+    }
+    enif_free(res->val.schema);
+    res->val.schema = nullptr;
+  }
+
+  if (res->val.values) {
+    if (res->val.values->release) {
+      res->val.values->release(res->val.values);
+      res->val.values->release = nullptr;
+    }
+    enif_free(res->val.values);
+    res->val.values = nullptr;
   }
 }
 

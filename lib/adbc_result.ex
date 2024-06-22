@@ -15,6 +15,20 @@ defmodule Adbc.Result do
           num_rows: non_neg_integer() | nil,
           data: [%Adbc.Column{}]
         }
+
+  @doc """
+  `materialize/1` converts the result set's data from reference type to regular Elixir terms.
+  """
+  def materialize(%Adbc.Result{data: %Adbc.Column{} = data} = result) do
+    case Adbc.Column.materialize(data) do
+      {:error, reason} ->
+        {:error, reason}
+
+      materialized ->
+        %{result | data: materialized}
+    end
+  end
+
   @doc """
   Returns a map of columns as a result.
   """

@@ -5,7 +5,7 @@ defmodule Adbc.Column do
   `Adbc.Column` corresponds to a column in the table. It contains the column's name, type, and
   data. The data is a list of values of the column's data type.
   """
-  @enforce_keys [:name, :type, :nullable, :data]
+  @enforce_keys [:type]
   defstruct [:name, :type, :nullable, :metadata, :data, :length, :offset]
 
   import Bitwise
@@ -1145,6 +1145,53 @@ defmodule Adbc.Column do
   def dictionary(key = %Adbc.Column{type: index_type}, value = %Adbc.Column{}, opts \\ [])
       when index_type in [:s8, :u8, :s16, :u16, :s32, :u32, :s64, :u64] do
     column(:dictionary, %{key: key, value: value}, opts)
+  end
+
+  @doc """
+  `materialize/1` converts a column's data from reference type to regular Elixir terms.
+  """
+  @spec materialize(%Adbc.Column{data: reference() | [reference()]}) ::
+          %Adbc.Column{} | {:error, String.t()}
+  def materialize(%Adbc.Column{data: data_ref})
+      when is_reference(data_ref) or is_list(data_ref) do
+    with {:ok, results} <- Adbc.Nif.adbc_column_materialize(data_ref) do
+      merge_columns(results)
+    end
+  end
+
+  defp merge_columns([result]), do: handle_decimal(result)
+
+  defp merge_columns(chucked_results) do
+    Enum.zip_with(chucked_results, fn columns ->
+      Enum.reduce(columns, fn column, merged_column ->
+        column = handle_decimal(column)
+        %{merged_column | data: merged_column.data ++ column.data}
+      end)
+    end)
+  end
+
+  defp handle_decimal([column | rest]) do
+    [handle_decimal(column) | handle_decimal(rest)]
+  end
+
+  defp handle_decimal(%Adbc.Column{type: {:decimal, bits, _, scale}, data: decimal_data} = column) do
+    %{column | data: handle_decimal(decimal_data, bits, scale)}
+  end
+
+  defp handle_decimal(column) do
+    column
+  end
+
+  defp handle_decimal(decimal_data, bits, scale) do
+    Enum.map(decimal_data, fn data ->
+      <<decimal::signed-integer-size(bits)-little>> = data
+
+      if decimal < 0 do
+        Decimal.new(-1, -decimal, -scale)
+      else
+        Decimal.new(1, decimal, -scale)
+      end
+    end)
   end
 
   @doc """

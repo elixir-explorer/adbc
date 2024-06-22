@@ -32,67 +32,67 @@ defmodule AdbcTest do
     end
 
     test "runs queries", %{conn: conn} do
-      assert {:ok,
-              %Adbc.Result{
-                data: [
-                  %Adbc.Column{
-                    name: "num",
-                    type: :s32,
-                    nullable: true,
-                    metadata: nil,
-                    data: [123]
-                  }
-                ]
-              }} =
-               Connection.query(conn, "SELECT 123 as num")
+      assert {:ok, results} = Connection.query(conn, "SELECT 123 as num")
+
+      assert %Adbc.Result{
+               data: [
+                 %Adbc.Column{
+                   name: "num",
+                   type: :s32,
+                   nullable: true,
+                   metadata: nil,
+                   data: [123]
+                 }
+               ]
+             } = Adbc.Result.materialize(results)
     end
 
     test "list responses", %{conn: conn} do
-      assert {:ok,
-              %Adbc.Result{
-                data: [
-                  %Adbc.Column{
-                    name: "num",
-                    type: :list,
-                    nullable: true,
-                    metadata: nil,
-                    data: [
-                      %Adbc.Column{
-                        name: "item",
-                        type: :s32,
-                        nullable: true,
-                        metadata: nil,
-                        data: [1, 2, 3]
-                      }
-                    ]
-                  }
-                ]
-              }} =
-               Connection.query(conn, "SELECT ARRAY[1, 2, 3] as num")
+      assert {:ok, results} = Connection.query(conn, "SELECT ARRAY[1, 2, 3] as num")
+
+      assert %Adbc.Result{
+               data: [
+                 %Adbc.Column{
+                   name: "num",
+                   type: :list,
+                   nullable: true,
+                   metadata: nil,
+                   data: [
+                     %Adbc.Column{
+                       name: "item",
+                       type: :s32,
+                       nullable: true,
+                       metadata: nil,
+                       data: [1, 2, 3]
+                     }
+                   ]
+                 }
+               ]
+             } = Adbc.Result.materialize(results)
     end
 
     test "list responses with null", %{conn: conn} do
-      assert {:ok,
-              %Adbc.Result{
-                data: [
-                  %Adbc.Column{
-                    name: "num",
-                    type: :list,
-                    nullable: true,
-                    metadata: nil,
-                    data: [
-                      %Adbc.Column{
-                        name: "item",
-                        type: :s32,
-                        nullable: true,
-                        metadata: nil,
-                        data: [1, 2, 3, nil, 5]
-                      }
-                    ]
-                  }
-                ]
-              }} =
-               Connection.query(conn, "SELECT ARRAY[1, 2, 3, null, 5] as num")
+      assert {:ok, results} = Connection.query(conn, "SELECT ARRAY[1, 2, 3, null, 5] as num")
+
+      assert %Adbc.Result{
+               data: [
+                 %Adbc.Column{
+                   name: "num",
+                   type: :list,
+                   nullable: true,
+                   metadata: nil,
+                   data: [
+                     %Adbc.Column{
+                       name: "item",
+                       type: :s32,
+                       nullable: true,
+                       metadata: nil,
+                       data: [1, 2, 3, nil, 5]
+                     }
+                   ]
+                 }
+               ]
+             } = Adbc.Result.materialize(results)
     end
 
     test "nested list responses with null", %{conn: conn} do
@@ -112,30 +112,31 @@ defmodule AdbcTest do
       #   child 0, item: int32
       # ----
       # num: [[[1,2,3,null,5,6,null,7,null,9]]]
-      assert {:ok,
-              %Adbc.Result{
-                data: [
-                  %Adbc.Column{
-                    name: "num",
-                    type: :list,
-                    nullable: true,
-                    metadata: nil,
-                    data: [
-                      %Adbc.Column{
-                        name: "item",
-                        type: :s32,
-                        nullable: true,
-                        metadata: nil,
-                        data: [1, 2, 3, nil, 5, 6, nil, 7, nil, 9]
-                      }
-                    ]
-                  }
-                ]
-              }} =
+      assert {:ok, results} =
                Connection.query(
                  conn,
                  "SELECT ARRAY[ARRAY[1, 2, 3, null, 5], ARRAY[6, null, 7, null, 9]] as num"
                )
+
+      assert %Adbc.Result{
+               data: [
+                 %Adbc.Column{
+                   name: "num",
+                   type: :list,
+                   nullable: true,
+                   metadata: nil,
+                   data: [
+                     %Adbc.Column{
+                       name: "item",
+                       type: :s32,
+                       nullable: true,
+                       metadata: nil,
+                       data: [1, 2, 3, nil, 5, 6, nil, 7, nil, 9]
+                     }
+                   ]
+                 }
+               ]
+             } = Adbc.Result.materialize(results)
     end
 
     test "getting all chunks", %{conn: conn} do
@@ -143,17 +144,37 @@ defmodule AdbcTest do
       SELECT * FROM generate_series('2000-03-01 00:00'::timestamp, '2100-03-04 12:00'::timestamp, '15 minutes')
       """
 
-      %Adbc.Result{
-        data: [
-          %Adbc.Column{
-            name: "generate_series",
-            type: {:timestamp, :microseconds, nil},
-            nullable: true,
-            metadata: nil,
-            data: generate_series
-          }
-        ]
-      } = Connection.query!(conn, query)
+      assert results =
+               %Adbc.Result{
+                 data: %Adbc.Column{
+                   data: _,
+                   name: "",
+                   type:
+                     {:struct,
+                      [
+                        %Adbc.Column{
+                          name: "generate_series",
+                          type: {:timestamp, :microseconds, nil},
+                          metadata: nil,
+                          nullable: true
+                        }
+                      ]},
+                   metadata: nil,
+                   nullable: true
+                 }
+               } = Connection.query!(conn, query)
+
+      assert %Adbc.Result{
+               data: [
+                 %Adbc.Column{
+                   name: "generate_series",
+                   type: {:timestamp, :microseconds, nil},
+                   nullable: true,
+                   metadata: nil,
+                   data: generate_series
+                 }
+               ]
+             } = Adbc.Result.materialize(results)
 
       assert Enum.count(generate_series) == 3_506_641
     end
@@ -169,6 +190,8 @@ defmodule AdbcTest do
         '10:23:45'::time as time,
         '10:23:45.123456'::time as time_usec
       """
+
+      assert {:ok, results} = Connection.query(conn, query)
 
       assert %Adbc.Result{
                data: [
@@ -222,38 +245,37 @@ defmodule AdbcTest do
                    data: [~T[10:23:45.123456]]
                  }
                ]
-             } = Connection.query!(conn, query)
+             } = Adbc.Result.materialize(results)
     end
 
     test "inf/-inf/nan", %{db: _, conn: conn} do
-      assert {
-               :ok,
-               %Adbc.Result{
-                 data: [
-                   %Adbc.Column{
-                     data: [
-                       %Adbc.Column{
-                         name: "item",
-                         type: :string,
-                         nullable: true,
-                         metadata: %{
-                           "ADBC:postgresql:typname" => "numeric"
-                         },
-                         data: ["inf", "-inf", "4.2", "nan"]
-                       }
-                     ],
-                     metadata: nil,
-                     name: "array",
-                     nullable: true,
-                     type: :list
-                   }
-                 ]
-               }
-             } =
+      assert {:ok, results} =
                Adbc.Connection.query(
                  conn,
                  "SELECT ARRAY['infinity'::NUMERIC, '-infinity'::NUMERIC, 4.2::NUMERIC, 'nan'::NUMERIC];"
                )
+
+      assert %Adbc.Result{
+               data: [
+                 %Adbc.Column{
+                   data: [
+                     %Adbc.Column{
+                       name: "item",
+                       type: :string,
+                       nullable: true,
+                       metadata: %{
+                         "ADBC:postgresql:typname" => "numeric"
+                       },
+                       data: ["inf", "-inf", "4.2", "nan"]
+                     }
+                   ],
+                   metadata: nil,
+                   name: "array",
+                   nullable: true,
+                   type: :list
+                 }
+               ]
+             } = Adbc.Result.materialize(results)
     end
   end
 
@@ -274,62 +296,64 @@ defmodule AdbcTest do
       d6 = Decimal.new("-9876543210987654321098765432109876543.2")
       d7 = Decimal.new("1E-37")
 
-      assert {:ok,
-              %Adbc.Result{
-                data: [
-                  %Adbc.Column{
-                    name: "d1",
-                    type: {:decimal, 128, 38, 37},
-                    nullable: true,
-                    metadata: nil,
-                    data: [^d1]
-                  },
-                  %Adbc.Column{
-                    name: "d2",
-                    type: {:decimal, 128, 38, 37},
-                    nullable: true,
-                    metadata: nil,
-                    data: [^d2]
-                  },
-                  %Adbc.Column{
-                    name: "d3",
-                    type: :f64,
-                    nullable: true,
-                    metadata: nil,
-                    data: [1.234567891234568]
-                  },
-                  %Adbc.Column{
-                    name: "d4",
-                    type: :f64,
-                    nullable: true,
-                    metadata: nil,
-                    data: [-1.234567891234568]
-                  },
-                  %Adbc.Column{
-                    name: "d5",
-                    type: {:decimal, 128, 38, 1},
-                    nullable: true,
-                    metadata: nil,
-                    data: [^d5]
-                  },
-                  %Adbc.Column{
-                    name: "d6",
-                    type: {:decimal, 128, 38, 1},
-                    nullable: true,
-                    metadata: nil,
-                    data: [^d6]
-                  },
-                  %Adbc.Column{
-                    name: "d7",
-                    type: {:decimal, 128, 38, 37},
-                    nullable: true,
-                    metadata: nil,
-                    data: [^d7]
-                  }
-                ],
-                num_rows: 0
-              }} =
-               Adbc.Connection.query(
+      assert {
+               :ok,
+               results = %Adbc.Result{
+                 data: %Adbc.Column{
+                   data: _,
+                   name: "duckdb_query_result",
+                   type:
+                     {:struct,
+                      [
+                        %Adbc.Column{
+                          name: "d1",
+                          type: {:decimal, 128, 38, 37},
+                          metadata: nil,
+                          nullable: true
+                        },
+                        %Adbc.Column{
+                          name: "d2",
+                          type: {:decimal, 128, 38, 37},
+                          metadata: nil,
+                          nullable: true
+                        },
+                        %Adbc.Column{
+                          name: "d3",
+                          type: :f64,
+                          metadata: nil,
+                          nullable: true
+                        },
+                        %Adbc.Column{
+                          name: "d4",
+                          type: :f64,
+                          metadata: nil,
+                          nullable: true
+                        },
+                        %Adbc.Column{
+                          name: "d5",
+                          type: {:decimal, 128, 38, 1},
+                          metadata: nil,
+                          nullable: true
+                        },
+                        %Adbc.Column{
+                          name: "d6",
+                          type: {:decimal, 128, 38, 1},
+                          metadata: nil,
+                          nullable: true
+                        },
+                        %Adbc.Column{
+                          name: "d7",
+                          type: {:decimal, 128, 38, 37},
+                          metadata: nil,
+                          nullable: true
+                        }
+                      ]},
+                   metadata: nil,
+                   nullable: false
+                 }
+               }
+             } =
+               Connection.query(
                  conn,
                  """
                  SELECT
@@ -342,6 +366,60 @@ defmodule AdbcTest do
                  0.0000000000000000000000000000000000001 as d7,
                  """
                )
+
+      assert %Adbc.Result{
+               data: [
+                 %Adbc.Column{
+                   name: "d1",
+                   type: {:decimal, 128, 38, 37},
+                   nullable: true,
+                   metadata: nil,
+                   data: [^d1]
+                 },
+                 %Adbc.Column{
+                   name: "d2",
+                   type: {:decimal, 128, 38, 37},
+                   nullable: true,
+                   metadata: nil,
+                   data: [^d2]
+                 },
+                 %Adbc.Column{
+                   name: "d3",
+                   type: :f64,
+                   nullable: true,
+                   metadata: nil,
+                   data: [1.234567891234568]
+                 },
+                 %Adbc.Column{
+                   name: "d4",
+                   type: :f64,
+                   nullable: true,
+                   metadata: nil,
+                   data: [-1.234567891234568]
+                 },
+                 %Adbc.Column{
+                   name: "d5",
+                   type: {:decimal, 128, 38, 1},
+                   nullable: true,
+                   metadata: nil,
+                   data: [^d5]
+                 },
+                 %Adbc.Column{
+                   name: "d6",
+                   type: {:decimal, 128, 38, 1},
+                   nullable: true,
+                   metadata: nil,
+                   data: [^d6]
+                 },
+                 %Adbc.Column{
+                   name: "d7",
+                   type: {:decimal, 128, 38, 37},
+                   nullable: true,
+                   metadata: nil,
+                   data: [^d7]
+                 }
+               ]
+             } = Adbc.Result.materialize(results)
     end
   end
 end

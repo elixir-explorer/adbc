@@ -76,60 +76,111 @@ defmodule Adbc.SQLite.Test do
       ]
     )
 
-    {:ok,
-     list_result = %Adbc.Result{
-       data: [
-         %Adbc.Column{name: "i1", type: :s64, nullable: true, metadata: nil, data: [1]},
-         %Adbc.Column{name: "i2", type: :s64, nullable: true, metadata: nil, data: [2]},
-         %Adbc.Column{name: "i3", type: :s64, nullable: true, metadata: nil, data: [3]},
-         %Adbc.Column{name: "i4", type: :s64, nullable: true, metadata: nil, data: [4]},
-         %Adbc.Column{name: "i5", type: :s64, nullable: true, metadata: nil, data: [5]},
-         %Adbc.Column{name: "i6", type: :s64, nullable: true, metadata: nil, data: [6]},
-         %Adbc.Column{name: "i7", type: :s64, nullable: true, metadata: nil, data: ~c"\a"},
-         %Adbc.Column{name: "i8", type: :s64, nullable: true, metadata: nil, data: ~c"\b"},
-         %Adbc.Column{name: "i9", type: :s64, nullable: true, metadata: nil, data: ~c"\t"},
-         %Adbc.Column{name: "t1", type: :string, nullable: true, metadata: nil, data: ["hello"]},
-         %Adbc.Column{name: "t2", type: :string, nullable: true, metadata: nil, data: ["world"]},
-         %Adbc.Column{
-           name: "t3",
-           type: :string,
-           nullable: true,
-           metadata: nil,
-           data: ["goodbye"]
-         },
-         %Adbc.Column{name: "t4", type: :string, nullable: true, metadata: nil, data: ["world"]},
-         %Adbc.Column{name: "t5", type: :string, nullable: true, metadata: nil, data: ["foo"]},
-         %Adbc.Column{name: "t6", type: :string, nullable: true, metadata: nil, data: ["bar"]},
-         %Adbc.Column{
-           name: "b1",
-           type: :string,
-           nullable: true,
-           metadata: nil,
-           data: [<<100, 97, 116, 97, 1, 2>>]
-         },
-         %Adbc.Column{name: "r1", type: :f64, nullable: true, metadata: nil, data: [1.1]},
-         %Adbc.Column{name: "r2", type: :f64, nullable: true, metadata: nil, data: [2.2]},
-         %Adbc.Column{name: "r3", type: :f64, nullable: true, metadata: nil, data: [3.3]},
-         %Adbc.Column{name: "r4", type: :f64, nullable: true, metadata: nil, data: [4.4]},
-         %Adbc.Column{name: "n1", type: :f64, nullable: true, metadata: nil, data: [1.1]},
-         %Adbc.Column{name: "n2", type: :f64, nullable: true, metadata: nil, data: [2.2]},
-         %Adbc.Column{name: "n3", type: :s64, nullable: true, metadata: nil, data: [1]},
-         %Adbc.Column{
-           name: "n4",
-           type: :string,
-           nullable: true,
-           metadata: nil,
-           data: ["2021-01-01"]
-         },
-         %Adbc.Column{
-           name: "n5",
-           type: :string,
-           nullable: true,
-           metadata: nil,
-           data: ["2021-01-01 00:00:00"]
-         }
-       ]
-     }} = Adbc.Connection.query(conn, "SELECT * FROM test")
+    assert {:ok, results = %Adbc.Result{num_rows: nil, data: %{data: _, name: ""}}} =
+             Connection.query(conn, "SELECT * FROM test")
+
+    assert list_result =
+             %Adbc.Result{
+               data: [
+                 %Adbc.Column{name: "i1", type: :s64, nullable: true, metadata: nil, data: [1]},
+                 %Adbc.Column{name: "i2", type: :s64, nullable: true, metadata: nil, data: [2]},
+                 %Adbc.Column{name: "i3", type: :s64, nullable: true, metadata: nil, data: [3]},
+                 %Adbc.Column{name: "i4", type: :s64, nullable: true, metadata: nil, data: [4]},
+                 %Adbc.Column{name: "i5", type: :s64, nullable: true, metadata: nil, data: [5]},
+                 %Adbc.Column{name: "i6", type: :s64, nullable: true, metadata: nil, data: [6]},
+                 %Adbc.Column{
+                   name: "i7",
+                   type: :s64,
+                   nullable: true,
+                   metadata: nil,
+                   data: ~c"\a"
+                 },
+                 %Adbc.Column{
+                   name: "i8",
+                   type: :s64,
+                   nullable: true,
+                   metadata: nil,
+                   data: ~c"\b"
+                 },
+                 %Adbc.Column{
+                   name: "i9",
+                   type: :s64,
+                   nullable: true,
+                   metadata: nil,
+                   data: ~c"\t"
+                 },
+                 %Adbc.Column{
+                   name: "t1",
+                   type: :string,
+                   nullable: true,
+                   metadata: nil,
+                   data: ["hello"]
+                 },
+                 %Adbc.Column{
+                   name: "t2",
+                   type: :string,
+                   nullable: true,
+                   metadata: nil,
+                   data: ["world"]
+                 },
+                 %Adbc.Column{
+                   name: "t3",
+                   type: :string,
+                   nullable: true,
+                   metadata: nil,
+                   data: ["goodbye"]
+                 },
+                 %Adbc.Column{
+                   name: "t4",
+                   type: :string,
+                   nullable: true,
+                   metadata: nil,
+                   data: ["world"]
+                 },
+                 %Adbc.Column{
+                   name: "t5",
+                   type: :string,
+                   nullable: true,
+                   metadata: nil,
+                   data: ["foo"]
+                 },
+                 %Adbc.Column{
+                   name: "t6",
+                   type: :string,
+                   nullable: true,
+                   metadata: nil,
+                   data: ["bar"]
+                 },
+                 %Adbc.Column{
+                   name: "b1",
+                   type: :string,
+                   nullable: true,
+                   metadata: nil,
+                   data: [<<100, 97, 116, 97, 1, 2>>]
+                 },
+                 %Adbc.Column{name: "r1", type: :f64, nullable: true, metadata: nil, data: [1.1]},
+                 %Adbc.Column{name: "r2", type: :f64, nullable: true, metadata: nil, data: [2.2]},
+                 %Adbc.Column{name: "r3", type: :f64, nullable: true, metadata: nil, data: [3.3]},
+                 %Adbc.Column{name: "r4", type: :f64, nullable: true, metadata: nil, data: [4.4]},
+                 %Adbc.Column{name: "n1", type: :f64, nullable: true, metadata: nil, data: [1.1]},
+                 %Adbc.Column{name: "n2", type: :f64, nullable: true, metadata: nil, data: [2.2]},
+                 %Adbc.Column{name: "n3", type: :s64, nullable: true, metadata: nil, data: [1]},
+                 %Adbc.Column{
+                   name: "n4",
+                   type: :string,
+                   nullable: true,
+                   metadata: nil,
+                   data: ["2021-01-01"]
+                 },
+                 %Adbc.Column{
+                   name: "n5",
+                   type: :string,
+                   nullable: true,
+                   metadata: nil,
+                   data: ["2021-01-01 00:00:00"]
+                 }
+               ]
+             } = Adbc.Result.materialize(results)
 
     %{
       "b1" => [<<100, 97, 116, 97, 1, 2>>],
@@ -196,73 +247,105 @@ defmodule Adbc.SQLite.Test do
       ]
     )
 
-    {:ok,
-     %Adbc.Result{
-       num_rows: nil,
-       data: [
-         %Adbc.Column{name: "i1", type: :s64, nullable: true, metadata: nil, data: [1]},
-         %Adbc.Column{name: "i2", type: :s64, nullable: true, metadata: nil, data: [2]},
-         %Adbc.Column{name: "i3", type: :s64, nullable: true, metadata: nil, data: [3]},
-         %Adbc.Column{name: "i4", type: :s64, nullable: true, metadata: nil, data: [4]},
-         %Adbc.Column{name: "i5", type: :s64, nullable: true, metadata: nil, data: [5]},
-         %Adbc.Column{name: "i6", type: :s64, nullable: true, metadata: nil, data: [6]},
-         %Adbc.Column{name: "i7", type: :s64, nullable: true, metadata: nil, data: ~c"\a"},
-         %Adbc.Column{name: "i8", type: :s64, nullable: true, metadata: nil, data: ~c"\b"},
-         %Adbc.Column{name: "i9", type: :s64, nullable: true, metadata: nil, data: ~c"\t"},
-         %Adbc.Column{name: "t1", type: :string, nullable: true, metadata: nil, data: ["hello"]},
-         %Adbc.Column{name: "t2", type: :string, nullable: true, metadata: nil, data: ["world"]},
-         %Adbc.Column{
-           name: "t3",
-           type: :string,
-           nullable: true,
-           metadata: nil,
-           data: ["goodbye"]
-         },
-         %Adbc.Column{name: "t4", type: :string, nullable: true, metadata: nil, data: ["world"]},
-         %Adbc.Column{name: "t5", type: :string, nullable: true, metadata: nil, data: ["foo"]},
-         %Adbc.Column{name: "t6", type: :string, nullable: true, metadata: nil, data: ["bar"]},
-         %Adbc.Column{
-           name: "b1",
-           type: :binary,
-           nullable: true,
-           metadata: nil,
-           data: [<<100, 97, 116, 97, 1, 2>>]
-         },
-         %Adbc.Column{
-           name: "r1",
-           type: :f64,
-           nullable: true,
-           metadata: nil,
-           data: [r1]
-         },
-         %Adbc.Column{name: "r2", type: :f64, nullable: true, metadata: nil, data: [2.2]},
-         %Adbc.Column{
-           name: "r3",
-           type: :f64,
-           nullable: true,
-           metadata: nil,
-           data: [r3]
-         },
-         %Adbc.Column{name: "r4", type: :f64, nullable: true, metadata: nil, data: [4.4]},
-         %Adbc.Column{name: "n1", type: :f64, nullable: true, metadata: nil, data: [1.1]},
-         %Adbc.Column{name: "n2", type: :f64, nullable: true, metadata: nil, data: [2.2]},
-         %Adbc.Column{name: "n3", type: :s64, nullable: true, metadata: nil, data: [1]},
-         %Adbc.Column{
-           name: "n4",
-           type: :string,
-           nullable: true,
-           metadata: nil,
-           data: ["2021-01-01"]
-         },
-         %Adbc.Column{
-           name: "n5",
-           type: :string,
-           nullable: true,
-           metadata: nil,
-           data: ["2021-01-01 00:00:00"]
-         }
-       ]
-     }} = Connection.query(conn, "SELECT * FROM test")
+    assert {:ok, results = %Adbc.Result{num_rows: nil, data: %{data: _, name: ""}}} =
+             Connection.query(conn, "SELECT * FROM test")
+
+    assert %Adbc.Result{
+             num_rows: nil,
+             data: [
+               %Adbc.Column{name: "i1", type: :s64, nullable: true, metadata: nil, data: [1]},
+               %Adbc.Column{name: "i2", type: :s64, nullable: true, metadata: nil, data: [2]},
+               %Adbc.Column{name: "i3", type: :s64, nullable: true, metadata: nil, data: [3]},
+               %Adbc.Column{name: "i4", type: :s64, nullable: true, metadata: nil, data: [4]},
+               %Adbc.Column{name: "i5", type: :s64, nullable: true, metadata: nil, data: [5]},
+               %Adbc.Column{name: "i6", type: :s64, nullable: true, metadata: nil, data: [6]},
+               %Adbc.Column{name: "i7", type: :s64, nullable: true, metadata: nil, data: ~c"\a"},
+               %Adbc.Column{name: "i8", type: :s64, nullable: true, metadata: nil, data: ~c"\b"},
+               %Adbc.Column{name: "i9", type: :s64, nullable: true, metadata: nil, data: ~c"\t"},
+               %Adbc.Column{
+                 name: "t1",
+                 type: :string,
+                 nullable: true,
+                 metadata: nil,
+                 data: ["hello"]
+               },
+               %Adbc.Column{
+                 name: "t2",
+                 type: :string,
+                 nullable: true,
+                 metadata: nil,
+                 data: ["world"]
+               },
+               %Adbc.Column{
+                 name: "t3",
+                 type: :string,
+                 nullable: true,
+                 metadata: nil,
+                 data: ["goodbye"]
+               },
+               %Adbc.Column{
+                 name: "t4",
+                 type: :string,
+                 nullable: true,
+                 metadata: nil,
+                 data: ["world"]
+               },
+               %Adbc.Column{
+                 name: "t5",
+                 type: :string,
+                 nullable: true,
+                 metadata: nil,
+                 data: ["foo"]
+               },
+               %Adbc.Column{
+                 name: "t6",
+                 type: :string,
+                 nullable: true,
+                 metadata: nil,
+                 data: ["bar"]
+               },
+               %Adbc.Column{
+                 name: "b1",
+                 type: :binary,
+                 nullable: true,
+                 metadata: nil,
+                 data: [<<100, 97, 116, 97, 1, 2>>]
+               },
+               %Adbc.Column{
+                 name: "r1",
+                 type: :f64,
+                 nullable: true,
+                 metadata: nil,
+                 data: [r1]
+               },
+               %Adbc.Column{name: "r2", type: :f64, nullable: true, metadata: nil, data: [2.2]},
+               %Adbc.Column{
+                 name: "r3",
+                 type: :f64,
+                 nullable: true,
+                 metadata: nil,
+                 data: [r3]
+               },
+               %Adbc.Column{name: "r4", type: :f64, nullable: true, metadata: nil, data: [4.4]},
+               %Adbc.Column{name: "n1", type: :f64, nullable: true, metadata: nil, data: [1.1]},
+               %Adbc.Column{name: "n2", type: :f64, nullable: true, metadata: nil, data: [2.2]},
+               %Adbc.Column{name: "n3", type: :s64, nullable: true, metadata: nil, data: [1]},
+               %Adbc.Column{
+                 name: "n4",
+                 type: :string,
+                 nullable: true,
+                 metadata: nil,
+                 data: ["2021-01-01"]
+               },
+               %Adbc.Column{
+                 name: "n5",
+                 type: :string,
+                 nullable: true,
+                 metadata: nil,
+                 data: ["2021-01-01 00:00:00"]
+               }
+             ]
+           } = Adbc.Result.materialize(results)
 
     assert is_float(r1) and is_float(r3)
     assert abs(r1 - 1.1) < 1.0e-6
@@ -271,28 +354,54 @@ defmodule Adbc.SQLite.Test do
 
   test "bulk-queries", %{db: _, conn: conn} do
     assert {:ok,
-            %Adbc.Result{
-              data: [
-                %Adbc.Column{
-                  data: [1, 2],
-                  metadata: nil,
-                  name: "S64",
-                  nullable: true,
-                  type: :s64
-                },
-                %Adbc.Column{
-                  name: "F64",
-                  type: :f64,
-                  nullable: true,
-                  metadata: nil,
-                  data: [3.3, 4.4]
-                }
-              ],
+            results = %Adbc.Result{
+              data: %Adbc.Column{
+                data: _,
+                name: "",
+                type:
+                  {:struct,
+                   [
+                     %Adbc.Column{
+                       name: "S64",
+                       type: :s64,
+                       metadata: nil,
+                       nullable: true
+                     },
+                     %Adbc.Column{
+                       name: "F64",
+                       type: :f64,
+                       metadata: nil,
+                       nullable: true
+                     }
+                   ]},
+                metadata: nil,
+                nullable: true
+              },
               num_rows: nil
             }} =
              Connection.query(conn, "SELECT ? AS S64, ? AS F64", [
                Adbc.Column.s64([1, 2]),
                Adbc.Column.f64([3.3, 4.4])
              ])
+
+    assert %Adbc.Result{
+             data: [
+               %Adbc.Column{
+                 data: [1, 2],
+                 metadata: nil,
+                 name: "S64",
+                 nullable: true,
+                 type: :s64
+               },
+               %Adbc.Column{
+                 name: "F64",
+                 type: :f64,
+                 nullable: true,
+                 metadata: nil,
+                 data: [3.3, 4.4]
+               }
+             ],
+             num_rows: nil
+           } = Adbc.Result.materialize(results)
   end
 end

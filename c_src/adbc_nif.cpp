@@ -494,23 +494,19 @@ static ERL_NIF_TERM adbc_arrow_array_stream_next(ErlNifEnv *env, int argc, const
         return erlang::nif::error(env, reason ? reason : "unknown error");
     }
 
-    if (res->private_data != nullptr) {
-        enif_free(res->private_data);
-        res->private_data = nullptr;
-    }
-
-    res->private_data = enif_alloc(sizeof(struct ArrowSchema));
-    memset(res->private_data, 0, sizeof(struct ArrowSchema));
-    code = res->val.get_schema(&res->val, (struct ArrowSchema *)res->private_data);
-    if (code != 0) {
-        const char * reason = res->val.get_last_error(&res->val);
-        enif_free(res->private_data);
-        res->private_data = nullptr;
-        return erlang::nif::error(env, reason ? reason : "unknown error");
+    if (res->private_data == nullptr) {
+        res->private_data = enif_alloc(sizeof(struct ArrowSchema));
+        memset(res->private_data, 0, sizeof(struct ArrowSchema));
+        code = res->val.get_schema(&res->val, (struct ArrowSchema *)res->private_data);
+        if (code != 0) {
+            const char * reason = res->val.get_last_error(&res->val);
+            enif_free(res->private_data);
+            res->private_data = nullptr;
+            return erlang::nif::error(env, reason ? reason : "unknown error");
+        }
     }
 
     std::vector<ERL_NIF_TERM> out_terms;
-
     auto schema = (struct ArrowSchema*)res->private_data;
     bool end_of_series = false;
     ERL_NIF_TERM out_type;

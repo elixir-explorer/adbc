@@ -1161,7 +1161,9 @@ defmodule Adbc.Column do
 
   defp merge_columns([result]), do: handle_decimal(result)
 
-  defp merge_columns(chucked_results) do
+  defp merge_columns(result) when is_map(result), do: handle_decimal(result)
+
+  defp merge_columns(chucked_results) when is_list(chucked_results) do
     Enum.zip_with(chucked_results, fn columns ->
       Enum.reduce(columns, fn column, merged_column ->
         column = handle_decimal(column)

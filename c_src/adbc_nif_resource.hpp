@@ -156,6 +156,11 @@ static void destruct_arrow_array_stream_record(ErlNifEnv *env, void *args) {
     enif_free(res->val.values);
     res->val.values = nullptr;
   }
+
+  if (res->val.lock) {
+    enif_rwlock_destroy(res->val.lock);
+    res->val.lock = nullptr;
+  }
 }
 
 #endif /* ADBC_NIF_RESOURCE_HPP */

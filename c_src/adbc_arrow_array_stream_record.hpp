@@ -5,8 +5,10 @@
 #include <adbc.h>
 
 struct ArrowArrayStreamRecord {
-    struct ArrowSchema *schema;
-    struct ArrowArray *values;
+    struct ArrowSchema *schema = nullptr;
+    struct ArrowArray *values = nullptr;
+    bool value_moved = false;
+    ErlNifRWLock *lock = nullptr;
 };
 
 #endif  // ADBC_ARROW_ARRAY_STREAM_RECORD_HPP

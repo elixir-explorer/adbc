@@ -497,6 +497,11 @@ static ERL_NIF_TERM adbc_arrow_array_stream_next(ErlNifEnv *env, int argc, const
     if (record == nullptr) {
         return error;
     }
+    char lock_name[] = "arrow_array_stream_record_lock";
+    record->val.lock = enif_rwlock_create(lock_name);
+    if (record->val.lock == nullptr) {
+        return erlang::nif::error(env, "out of memory: cannot create lock for ArrowArrayStreamRecord");
+    }
     record->val.values = (struct ArrowArray *)enif_alloc(sizeof(struct ArrowArray));
     if (record->val.values == nullptr) {
         return erlang::nif::error(env, "out of memory");
@@ -612,6 +617,7 @@ static ERL_NIF_TERM adbc_column_materialize(ErlNifEnv *env, int argc, const ERL_
 
     std::vector<ERL_NIF_TERM> materialized;
     ERL_NIF_TERM error{};
+    int64_t index = 0;
     for (auto& ref : data_ref) {
         if ((res = record_type::get_resource(env, ref, error)) == nullptr) {
             return error;
@@ -624,8 +630,21 @@ static ERL_NIF_TERM adbc_column_materialize(ErlNifEnv *env, int argc, const ERL_
         constexpr int level = 0;
         ERL_NIF_TERM out_type;
         ERL_NIF_TERM out_metadata;
-        if (arrow_array_to_nif_term(env, res->val.schema, res->val.values, level, out_terms, out_type, out_metadata, error) != 0) {
-            // schema and values will be release when the resource is GC'ed
+        int has_error = 0;
+        
+        enif_rwlock_rwlock(res->val.lock);
+        if (res->val.value_moved) {
+            has_error = 1;
+            char buf[256] = {'\0'};
+            snprintf(buf, sizeof(buf), "ArrowArray value at index %lld has been moved", index);
+            error = erlang::nif::error(env, buf);
+        } else {
+            if (arrow_array_to_nif_term(env, res->val.schema, res->val.values, level, out_terms, out_type, out_metadata, error) != 0) {
+                has_error = 1;
+            }
+        }
+        enif_rwlock_rwunlock(res->val.lock);
+        if (has_error) {
             return error;
         }
 
@@ -637,8 +656,9 @@ static ERL_NIF_TERM adbc_column_materialize(ErlNifEnv *env, int argc, const ERL_
         }
 
         materialized.emplace_back(ret);
+        index++;
     }
-
+    
     ERL_NIF_TERM ret = enif_make_list_from_array(env, materialized.data(), materialized.size());
     return erlang::nif::ok(env, ret);
 }
@@ -807,37 +827,17 @@ static ERL_NIF_TERM adbc_statement_bind(ErlNifEnv *env, int argc, const ERL_NIF_
     values.release = nullptr;
     schema.release = nullptr;
 
-    std::vector<ERL_NIF_TERM> refs;
-    bool is_refs = false;
-
-    if (adbc_column_to_arrow_type_struct(env, argv[1], &values, &schema, &arrow_error, refs, is_refs)) {
+    if (adbc_column_to_arrow_type_struct(env, argv[1], &values, &schema, &arrow_error)) {
         ret = erlang::nif::error(env, arrow_error.message);
         goto cleanup;
     }
 
-    if (is_refs) {
-        if (refs.size() == 1) {
-            using res_type = NifRes<struct ArrowArrayStreamRecord>;
-            res_type * record = nullptr;
-            if ((record = res_type::get_resource(env, refs[0], error)) == nullptr) {
-                return error;
-            }
-            code = AdbcStatementBind(&statement->val, record->val.values, record->val.schema, &adbc_error);
-            if (code != ADBC_STATUS_OK) {
-                return nif_error_from_adbc_error(env, &adbc_error);
-            }
-            return erlang::nif::ok(env);
-        } else {
-            return erlang::nif::error(env, "data with multiple references is not supported yet");
-        }
-    } else {
-        code = AdbcStatementBind(&statement->val, &values, &schema, &adbc_error);
-        if (code != ADBC_STATUS_OK) {
-            ret = nif_error_from_adbc_error(env, &adbc_error);
-            goto cleanup;
-        }
-        ret = erlang::nif::ok(env);
+    code = AdbcStatementBind(&statement->val, &values, &schema, &adbc_error);
+    if (code != ADBC_STATUS_OK) {
+        ret = nif_error_from_adbc_error(env, &adbc_error);
+        goto cleanup;
     }
+    ret = erlang::nif::ok(env);
 
 cleanup:
     if (values.release) values.release(&values);

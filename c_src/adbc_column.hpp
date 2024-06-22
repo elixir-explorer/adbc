@@ -1437,22 +1437,26 @@ int adbc_column_to_adbc_field(ErlNifEnv *env, ERL_NIF_TERM adbc_column, bool all
 }
 
 // non-zero return value indicating errors
-int adbc_column_to_arrow_type_struct(ErlNifEnv *env, ERL_NIF_TERM values, struct ArrowArray* array_out, struct ArrowSchema* schema_out, struct ArrowError* error_out, std::vector<ERL_NIF_TERM> &refs, bool &is_ref) {
+int adbc_column_to_arrow_type_struct(ErlNifEnv *env, ERL_NIF_TERM values, struct ArrowArray* array_out, struct ArrowSchema* schema_out, struct ArrowError* error_out) {
+    using res_type = NifRes<struct ArrowArrayStreamRecord>;
     unsigned n_items = 0;
     if (!enif_get_list_length(env, values, &n_items)) {
         return 1;
     }
 
-    ERL_NIF_TERM head, tail;
+    ArrowSchemaInit(schema_out);
+    NANOARROW_RETURN_NOT_OK(ArrowSchemaSetTypeStruct(schema_out, n_items));
+    NANOARROW_RETURN_NOT_OK(ArrowArrayInitFromType(array_out, NANOARROW_TYPE_STRUCT));
+    NANOARROW_RETURN_NOT_OK(ArrowArrayAllocateChildren(array_out, static_cast<int64_t>(n_items)));
+    array_out->length = 1;
+
+    ERL_NIF_TERM head, tail, error;
     tail = values;
     int64_t processed = 0;
-    // mode
-    // 0: unknown
-    // 1: reference, list of references
-    // 2: regular data
-    int mode = 0;
-    bool initialized = false;
     while (enif_get_list_cell(env, tail, &head, &tail)) {
+        auto schema_i = schema_out->children[processed];
+        auto child_i = array_out->children[processed];
+
         if (enif_is_map(env, head)) {
             ERL_NIF_TERM data_term;
             if (!enif_get_map_value(env, head, kAtomDataKey, &data_term)) {
@@ -1460,27 +1464,27 @@ int adbc_column_to_arrow_type_struct(ErlNifEnv *env, ERL_NIF_TERM values, struct
                 return 1;
             }
 
+            std::vector<ERL_NIF_TERM> refs;
             // there're two possibilities here:
             // 1. data_term is a reference
-            // 2. data_term is a list of references
-            // if it's a reference, we need to get the actual data
-            unsigned n_refs;
+            // 2. data_term is a list of references, not supported yet, except if the length is 1
             if (enif_is_ref(env, data_term)) {
                 refs.emplace_back(data_term);
-                is_ref = true;
-            } else if (enif_get_list_length(env, data_term, &n_refs)) {
+            } else {
                 ERL_NIF_TERM ref_head, ref_tail, ref_list;
                 ref_list = data_term;
                 while (enif_get_list_cell(env, ref_list, &ref_head, &ref_tail)) {
                     if (enif_is_ref(env, ref_head)) {
                         refs.emplace_back(ref_head);
-                        is_ref = true;
+                        if (refs.size() > 1) {
+                            snprintf(error_out->message, sizeof(error_out->message), "`data` field of `%%Adbc.Column{}` with multiple references is not supported yet.");
+                            return 1;
+                        }
                     } else {
-                        if (is_ref) {
-                            snprintf(error_out->message, sizeof(error_out->message), "Expected `data` field of `%%Adbc.Column{}` to be a list of references.");
+                        if (refs.size() > 1) {
+                            snprintf(error_out->message, sizeof(error_out->message), "`data` field of `%%Adbc.Column{}` cannot be a mix of references and values.");
                             return 1;
                         } else {
-                            is_ref = false;
                             break;
                         }
                     }
@@ -1488,27 +1492,49 @@ int adbc_column_to_arrow_type_struct(ErlNifEnv *env, ERL_NIF_TERM values, struct
                 }
             }
 
-            if (is_ref && mode == 0) {
-                // if data is a reference or a list of references, we can stop here
-                return 0;
+            if (refs.size() == 1) {
+                res_type *record = nullptr;
+                if ((record = res_type::get_resource(env, refs[0], error)) == nullptr) {
+                    snprintf(error_out->message, sizeof(error_out->message), "cannot access Nif resource");
+                    return 1;
+                }
+
+                // we don;t need the following check at the moment
+                // because we only support one reference
+                // However, I'll keep the code here for future reference
+                //
+                // auto iter = record_locked.find(record->val.lock);
+                // if (iter != record_locked.end()) {
+                //     snprintf(error_out->message, sizeof(error_out->message), "ArrowArray cannot be used as a binding parameter more than once");
+                //     return 1;
+                // }
+                if (record->val.lock == nullptr) {
+                    snprintf(error_out->message, sizeof(error_out->message), "invalid ArrowArray found at index %lld", processed);
+                    return 1;
+                }
+
+                enif_rwlock_rwlock(record->val.lock);
+                if (record->val.value_moved) {
+                    snprintf(error_out->message, sizeof(error_out->message), "ArrowArray at index %lld is already used (value moved after used as a binding parameter)", processed);
+                    return 1;
+                }
+                if (strcmp(record->val.schema->format, "+s") == 0 && record->val.schema->n_children == 1) {
+                    ArrowArrayMove(record->val.values->children[0], array_out->children[processed]);
+                    ArrowSchemaMove(record->val.schema->children[0], schema_out->children[processed]);
+                    array_out->length = record->val.values->children[0]->length;
+                } else {
+                    ArrowArrayMove(record->val.values, array_out->children[processed]);
+                    ArrowSchemaMove(record->val.schema, schema_out->children[processed]);
+                    array_out->length = record->val.values->length;
+                }
+                record->val.value_moved = true;
+                enif_rwlock_rwunlock(record->val.lock);
+
+                processed++;
+                continue;
             }
 
-            // set mode to regular data
-            mode = 2;
-
-            if (!initialized) {
-                ArrowSchemaInit(schema_out);
-                NANOARROW_RETURN_NOT_OK(ArrowSchemaSetTypeStruct(schema_out, n_items));
-                NANOARROW_RETURN_NOT_OK(ArrowArrayInitFromType(array_out, NANOARROW_TYPE_STRUCT));
-                NANOARROW_RETURN_NOT_OK(ArrowArrayAllocateChildren(array_out, static_cast<int64_t>(n_items)));
-                array_out->length = 1;
-                initialized = true;
-            }
-
-            auto schema_i = schema_out->children[processed];
             ArrowSchemaInit(schema_i);
-            auto child_i = array_out->children[processed];
-
             unsigned n_items = 0;
             int ret = adbc_column_to_adbc_field(env, head, false, child_i, schema_i, error_out, &n_items);
             if (array_out->length == 1 && n_items != 0) {
@@ -1546,21 +1572,7 @@ int adbc_column_to_arrow_type_struct(ErlNifEnv *env, ERL_NIF_TERM values, struct
                 break;
             }
         } else {
-            // set mode to regular data
-            mode = 2;
-
-            if (!initialized) {
-                ArrowSchemaInit(schema_out);
-                NANOARROW_RETURN_NOT_OK(ArrowSchemaSetTypeStruct(schema_out, n_items));
-                NANOARROW_RETURN_NOT_OK(ArrowArrayInitFromType(array_out, NANOARROW_TYPE_STRUCT));
-                NANOARROW_RETURN_NOT_OK(ArrowArrayAllocateChildren(array_out, static_cast<int64_t>(n_items)));
-                array_out->length = 1;
-                initialized = true;
-            }
-
-            auto schema_i = schema_out->children[processed];
             ArrowSchemaInit(schema_i);
-            auto child_i = array_out->children[processed];
 
             ErlNifSInt64 i64;
             double f64;
@@ -1621,9 +1633,9 @@ int adbc_column_to_arrow_type_struct(ErlNifEnv *env, ERL_NIF_TERM values, struct
                 return 1;
             }
         }
-        
         processed++;
     }
+
     NANOARROW_RETURN_NOT_OK(ArrowArrayFinishBuilding(array_out, NANOARROW_VALIDATION_LEVEL_FULL, error_out));
     return !(processed == n_items);
 }

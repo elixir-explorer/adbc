@@ -1437,85 +1437,78 @@ int adbc_column_to_adbc_field(ErlNifEnv *env, ERL_NIF_TERM adbc_column, bool all
 }
 
 // non-zero return value indicating errors
-int adbc_column_to_arrow_type_struct(ErlNifEnv *env, ERL_NIF_TERM values, struct ArrowArray* array_out, struct ArrowSchema* schema_out, struct ArrowError* error_out) {
-    array_out->release = NULL;
-    schema_out->release = NULL;
-
+int adbc_column_to_arrow_type_struct(ErlNifEnv *env, ERL_NIF_TERM values, struct ArrowArray* array_out, struct ArrowSchema* schema_out, struct ArrowError* error_out, std::vector<ERL_NIF_TERM> &refs, bool &is_ref) {
     unsigned n_items = 0;
     if (!enif_get_list_length(env, values, &n_items)) {
         return 1;
     }
 
-    ArrowSchemaInit(schema_out);
-    NANOARROW_RETURN_NOT_OK(ArrowSchemaSetTypeStruct(schema_out, n_items));
-    NANOARROW_RETURN_NOT_OK(ArrowArrayInitFromType(array_out, NANOARROW_TYPE_STRUCT));
-    NANOARROW_RETURN_NOT_OK(ArrowArrayAllocateChildren(array_out, static_cast<int64_t>(n_items)));
-    array_out->length = 1;
-
     ERL_NIF_TERM head, tail;
     tail = values;
     int64_t processed = 0;
+    // mode
+    // 0: unknown
+    // 1: reference, list of references
+    // 2: regular data
+    int mode = 0;
+    bool initialized = false;
     while (enif_get_list_cell(env, tail, &head, &tail)) {
-        auto schema_i = schema_out->children[processed];
-        ArrowSchemaInit(schema_i);
-
-        auto child_i = array_out->children[processed];
-
-        ErlNifSInt64 i64;
-        double f64;
-        ErlNifBinary bytes;
-
-        if (enif_get_int64(env, head, &i64)) {
-            NANOARROW_RETURN_NOT_OK(ArrowSchemaSetType(schema_i, NANOARROW_TYPE_INT64));
-            NANOARROW_RETURN_NOT_OK(ArrowSchemaSetName(schema_i, ""));
-            NANOARROW_RETURN_NOT_OK(ArrowArrayInitFromSchema(child_i, schema_i, error_out));
-            NANOARROW_RETURN_NOT_OK(ArrowArrayStartAppending(child_i));
-            NANOARROW_RETURN_NOT_OK(ArrowArrayAppendInt(child_i, i64));
-        } else if (enif_get_double(env, head, &f64)) {
-            NANOARROW_RETURN_NOT_OK(ArrowSchemaSetType(schema_i, NANOARROW_TYPE_DOUBLE));
-            NANOARROW_RETURN_NOT_OK(ArrowSchemaSetName(schema_i, ""));
-            NANOARROW_RETURN_NOT_OK(ArrowArrayInitFromSchema(child_i, schema_i, error_out));
-            NANOARROW_RETURN_NOT_OK(ArrowArrayStartAppending(child_i));
-            NANOARROW_RETURN_NOT_OK(ArrowArrayAppendDouble(child_i, f64));
-        } else if (enif_inspect_iolist_as_binary(env, head, &bytes)) {
-            auto type = NANOARROW_TYPE_STRING;
-            if (bytes.size > INT32_MAX) {
-                type = NANOARROW_TYPE_LARGE_STRING;
-            }
-            struct ArrowStringView view{};
-            view.data = (const char*)(bytes.data);
-            view.size_bytes = static_cast<int64_t>(bytes.size);
-            NANOARROW_RETURN_NOT_OK(ArrowSchemaSetType(schema_i, type));
-            NANOARROW_RETURN_NOT_OK(ArrowSchemaSetName(schema_i, ""));
-            NANOARROW_RETURN_NOT_OK(ArrowArrayInitFromSchema(child_i, schema_i, error_out));
-            NANOARROW_RETURN_NOT_OK(ArrowArrayStartAppending(child_i));
-            NANOARROW_RETURN_NOT_OK(ArrowArrayAppendString(child_i, view));
-        } else if (enif_is_atom(env, head)) {
-            int64_t val{};
-            auto type = NANOARROW_TYPE_BOOL;
-            if (enif_is_identical(head, kAtomTrue)) {
-                val = 1;
-            } else if (enif_is_identical(head, kAtomFalse)) {
-                val = 0;
-            } else if (enif_is_identical(head, kAtomNil)) {
-                type = NANOARROW_TYPE_NA;
-            } else {
-                enif_snprintf(error_out->message, sizeof(error_out->message), "atom `:%T` is not supported yet.", head);
+        if (enif_is_map(env, head)) {
+            ERL_NIF_TERM data_term;
+            if (!enif_get_map_value(env, head, kAtomDataKey, &data_term)) {
+                snprintf(error_out->message, sizeof(error_out->message), "Expected `%%Adbc.Column{}` to have a `data` field.");
                 return 1;
             }
 
-            NANOARROW_RETURN_NOT_OK(ArrowSchemaSetType(schema_i, type));
-            NANOARROW_RETURN_NOT_OK(ArrowSchemaSetName(schema_i, ""));
-            NANOARROW_RETURN_NOT_OK(ArrowArrayInitFromSchema(child_i, schema_i, error_out));
-            NANOARROW_RETURN_NOT_OK(ArrowArrayStartAppending(child_i));
-            if (type == NANOARROW_TYPE_BOOL) {
-                NANOARROW_RETURN_NOT_OK(ArrowArrayAppendInt(child_i, val));
-            } else {
-                // 1x Null
-                val = 1;
-                NANOARROW_RETURN_NOT_OK(ArrowArrayAppendNull(child_i, val));
+            // there're two possibilities here:
+            // 1. data_term is a reference
+            // 2. data_term is a list of references
+            // if it's a reference, we need to get the actual data
+            unsigned n_refs;
+            if (enif_is_ref(env, data_term)) {
+                refs.emplace_back(data_term);
+                is_ref = true;
+            } else if (enif_get_list_length(env, data_term, &n_refs)) {
+                ERL_NIF_TERM ref_head, ref_tail, ref_list;
+                ref_list = data_term;
+                while (enif_get_list_cell(env, ref_list, &ref_head, &ref_tail)) {
+                    if (enif_is_ref(env, ref_head)) {
+                        refs.emplace_back(ref_head);
+                        is_ref = true;
+                    } else {
+                        if (is_ref) {
+                            snprintf(error_out->message, sizeof(error_out->message), "Expected `data` field of `%%Adbc.Column{}` to be a list of references.");
+                            return 1;
+                        } else {
+                            is_ref = false;
+                            break;
+                        }
+                    }
+                    ref_list = ref_tail;
+                }
             }
-        } else if (enif_is_map(env, head)) {
+
+            if (is_ref && mode == 0) {
+                // if data is a reference or a list of references, we can stop here
+                return 0;
+            }
+
+            // set mode to regular data
+            mode = 2;
+
+            if (!initialized) {
+                ArrowSchemaInit(schema_out);
+                NANOARROW_RETURN_NOT_OK(ArrowSchemaSetTypeStruct(schema_out, n_items));
+                NANOARROW_RETURN_NOT_OK(ArrowArrayInitFromType(array_out, NANOARROW_TYPE_STRUCT));
+                NANOARROW_RETURN_NOT_OK(ArrowArrayAllocateChildren(array_out, static_cast<int64_t>(n_items)));
+                array_out->length = 1;
+                initialized = true;
+            }
+
+            auto schema_i = schema_out->children[processed];
+            ArrowSchemaInit(schema_i);
+            auto child_i = array_out->children[processed];
+
             unsigned n_items = 0;
             int ret = adbc_column_to_adbc_field(env, head, false, child_i, schema_i, error_out, &n_items);
             if (array_out->length == 1 && n_items != 0) {
@@ -1553,9 +1546,82 @@ int adbc_column_to_arrow_type_struct(ErlNifEnv *env, ERL_NIF_TERM values, struct
                 break;
             }
         } else {
-            enif_snprintf(error_out->message, sizeof(error_out->message), "unsupported parameter `%T` in adbc_column_to_arrow_type_struct:%d", head, __LINE__);
-            return 1;
+            // set mode to regular data
+            mode = 2;
+
+            if (!initialized) {
+                ArrowSchemaInit(schema_out);
+                NANOARROW_RETURN_NOT_OK(ArrowSchemaSetTypeStruct(schema_out, n_items));
+                NANOARROW_RETURN_NOT_OK(ArrowArrayInitFromType(array_out, NANOARROW_TYPE_STRUCT));
+                NANOARROW_RETURN_NOT_OK(ArrowArrayAllocateChildren(array_out, static_cast<int64_t>(n_items)));
+                array_out->length = 1;
+                initialized = true;
+            }
+
+            auto schema_i = schema_out->children[processed];
+            ArrowSchemaInit(schema_i);
+            auto child_i = array_out->children[processed];
+
+            ErlNifSInt64 i64;
+            double f64;
+            ErlNifBinary bytes;
+
+            if (enif_get_int64(env, head, &i64)) {
+                NANOARROW_RETURN_NOT_OK(ArrowSchemaSetType(schema_i, NANOARROW_TYPE_INT64));
+                NANOARROW_RETURN_NOT_OK(ArrowSchemaSetName(schema_i, ""));
+                NANOARROW_RETURN_NOT_OK(ArrowArrayInitFromSchema(child_i, schema_i, error_out));
+                NANOARROW_RETURN_NOT_OK(ArrowArrayStartAppending(child_i));
+                NANOARROW_RETURN_NOT_OK(ArrowArrayAppendInt(child_i, i64));
+            } else if (enif_get_double(env, head, &f64)) {
+                NANOARROW_RETURN_NOT_OK(ArrowSchemaSetType(schema_i, NANOARROW_TYPE_DOUBLE));
+                NANOARROW_RETURN_NOT_OK(ArrowSchemaSetName(schema_i, ""));
+                NANOARROW_RETURN_NOT_OK(ArrowArrayInitFromSchema(child_i, schema_i, error_out));
+                NANOARROW_RETURN_NOT_OK(ArrowArrayStartAppending(child_i));
+                NANOARROW_RETURN_NOT_OK(ArrowArrayAppendDouble(child_i, f64));
+            } else if (enif_inspect_iolist_as_binary(env, head, &bytes)) {
+                auto type = NANOARROW_TYPE_STRING;
+                if (bytes.size > INT32_MAX) {
+                    type = NANOARROW_TYPE_LARGE_STRING;
+                }
+                struct ArrowStringView view{};
+                view.data = (const char*)(bytes.data);
+                view.size_bytes = static_cast<int64_t>(bytes.size);
+                NANOARROW_RETURN_NOT_OK(ArrowSchemaSetType(schema_i, type));
+                NANOARROW_RETURN_NOT_OK(ArrowSchemaSetName(schema_i, ""));
+                NANOARROW_RETURN_NOT_OK(ArrowArrayInitFromSchema(child_i, schema_i, error_out));
+                NANOARROW_RETURN_NOT_OK(ArrowArrayStartAppending(child_i));
+                NANOARROW_RETURN_NOT_OK(ArrowArrayAppendString(child_i, view));
+            } else if (enif_is_atom(env, head)) {
+                int64_t val{};
+                auto type = NANOARROW_TYPE_BOOL;
+                if (enif_is_identical(head, kAtomTrue)) {
+                    val = 1;
+                } else if (enif_is_identical(head, kAtomFalse)) {
+                    val = 0;
+                } else if (enif_is_identical(head, kAtomNil)) {
+                    type = NANOARROW_TYPE_NA;
+                } else {
+                    enif_snprintf(error_out->message, sizeof(error_out->message), "atom `:%T` is not supported yet.", head);
+                    return 1;
+                }
+
+                NANOARROW_RETURN_NOT_OK(ArrowSchemaSetType(schema_i, type));
+                NANOARROW_RETURN_NOT_OK(ArrowSchemaSetName(schema_i, ""));
+                NANOARROW_RETURN_NOT_OK(ArrowArrayInitFromSchema(child_i, schema_i, error_out));
+                NANOARROW_RETURN_NOT_OK(ArrowArrayStartAppending(child_i));
+                if (type == NANOARROW_TYPE_BOOL) {
+                    NANOARROW_RETURN_NOT_OK(ArrowArrayAppendInt(child_i, val));
+                } else {
+                    // 1x Null
+                    val = 1;
+                    NANOARROW_RETURN_NOT_OK(ArrowArrayAppendNull(child_i, val));
+                }
+            } else {
+                enif_snprintf(error_out->message, sizeof(error_out->message), "unsupported parameter `%T` in adbc_column_to_arrow_type_struct:%d", head, __LINE__);
+                return 1;
+            }
         }
+        
         processed++;
     }
     NANOARROW_RETURN_NOT_OK(ArrowArrayFinishBuilding(array_out, NANOARROW_VALIDATION_LEVEL_FULL, error_out));

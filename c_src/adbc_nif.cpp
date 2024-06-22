@@ -804,18 +804,40 @@ static ERL_NIF_TERM adbc_statement_bind(ErlNifEnv *env, int argc, const ERL_NIF_
     struct ArrowError arrow_error{};
     struct AdbcError adbc_error{};
     AdbcStatusCode code{};
+    values.release = nullptr;
+    schema.release = nullptr;
 
-    if (adbc_column_to_arrow_type_struct(env, argv[1], &values, &schema, &arrow_error)) {
+    std::vector<ERL_NIF_TERM> refs;
+    bool is_refs = false;
+
+    if (adbc_column_to_arrow_type_struct(env, argv[1], &values, &schema, &arrow_error, refs, is_refs)) {
         ret = erlang::nif::error(env, arrow_error.message);
         goto cleanup;
     }
 
-    code = AdbcStatementBind(&statement->val, &values, &schema, &adbc_error);
-    if (code != ADBC_STATUS_OK) {
-        ret = nif_error_from_adbc_error(env, &adbc_error);
-        goto cleanup;
+    if (is_refs) {
+        if (refs.size() == 1) {
+            using res_type = NifRes<struct ArrowArrayStreamRecord>;
+            res_type * record = nullptr;
+            if ((record = res_type::get_resource(env, refs[0], error)) == nullptr) {
+                return error;
+            }
+            code = AdbcStatementBind(&statement->val, record->val.values, record->val.schema, &adbc_error);
+            if (code != ADBC_STATUS_OK) {
+                return nif_error_from_adbc_error(env, &adbc_error);
+            }
+            return erlang::nif::ok(env);
+        } else {
+            return erlang::nif::error(env, "data with multiple references is not supported yet");
+        }
+    } else {
+        code = AdbcStatementBind(&statement->val, &values, &schema, &adbc_error);
+        if (code != ADBC_STATUS_OK) {
+            ret = nif_error_from_adbc_error(env, &adbc_error);
+            goto cleanup;
+        }
+        ret = erlang::nif::ok(env);
     }
-    ret = erlang::nif::ok(env);
 
 cleanup:
     if (values.release) values.release(&values);

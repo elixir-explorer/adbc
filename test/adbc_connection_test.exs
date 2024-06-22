@@ -367,6 +367,62 @@ defmodule Adbc.Connection.Test do
              } = Adbc.Result.materialize(results)
     end
 
+    test "use reference type results as query parameters", %{db: db} do
+      conn = start_supervised!({Connection, database: db})
+
+      assert {:ok,
+              results = %Adbc.Result{
+                data:
+                  column = %Adbc.Column{
+                    data: _,
+                    name: "",
+                    type:
+                      {:struct,
+                       [
+                         %Adbc.Column{
+                           name: "num",
+                           type: :s64,
+                           metadata: nil,
+                           nullable: true
+                         }
+                       ]},
+                    metadata: nil,
+                    nullable: true
+                  },
+                num_rows: nil
+              }} = Connection.query(conn, "SELECT 123 + ? as num", [456])
+
+      assert %Adbc.Result{
+               data: [
+                 %Adbc.Column{
+                   name: "num",
+                   type: :s64,
+                   nullable: true,
+                   metadata: nil,
+                   data: [579]
+                 }
+               ]
+             } = Adbc.Result.materialize(results)
+
+      assert {:ok,
+              results = %Adbc.Result{
+                data: column,
+                num_rows: nil
+              }} = Connection.query(conn, "SELECT 123 + ? as num", [column])
+
+      assert %Adbc.Result{
+               data: [
+                 %Adbc.Column{
+                   name: "num",
+                   type: :s64,
+                   nullable: true,
+                   metadata: nil,
+                   data: [702]
+                 }
+               ]
+             } = Adbc.Result.materialize(results)
+    end
+
     test "fails on invalid query", %{db: db} do
       conn = start_supervised!({Connection, database: db})
       assert {:error, %Adbc.Error{} = error} = Connection.query(conn, "NOT VALID SQL")

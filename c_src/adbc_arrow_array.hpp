@@ -229,11 +229,11 @@ int get_arrow_array_children_as_list(ErlNifEnv *env, struct ArrowSchema * schema
 
 int get_arrow_struct(ErlNifEnv *env, struct ArrowSchema * schema, struct ArrowArray * values, int64_t offset, int64_t count, uint64_t level, std::vector<ERL_NIF_TERM> &children, ERL_NIF_TERM &error) {
     if (schema->n_children > 0 && schema->children == nullptr) {
-        error = erlang::nif::error(env, "invalid ArrowSchema, schema->children == nullptr, however, schema->n_children > 0");
+        error = erlang::nif::error(env, "invalid ArrowSchema, schema->children == nullptr while schema->n_children > 0");
         return 1;
     }
     if (values->n_children > 0 && values->children == nullptr) {
-        error =  erlang::nif::error(env, "invalid ArrowArray, values->children == nullptr, however, values->n_children > 0");
+        error =  erlang::nif::error(env, "invalid ArrowArray, values->children == nullptr while values->n_children > 0");
         return 1;
     }
     if (values->n_children != schema->n_children) {
@@ -259,7 +259,7 @@ int get_arrow_struct(ErlNifEnv *env, struct ArrowSchema * schema, struct ArrowAr
             if (enif_is_identical(childrens[1], kAtomNil)) {
                 children[child_i] = kAtomNil;
             } else {
-                children[child_i] = make_adbc_column(env, schema, values, childrens[0], child_type, nullable, child_metadata, childrens[1]);
+                children[child_i] = make_adbc_column(env, child_schema, values, childrens[0], child_type, nullable, child_metadata, childrens[1]);
             }
         }
     }
@@ -329,46 +329,50 @@ ERL_NIF_TERM get_arrow_array_map_children(ErlNifEnv *env, struct ArrowSchema * s
 
     struct ArrowSchema * entries_schema = schema->children[0];
     struct ArrowArray * entries_values = values->children[0];
-    if (strncmp("entries", entries_schema->name, 7) != 0) {
+    if (strcmp("entries", entries_schema->name) != 0) {
         return erlang::nif::error(env, "invalid ArrowSchema (map), its single child is not named entries");
     }
-    if (count == -1) count = entries_values->n_children;
+    if (entries_schema->n_children != 2) {
+        return erlang::nif::error(env, "invalid ArrowSchema (map), its entries n_children != 2");
+    }
+
+    struct ArrowSchema * key_schema, * value_schema;
+    struct ArrowArray * key_values, * value_values;
+    if (strcmp("key", entries_schema->children[0]->name) == 0 && strcmp("value", entries_schema->children[1]->name) == 0) {
+        key_schema = entries_schema->children[0];
+        key_values = entries_values->children[0];
+        value_schema = entries_schema->children[1];
+        value_values = entries_values->children[1];
+    } else if (strcmp("key", entries_schema->children[1]->name) == 0 && strcmp("value", entries_schema->children[0]->name) == 0) {
+        key_schema = entries_schema->children[1];
+        key_values = entries_values->children[1];
+        value_schema = entries_schema->children[0];
+        value_values = entries_values->children[0];
+    } else {
+        return erlang::nif::error(env, "invalid map entries, key or value or both are missing");
+    }
 
     std::vector<ERL_NIF_TERM> nif_keys, nif_values;
-    bool failed = false;
-    for (int64_t child_i = offset; child_i < offset + count; child_i++) {
-        struct ArrowSchema * entry_schema = entries_schema->children[child_i];
-        struct ArrowArray * entry_values = entries_values->children[child_i];
-        if (strncmp("key", entry_schema->name, 3) == 0) {
-            if (get_arrow_array_children_as_list(env, entry_schema, entry_values, level + 1, nif_keys, error) == 1) {
-                failed = true;
-                break;
-            }
-        } else if (strncmp("value", entry_schema->name, 5) == 0 && entry_schema->n_children == 1) {
-            struct ArrowSchema * item_schema = entry_schema->children[0];
-            struct ArrowArray * item_values = entry_values->children[0];
-            if (get_arrow_array_children_as_list(env, item_schema, item_values, level + 1, nif_values, error) == 1) {
-                failed = true;
-                break;
-            }
-        } else {
-            failed = true;
-        }
+    ERL_NIF_TERM key_type, key_metadata;
+    ERL_NIF_TERM value_type, value_metadata;
+    if (arrow_array_to_nif_term(env, key_schema, key_values, offset, count, level + 1, nif_keys, key_type, key_metadata, error) == 1) {
+        return erlang::nif::error(env, "failed to get map keys");
     }
-
-    if (!failed) {
-        if (nif_keys.size() != nif_values.size()) {
-            return erlang::nif::error(env, "number of keys and values doesn't match");
-        }
-
-        if (!enif_make_map_from_arrays(env, nif_keys.data(), nif_values.data(), (unsigned)nif_keys.size(), &map_out)) {
-            return erlang::nif::error(env, "map contains duplicated keys");
-        } else {
-            return map_out;
-        }
-    } else {
-        return erlang::nif::error(env, "invalid map");
+    if (arrow_array_to_nif_term(env, value_schema, value_values, offset, count, level + 1, nif_values, value_type, value_metadata, error) == 1) {
+        return erlang::nif::error(env, "failed to get map values");
     }
+    
+    ERL_NIF_TERM map_keys[] = {
+        kAtomKey,
+        kAtomValue
+    };
+    ERL_NIF_TERM map_values[] = {
+        make_adbc_column(env, key_schema, key_values, nif_keys[0], key_type, key_schema->flags & ARROW_FLAG_NULLABLE, key_metadata, nif_keys[1]),
+        make_adbc_column(env, value_schema, value_values, nif_values[0], value_type, value_schema->flags & ARROW_FLAG_NULLABLE, value_metadata, nif_values[1])
+    };
+
+    enif_make_map_from_arrays(env, map_keys, map_values, (unsigned)(sizeof(map_keys)/sizeof(map_keys[0])), &map_out);
+    return map_out;
 }
 
 ERL_NIF_TERM get_arrow_array_map_children(ErlNifEnv *env, struct ArrowSchema * schema, struct ArrowArray * values, uint64_t level) {
@@ -1680,7 +1684,7 @@ int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct 
     }
 
     if (!format_processed) {
-        snprintf(err_msg_buf, 255, "not yet implemented for format: `%s`", schema->format);
+        snprintf(err_msg_buf, sizeof(err_msg_buf)/sizeof(err_msg_buf[0]), "not yet implemented for format: `%s`", schema->format);
         error = erlang::nif::error(env, erlang::nif::make_binary(env, err_msg_buf));
         return 1;
         // printf("not implemented for format: `%s`\r\n", schema->format);
@@ -1693,7 +1697,6 @@ int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct 
     }
 
     out_terms.clear();
-
     if (is_struct) {
         if (level > 0) {
             out_terms.emplace_back(erlang::nif::make_binary(env, name));

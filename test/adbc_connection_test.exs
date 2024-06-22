@@ -367,30 +367,11 @@ defmodule Adbc.Connection.Test do
              } = Adbc.Result.materialize(results)
     end
 
-    test "use reference type results as query parameters", %{db: db} do
+    test "use reference type results as query parameter", %{db: db} do
       conn = start_supervised!({Connection, database: db})
 
-      assert {:ok,
-              results = %Adbc.Result{
-                data:
-                  column = %Adbc.Column{
-                    data: _,
-                    name: "",
-                    type:
-                      {:struct,
-                       [
-                         %Adbc.Column{
-                           name: "num",
-                           type: :s64,
-                           metadata: nil,
-                           nullable: true
-                         }
-                       ]},
-                    metadata: nil,
-                    nullable: true
-                  },
-                num_rows: nil
-              }} = Connection.query(conn, "SELECT 123 + ? as num", [456])
+      assert {:ok, results = %Adbc.Result{data: column}} =
+               Connection.query(conn, "SELECT 123 + ? as num", [456])
 
       assert %Adbc.Result{
                data: [
@@ -406,9 +387,9 @@ defmodule Adbc.Connection.Test do
 
       assert {:ok,
               results = %Adbc.Result{
-                data: column,
+                data: _,
                 num_rows: nil
-              }} = Connection.query(conn, "SELECT 123 + ? as num", [column])
+              }} = Connection.query(conn, "SELECT ? + ? as num", [421, column])
 
       assert %Adbc.Result{
                data: [
@@ -417,7 +398,7 @@ defmodule Adbc.Connection.Test do
                    type: :s64,
                    nullable: true,
                    metadata: nil,
-                   data: [702]
+                   data: [1000]
                  }
                ]
              } = Adbc.Result.materialize(results)

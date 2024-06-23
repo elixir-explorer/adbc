@@ -5,7 +5,7 @@ defmodule Adbc.Column do
   `Adbc.Column` corresponds to a column in the table. It contains the column's name, type, and
   data. The data is a list of values of the column's data type.
   """
-  @enforce_keys [:type]
+  @enforce_keys [:name, :type, :nullable]
   defstruct [:name, :type, :nullable, :metadata, :data, :length, :offset]
 
   import Bitwise
@@ -1152,28 +1152,25 @@ defmodule Adbc.Column do
   """
   @spec materialize(%Adbc.Column{data: reference() | [reference()]}) ::
           %Adbc.Column{} | {:error, String.t()}
-  def materialize(%Adbc.Column{data: data_ref})
+  def materialize(%Adbc.Column{data: data_ref, type: type} = self)
       when is_reference(data_ref) or is_list(data_ref) do
     with {:ok, results} <- Adbc.Nif.adbc_column_materialize(data_ref) do
-      merge_columns(results)
+      materialized =
+        Enum.reduce(results, [], fn result, acc ->
+          acc ++ result
+        end)
+
+      type =
+        case type do
+          {:list, _} ->
+            :list
+
+          _ ->
+            type
+        end
+
+      handle_decimal(%{self | data: materialized, type: type})
     end
-  end
-
-  defp merge_columns([result]), do: handle_decimal(result)
-
-  defp merge_columns(result) when is_map(result), do: handle_decimal(result)
-
-  defp merge_columns(chucked_results) when is_list(chucked_results) do
-    Enum.zip_with(chucked_results, fn columns ->
-      Enum.reduce(columns, fn column, merged_column ->
-        column = handle_decimal(column)
-        %{merged_column | data: merged_column.data ++ column.data}
-      end)
-    end)
-  end
-
-  defp handle_decimal([column | rest]) do
-    [handle_decimal(column) | handle_decimal(rest)]
   end
 
   defp handle_decimal(%Adbc.Column{type: {:decimal, bits, _, scale}, data: decimal_data} = column) do

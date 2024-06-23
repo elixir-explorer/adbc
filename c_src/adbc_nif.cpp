@@ -478,13 +478,12 @@ static ERL_NIF_TERM adbc_arrow_array_stream_get_pointer(ErlNifEnv *env, int argc
 
 static ERL_NIF_TERM adbc_arrow_array_stream_next(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
     using res_type = NifRes<struct ArrowArrayStream>;
-    using record_type = NifRes<struct ArrowArrayStreamRecord>;
     ERL_NIF_TERM error{};
 
     res_type * res = nullptr;
     struct ArrowSchema * schema = nullptr;
+    struct ArrowArray array{};
     std::vector<ERL_NIF_TERM> out_terms;
-    ERL_NIF_TERM record_data;
 
     if ((res = res_type::get_resource(env, argv[0], error)) == nullptr) {
         return error;
@@ -493,26 +492,17 @@ static ERL_NIF_TERM adbc_arrow_array_stream_next(ErlNifEnv *env, int argc, const
         return enif_make_badarg(env);
     }
 
-    auto * record = record_type::allocate_resource(env, error);
-    if (record == nullptr) {
-        return error;
-    }
-    record->val.values = (struct ArrowArray *)enif_alloc(sizeof(struct ArrowArray));
-    if (record->val.values == nullptr) {
-        return erlang::nif::error(env, "out of memory");
-    }
-    int code = res->val.get_next(&res->val, record->val.values);
+    int code = res->val.get_next(&res->val, &array);
     if (code != 0) {
         const char * reason = res->val.get_last_error(&res->val);
         return erlang::nif::error(env, reason ? reason : "unknown error: cannot get next record with record->val.values");
     }
     // if no error and the array is released, the stream has ended
-    if (record->val.values->release == nullptr) {
-        enif_free(record->val.values);
-        record->val.values = nullptr;
+    if (array.release == nullptr) {
         return kAtomEndOfSeries;
     }
 
+    // only allocate priv data once for the entire stream
     if (res->private_data == nullptr) {
         const char * reason = nullptr;
         res->private_data = enif_alloc(sizeof(struct ArrowSchema));
@@ -532,56 +522,28 @@ static ERL_NIF_TERM adbc_arrow_array_stream_next(ErlNifEnv *env, int argc, const
 
         if (res->private_data == nullptr) {
             error = erlang::nif::error(env, reason ? reason : "unknown error");
-            goto release_record_values;
+            if (array.release) {
+                array.release(&array);
+            }
+            return error;
         }
     }
     schema = (struct ArrowSchema *)res->private_data;
-
-    record->val.schema = (struct ArrowSchema*)enif_alloc(sizeof(struct ArrowSchema));
-    if (record->val.schema == nullptr) {
-        error = erlang::nif::error(env, "out of memory");
-        goto release_private_data;
+    code = arrow_schema_to_nif_term(env, schema, &array, out_terms, error);
+    // the outter array should be released because we have moved the values 
+    // for each column to the corresponding reference in `Adbc.Column.data`
+    if (array.release) {
+        array.release(&array);
     }
 
-    memset(record->val.schema, 0, sizeof(struct ArrowSchema));
-    if (ArrowSchemaDeepCopy((struct ArrowSchema *)res->private_data, record->val.schema) != NANOARROW_OK) {
-        enif_free(record->val.schema);
-        record->val.schema = nullptr;
-        
-        error = erlang::nif::error(env, "cannot copy schema");
-        goto release_private_data;
-    }
-
-    record_data = record->make_resource(env);
-    if (arrow_schema_to_nif_term(env, schema, out_terms, error) != 0) {
+    if (code != 0) {
         // error is already set in arrow_schema_to_nif_term
-        goto release_record_schema;
+        // we don't need to release the schema in private data here
+        // it will be released when the stream resource is GC'd
+        return error;
+    } else {
+        return erlang::nif::ok(env, out_terms[0]);
     }
-
-    return enif_make_tuple3(env, erlang::nif::ok(env), out_terms[0], record_data);
-
-release_record_schema:
-    if (record->val.schema->release) {
-        record->val.schema->release(record->val.schema);
-    }
-    enif_free(record->val.schema);
-    record->val.schema = nullptr;
-
-release_private_data:
-    if (schema && schema->release) {
-        schema->release(schema);
-        schema = nullptr;
-    }
-    enif_free(res->private_data);
-    res->private_data = nullptr;
-
-release_record_values:
-    // `record->val.values->release` cannot be null as we checked earlier
-    record->val.values->release(record->val.values);
-    enif_free(record->val.values);
-    record->val.values = nullptr;
-
-    return error;
 }
 
 static ERL_NIF_TERM adbc_column_materialize(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
@@ -632,7 +594,7 @@ static ERL_NIF_TERM adbc_column_materialize(ErlNifEnv *env, int argc, const ERL_
         if (out_terms.size() == 1) {
             ret = out_terms[0];
         } else {
-            ret = enif_make_tuple2(env, out_terms[0], out_terms[1]);
+            ret = out_terms[1];
         }
 
         materialized.emplace_back(ret);
@@ -980,38 +942,40 @@ static int on_load(ErlNifEnv *env, void **, ERL_NIF_TERM) {
     kAdbcColumnTypeDictionary = erlang::nif::atom(env, "dictionary");
 
     primitiveFormatMapping = {
-        {"n", kAtomNil},
-        {"b", kAdbcColumnTypeBool},
-        {"c", kAdbcColumnTypeS8},
-        {"C", kAdbcColumnTypeU8},
-        {"s", kAdbcColumnTypeS16},
-        {"S", kAdbcColumnTypeU16},
-        {"i", kAdbcColumnTypeS32},
-        {"I", kAdbcColumnTypeU32},
-        {"l", kAdbcColumnTypeS64},
-        {"L", kAdbcColumnTypeU64},
-        {"e", kAdbcColumnTypeF16},
-        {"f", kAdbcColumnTypeF32},
-        {"g", kAdbcColumnTypeF64},
-        {"z", kAdbcColumnTypeBinary},
-        {"Z", kAdbcColumnTypeLargeBinary},
+        {"n", {kAtomNil}},
+        {"b", {kAdbcColumnTypeBool}},
+        {"c", {kAdbcColumnTypeS8}},
+        {"C", {kAdbcColumnTypeU8}},
+        {"s", {kAdbcColumnTypeS16}},
+        {"S", {kAdbcColumnTypeU16}},
+        {"i", {kAdbcColumnTypeS32}},
+        {"I", {kAdbcColumnTypeU32}},
+        {"l", {kAdbcColumnTypeS64}},
+        {"L", {kAdbcColumnTypeU64}},
+        {"e", {kAdbcColumnTypeF16}},
+        {"f", {kAdbcColumnTypeF32}},
+        {"g", {kAdbcColumnTypeF64}},
+        {"z", {kAdbcColumnTypeBinary}},
+        {"Z", {kAdbcColumnTypeLargeBinary}},
         // {"vz", kAdbcColumnTypeBinaryView}, // not implemented yet
-        {"u", kAdbcColumnTypeString},
-        {"U", kAdbcColumnTypeLargeString},
+        {"u", {kAdbcColumnTypeString}},
+        {"U", {kAdbcColumnTypeLargeString}},
         // {"vu", kAdbcColumnTypeStringView}, // not implemented yet
-        {"tdD", kAdbcColumnTypeDate32},
-        {"tdm", kAdbcColumnTypeDate64},
-        {"tts", kAdbcColumnTypeTime32Seconds},
-        {"ttm", kAdbcColumnTypeTime32Milliseconds},
-        {"ttu", kAdbcColumnTypeTime64Microseconds},
-        {"ttn", kAdbcColumnTypeTime64Nanoseconds},
-        {"tDs", kAdbcColumnTypeDurationSeconds},
-        {"tDm", kAdbcColumnTypeDurationMilliseconds},
-        {"tDu", kAdbcColumnTypeDurationMicroseconds},
-        {"tDn", kAdbcColumnTypeDurationNanoseconds},
-        {"tiM", kAdbcColumnTypeIntervalMonth},
-        {"tiD", kAdbcColumnTypeIntervalDayTime},
-        {"tin", kAdbcColumnTypeIntervalMonthDayNano},
+        {"tdD", {kAdbcColumnTypeDate32}},
+        {"tdm", {kAdbcColumnTypeDate64}},
+        // we cannot call enif_make_tuple2 here and reuse the tuple later
+        // it has to be generated each time
+        {"tts", {kAtomTime32, kAtomSeconds}},
+        {"ttm", {kAtomTime32, kAtomMilliseconds}},
+        {"ttu", {kAtomTime64, kAtomMicroseconds}},
+        {"ttn", {kAtomTime64, kAtomNanoseconds}},
+        {"tDs", {kAtomDuration, kAtomSeconds}},
+        {"tDm", {kAtomDuration, kAtomMilliseconds}},
+        {"tDu", {kAtomDuration, kAtomMicroseconds}},
+        {"tDn", {kAtomDuration, kAtomNanoseconds}},
+        {"tiM", {kAtomInterval, kAtomMonth}},
+        {"tiD", {kAtomInterval, kAtomDayTime}},
+        {"tin", {kAtomInterval, kAtomMonthDayNano}},
     };
 
     return 0;

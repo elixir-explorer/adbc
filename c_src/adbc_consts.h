@@ -5,7 +5,7 @@
 #include <map>
 #include <string>
 
-static std::map<std::string, ERL_NIF_TERM> primitiveFormatMapping;
+static std::map<std::string, std::vector<ERL_NIF_TERM>> primitiveFormatMapping;
 // Atoms
 static ERL_NIF_TERM kAtomAdbcError;
 static ERL_NIF_TERM kAtomNil;

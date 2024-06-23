@@ -396,8 +396,8 @@ defmodule Adbc.Connection do
 
   defp stream_results(reference, acc, num_rows) do
     case Adbc.Nif.adbc_arrow_array_stream_next(reference) do
-      {:ok, result, data_ref} ->
-        stream_results(reference, [%{result | data: data_ref} | acc], num_rows)
+      {:ok, result} ->
+        stream_results(reference, [result | acc], num_rows)
 
       :end_of_series ->
         {:ok, %Adbc.Result{data: merge_columns(Enum.reverse(acc)), num_rows: num_rows}}
@@ -407,15 +407,20 @@ defmodule Adbc.Connection do
     end
   end
 
-  defp merge_columns([]), do: []
+  defp merge_columns(chucked_results) do
+    Enum.zip_with(chucked_results, fn columns ->
+      Enum.reduce(columns, fn column, merged_column ->
+        merged_data =
+          case {is_list(merged_column.data), is_list(column.data)} do
+            {true, true} -> merged_column.data ++ column.data
+            {true, false} -> merged_column.data ++ [column.data]
+            {false, true} -> [merged_column.data] ++ column.data
+            {false, false} -> [merged_column.data] ++ [column.data]
+          end
 
-  defp merge_columns(results) do
-    list_of_data =
-      Enum.map(results, fn %Adbc.Column{data: data} ->
-        data
+        %{merged_column | data: merged_data}
       end)
-
-    %{hd(results) | data: list_of_data}
+    end)
   end
 
   ## Callbacks

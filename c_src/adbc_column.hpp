@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <functional>
 #include <type_traits>
+#include <optional>
 #include <adbc.h>
 #include <erl_nif.h>
 #include <nanoarrow/nanoarrow.hpp>
@@ -97,7 +98,7 @@ int AdbcColumnNifTerm::from_term(ErlNifEnv *env, ERL_NIF_TERM adbc_column, bool 
     return 0;
 }
 
-ERL_NIF_TERM make_adbc_column(ErlNifEnv *env, struct ArrowSchema * schema, ERL_NIF_TERM type_term, ERL_NIF_TERM metadata, bool with_data_key = false) {
+ERL_NIF_TERM make_adbc_column(ErlNifEnv *env, struct ArrowSchema * schema, ERL_NIF_TERM type_term, ERL_NIF_TERM metadata, std::optional<ERL_NIF_TERM> data_ref = std::nullopt) {
     ERL_NIF_TERM nullable_term = schema->flags & ARROW_FLAG_NULLABLE ? kAtomTrue : kAtomFalse;
     ERL_NIF_TERM name_term = erlang::nif::make_binary(env, schema->name == nullptr ? "" : schema->name);
 
@@ -116,9 +117,9 @@ ERL_NIF_TERM make_adbc_column(ErlNifEnv *env, struct ArrowSchema * schema, ERL_N
         metadata,
     };
 
-    if (with_data_key) {
+    if (data_ref) {
         keys.emplace_back(kAtomDataKey);
-        values.emplace_back(kAtomNil);
+        values.emplace_back(data_ref.value());
     }
 
     ERL_NIF_TERM adbc_column;

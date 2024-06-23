@@ -14,9 +14,9 @@
 #include "adbc_column.hpp"
 #include "nif_utils.hpp"
 
-static int arrow_schema_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, uint64_t level, std::vector<ERL_NIF_TERM> &out_terms, ERL_NIF_TERM &value_type, ERL_NIF_TERM &metadata, ERL_NIF_TERM &error);
+static int arrow_schema_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct ArrowArray * array, uint64_t level, std::vector<ERL_NIF_TERM> &out_terms, ERL_NIF_TERM &value_type, ERL_NIF_TERM &metadata, ERL_NIF_TERM &error);
 
-static int get_struct_schema(ErlNifEnv *env, struct ArrowSchema * schema, uint64_t level, std::vector<ERL_NIF_TERM> &children, ERL_NIF_TERM &error) {
+static int get_struct_schema(ErlNifEnv *env, struct ArrowSchema * schema, struct ArrowArray * array, uint64_t level, std::vector<ERL_NIF_TERM> &children, ERL_NIF_TERM &error) {
     if (schema->n_children > 0 && schema->children == nullptr) {
         error = erlang::nif::error(env, "invalid ArrowSchema, schema->children == nullptr while schema->n_children > 0");
         return 1;
@@ -24,14 +24,33 @@ static int get_struct_schema(ErlNifEnv *env, struct ArrowSchema * schema, uint64
     children.resize(schema->n_children);
     for (int64_t child_i = 0; child_i < schema->n_children; child_i++) {
         struct ArrowSchema * child_schema = schema->children[child_i];
+        struct ArrowArray * child_array = array->children[child_i];
         std::vector<ERL_NIF_TERM> childrens;
         ERL_NIF_TERM child_type;
         ERL_NIF_TERM child_metadata;
-        if (arrow_schema_to_nif_term(env, child_schema, level + 1, childrens, child_type, child_metadata, error) != 0) {
+        if (arrow_schema_to_nif_term(env, child_schema, nullptr, level + 1, childrens, child_type, child_metadata, error) != 0) {
             return 1;
         }
 
-        children[child_i] = make_adbc_column(env, child_schema, child_type, child_metadata);
+        if (level == 0) {
+            using record_type = NifRes<struct ArrowArrayStreamRecord>;
+            auto * record = record_type::allocate_resource(env, error);
+            if (record == nullptr) {
+                return 1;
+            }
+            if (record->val.allocate_schema_and_values()) {
+                error = erlang::nif::error(env, "out of memory");
+                return 1;
+            }
+            ArrowSchemaDeepCopy(child_schema, record->val.schema);
+            ArrowArrayMove(child_array, record->val.values);
+            memset(array->children[child_i], 0, sizeof(struct ArrowArray));
+            ERL_NIF_TERM data_ref = record->make_resource(env);
+
+            children[child_i] = make_adbc_column(env, child_schema, child_type, child_metadata, data_ref);
+        } else {
+            children[child_i] = make_adbc_column(env, child_schema, child_type, child_metadata);
+        }
     }
 
     return 0;
@@ -56,7 +75,7 @@ static int get_run_end_encoded_schema(ErlNifEnv *env, struct ArrowSchema * schem
         std::vector<ERL_NIF_TERM> childrens;
         ERL_NIF_TERM child_type;
         ERL_NIF_TERM child_metadata;
-        if (arrow_schema_to_nif_term(env, schema->children[child_i], level + 1, childrens, child_type, child_metadata, error) != 0) {
+        if (arrow_schema_to_nif_term(env, schema->children[child_i], nullptr, level + 1, childrens, child_type, child_metadata, error) != 0) {
             return 1;
         }
 
@@ -99,14 +118,14 @@ static int get_map_schema(ErlNifEnv *env, struct ArrowSchema * schema, uint64_t 
         ERL_NIF_TERM child_type;
         ERL_NIF_TERM child_metadata;
         if (strcmp("key", entry_schema->name) == 0) {
-            if (arrow_schema_to_nif_term(env, entry_schema, level + 1, childrens, child_type, child_metadata, error) != 0) {
+            if (arrow_schema_to_nif_term(env, entry_schema, nullptr, level + 1, childrens, child_type, child_metadata, error) != 0) {
                 return 1;
             }
 
             key_schema = make_adbc_column(env, entry_schema, child_type, child_metadata);
             kv |= 0x1;
         } else if (strcmp("value", entry_schema->name) == 0) {
-            if (arrow_schema_to_nif_term(env, entry_schema, level + 1, childrens, child_type, child_metadata, error) != 0) {
+            if (arrow_schema_to_nif_term(env, entry_schema, nullptr, level + 1, childrens, child_type, child_metadata, error) != 0) {
                 return 1;
             }
 
@@ -145,28 +164,32 @@ static int get_list_element_schema(ErlNifEnv *env, struct ArrowSchema * schema, 
     std::vector<ERL_NIF_TERM> childrens;
     ERL_NIF_TERM child_type;
     ERL_NIF_TERM child_metadata;
-    if (arrow_schema_to_nif_term(env, items_schema, level + 1, childrens, child_type, child_metadata, error) != 0) {
+    if (arrow_schema_to_nif_term(env, items_schema, nullptr, level + 1, childrens, child_type, child_metadata, error) != 0) {
         return 1;
     }
     element_schema = make_adbc_column(env, items_schema, child_type, child_metadata);
     return 0;
 }
 
-static int arrow_schema_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, std::vector<ERL_NIF_TERM> &out_terms, ERL_NIF_TERM &error) {
+static int arrow_schema_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct ArrowArray * array, std::vector<ERL_NIF_TERM> &out_terms, ERL_NIF_TERM &error) {
     ERL_NIF_TERM type_term, metadata;
     int level = 0;
-    return arrow_schema_to_nif_term(env, schema, level, out_terms, type_term, metadata, error);
+    return arrow_schema_to_nif_term(env, schema, array, level, out_terms, type_term, metadata, error);
 }
 
-static int arrow_schema_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, uint64_t level, std::vector<ERL_NIF_TERM> &out_terms, ERL_NIF_TERM &type_term, ERL_NIF_TERM &metadata, ERL_NIF_TERM &error) {
+static int arrow_schema_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct ArrowArray * array, uint64_t level, std::vector<ERL_NIF_TERM> &out_terms, ERL_NIF_TERM &type_term, ERL_NIF_TERM &metadata, ERL_NIF_TERM &error) {
     if (schema == nullptr) {
         error = erlang::nif::error(env, "invalid ArrowSchema (nullptr) when invoking next");
+        return 1;
+    }
+    if (level == 0 && array == nullptr) {
+        error = erlang::nif::error(env, "invalid ArrowArray (nullptr) is nullptr at top-level entry");
         return 1;
     }
 
     char err_msg_buf[256] = { '\0' };
     const char* format = schema->format ? schema->format : "";
-    ERL_NIF_TERM current_term{}, children_term{};
+    ERL_NIF_TERM children_term{};
     size_t format_len = strlen(format);
 
     type_term = kAtomNil;
@@ -188,7 +211,7 @@ static int arrow_schema_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema,
         std::vector<ERL_NIF_TERM> childrens;
         ERL_NIF_TERM child_type;
         ERL_NIF_TERM child_metadata;
-        if (arrow_schema_to_nif_term(env, schema->dictionary, level + 1, childrens, child_type, child_metadata, error) != 0) {
+        if (arrow_schema_to_nif_term(env, schema->dictionary, nullptr, level + 1, childrens, child_type, child_metadata, error) != 0) {
             return 1;
         }
 
@@ -199,19 +222,21 @@ static int arrow_schema_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema,
 
     auto iter = primitiveFormatMapping.find(format);
     if (iter != primitiveFormatMapping.end()) {
-        type_term = iter->second;
+        if (iter->second.size() == 1) {
+            type_term = iter->second[0];
+        } else {
+            type_term = enif_make_tuple_from_array(env, iter->second.data(), (unsigned)iter->second.size());
+        }
         children_term = make_adbc_column(env, schema, type_term, metadata);
     }
 
-    bool is_struct = false;
     bool format_processed = true;
     if (format_len == 1) {
         format_processed = iter != primitiveFormatMapping.end();
     } else if (format_len == 2) {
         if (strncmp("+s", format, 2) == 0) {
             // NANOARROW_TYPE_STRUCT
-            is_struct = true;
-            if (get_struct_schema(env, schema, level, children, error) != 0) {
+            if (get_struct_schema(env, schema, array, level, children, error) != 0) {
                 return 1;
             }
 
@@ -410,20 +435,7 @@ static int arrow_schema_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema,
     }
 
     out_terms.clear();
-    if (is_struct) {
-        if (level == 0) {
-            out_terms.emplace_back(make_adbc_column(env, schema, type_term, metadata, true));
-        } else {
-            out_terms.emplace_back(children_term);
-        }
-    } else {
-        if (schema->children) {
-            out_terms.emplace_back(children_term);
-        } else {
-            out_terms.emplace_back(current_term);
-        }
-    }
-
+    out_terms.emplace_back(children_term);
     return 0;
 }
 

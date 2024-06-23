@@ -76,7 +76,7 @@ defmodule Adbc.SQLite.Test do
       ]
     )
 
-    assert {:ok, results = %Adbc.Result{num_rows: nil, data: %{data: _, name: ""}}} =
+    assert {:ok, results = %Adbc.Result{num_rows: nil, data: _}} =
              Connection.query(conn, "SELECT * FROM test")
 
     assert list_result =
@@ -247,7 +247,7 @@ defmodule Adbc.SQLite.Test do
       ]
     )
 
-    assert {:ok, results = %Adbc.Result{num_rows: nil, data: %{data: _, name: ""}}} =
+    assert {:ok, results = %Adbc.Result{num_rows: nil, data: _}} =
              Connection.query(conn, "SELECT * FROM test")
 
     assert %Adbc.Result{
@@ -355,29 +355,20 @@ defmodule Adbc.SQLite.Test do
   test "bulk-queries", %{db: _, conn: conn} do
     assert {:ok,
             results = %Adbc.Result{
-              data: %Adbc.Column{
-                data: _,
-                name: "",
-                type:
-                  {:struct,
-                   [
-                     %Adbc.Column{
-                       name: "S64",
-                       type: :s64,
-                       metadata: nil,
-                       nullable: true
-                     },
-                     %Adbc.Column{
-                       name: "F64",
-                       type: :f64,
-                       metadata: nil,
-                       nullable: true
-                     }
-                   ]},
-                metadata: nil,
-                nullable: true
-              },
-              num_rows: nil
+              data: [
+                %Adbc.Column{
+                  name: "S64",
+                  type: :s64,
+                  metadata: nil,
+                  nullable: true
+                },
+                %Adbc.Column{
+                  name: "F64",
+                  type: :f64,
+                  metadata: nil,
+                  nullable: true
+                }
+              ]
             }} =
              Connection.query(conn, "SELECT ? AS S64, ? AS F64", [
                Adbc.Column.s64([1, 2]),

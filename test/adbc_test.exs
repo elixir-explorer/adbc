@@ -146,22 +146,14 @@ defmodule AdbcTest do
 
       assert results =
                %Adbc.Result{
-                 data: %Adbc.Column{
-                   data: _,
-                   name: "",
-                   type:
-                     {:struct,
-                      [
-                        %Adbc.Column{
-                          name: "generate_series",
-                          type: {:timestamp, :microseconds, nil},
-                          metadata: nil,
-                          nullable: true
-                        }
-                      ]},
-                   metadata: nil,
-                   nullable: true
-                 }
+                 data: [
+                   %Adbc.Column{
+                     name: "generate_series",
+                     type: {:timestamp, :microseconds, nil},
+                     metadata: nil,
+                     nullable: true
+                   }
+                 ]
                } = Connection.query!(conn, query)
 
       assert %Adbc.Result{
@@ -296,63 +288,53 @@ defmodule AdbcTest do
       d6 = Decimal.new("-9876543210987654321098765432109876543.2")
       d7 = Decimal.new("1E-37")
 
-      assert {
-               :ok,
-               results = %Adbc.Result{
-                 data: %Adbc.Column{
-                   data: _,
-                   name: "duckdb_query_result",
-                   type:
-                     {:struct,
-                      [
-                        %Adbc.Column{
-                          name: "d1",
-                          type: {:decimal, 128, 38, 37},
-                          metadata: nil,
-                          nullable: true
-                        },
-                        %Adbc.Column{
-                          name: "d2",
-                          type: {:decimal, 128, 38, 37},
-                          metadata: nil,
-                          nullable: true
-                        },
-                        %Adbc.Column{
-                          name: "d3",
-                          type: :f64,
-                          metadata: nil,
-                          nullable: true
-                        },
-                        %Adbc.Column{
-                          name: "d4",
-                          type: :f64,
-                          metadata: nil,
-                          nullable: true
-                        },
-                        %Adbc.Column{
-                          name: "d5",
-                          type: {:decimal, 128, 38, 1},
-                          metadata: nil,
-                          nullable: true
-                        },
-                        %Adbc.Column{
-                          name: "d6",
-                          type: {:decimal, 128, 38, 1},
-                          metadata: nil,
-                          nullable: true
-                        },
-                        %Adbc.Column{
-                          name: "d7",
-                          type: {:decimal, 128, 38, 37},
-                          metadata: nil,
-                          nullable: true
-                        }
-                      ]},
-                   metadata: nil,
-                   nullable: false
-                 }
-               }
-             } =
+      assert {:ok,
+              results = %Adbc.Result{
+                data: [
+                  %Adbc.Column{
+                    name: "d1",
+                    type: {:decimal, 128, 38, 37},
+                    metadata: nil,
+                    nullable: true
+                  },
+                  %Adbc.Column{
+                    name: "d2",
+                    type: {:decimal, 128, 38, 37},
+                    metadata: nil,
+                    nullable: true
+                  },
+                  %Adbc.Column{
+                    name: "d3",
+                    type: :f64,
+                    metadata: nil,
+                    nullable: true
+                  },
+                  %Adbc.Column{
+                    name: "d4",
+                    type: :f64,
+                    metadata: nil,
+                    nullable: true
+                  },
+                  %Adbc.Column{
+                    name: "d5",
+                    type: {:decimal, 128, 38, 1},
+                    metadata: nil,
+                    nullable: true
+                  },
+                  %Adbc.Column{
+                    name: "d6",
+                    type: {:decimal, 128, 38, 1},
+                    metadata: nil,
+                    nullable: true
+                  },
+                  %Adbc.Column{
+                    name: "d7",
+                    type: {:decimal, 128, 38, 37},
+                    metadata: nil,
+                    nullable: true
+                  }
+                ]
+              }} =
                Connection.query(
                  conn,
                  """

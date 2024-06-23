@@ -47,28 +47,20 @@ defmodule Adbc.Connection.Test do
       assert {
                :ok,
                results = %Adbc.Result{
-                 data: %Adbc.Column{
-                   data: _,
-                   name: "",
-                   type:
-                     {:struct,
-                      [
-                        %Adbc.Column{
-                          name: "info_name",
-                          type: :u32,
-                          metadata: nil,
-                          nullable: false
-                        },
-                        %Adbc.Column{
-                          name: "info_value",
-                          type: :dense_union,
-                          metadata: nil,
-                          nullable: true
-                        }
-                      ]},
-                   metadata: nil,
-                   nullable: true
-                 },
+                 data: [
+                   %Adbc.Column{
+                     name: "info_name",
+                     type: :u32,
+                     metadata: nil,
+                     nullable: false
+                   },
+                   %Adbc.Column{
+                     name: "info_value",
+                     type: :dense_union,
+                     metadata: nil,
+                     nullable: true
+                   }
+                 ],
                  num_rows: nil
                }
              } = Connection.get_info(conn)
@@ -108,28 +100,20 @@ defmodule Adbc.Connection.Test do
 
       assert {:ok,
               results = %Adbc.Result{
-                data: %Adbc.Column{
-                  data: _,
-                  name: "",
-                  type:
-                    {:struct,
-                     [
-                       %Adbc.Column{
-                         name: "info_name",
-                         type: :u32,
-                         metadata: nil,
-                         nullable: false
-                       },
-                       %Adbc.Column{
-                         name: "info_value",
-                         type: :dense_union,
-                         metadata: nil,
-                         nullable: true
-                       }
-                     ]},
-                  metadata: nil,
-                  nullable: true
-                },
+                data: [
+                  %Adbc.Column{
+                    name: "info_name",
+                    type: :u32,
+                    metadata: nil,
+                    nullable: false
+                  },
+                  %Adbc.Column{
+                    name: "info_value",
+                    type: :dense_union,
+                    metadata: nil,
+                    nullable: true
+                  }
+                ],
                 num_rows: nil
               }} = Connection.get_info(conn, [0])
 
@@ -211,22 +195,14 @@ defmodule Adbc.Connection.Test do
       assert {:ok,
               results = %Adbc.Result{
                 num_rows: nil,
-                data: %Adbc.Column{
-                  data: _,
-                  name: "",
-                  type:
-                    {:struct,
-                     [
-                       %Adbc.Column{
-                         name: "table_type",
-                         type: :string,
-                         metadata: nil,
-                         nullable: false
-                       }
-                     ]},
-                  metadata: nil,
-                  nullable: true
-                }
+                data: [
+                  %Adbc.Column{
+                    name: "table_type",
+                    type: :string,
+                    metadata: nil,
+                    nullable: false
+                  }
+                ]
               }} = Connection.get_table_types(conn)
 
       assert results =
@@ -252,22 +228,14 @@ defmodule Adbc.Connection.Test do
 
       assert {:ok,
               results = %Adbc.Result{
-                data: %Adbc.Column{
-                  data: _,
-                  name: "",
-                  type:
-                    {:struct,
-                     [
-                       %Adbc.Column{
-                         name: "num",
-                         type: :s64,
-                         metadata: nil,
-                         nullable: true
-                       }
-                     ]},
-                  metadata: nil,
-                  nullable: true
-                },
+                data: [
+                  %Adbc.Column{
+                    name: "num",
+                    type: :s64,
+                    metadata: nil,
+                    nullable: true
+                  }
+                ],
                 num_rows: nil
               }} = Connection.query(conn, "SELECT 123 as num")
 
@@ -285,28 +253,20 @@ defmodule Adbc.Connection.Test do
 
       assert {:ok,
               results = %Adbc.Result{
-                data: %Adbc.Column{
-                  data: _,
-                  name: "",
-                  type:
-                    {:struct,
-                     [
-                       %Adbc.Column{
-                         name: "num",
-                         type: :s64,
-                         metadata: nil,
-                         nullable: true
-                       },
-                       %Adbc.Column{
-                         name: "bool",
-                         type: :s64,
-                         metadata: nil,
-                         nullable: true
-                       }
-                     ]},
-                  metadata: nil,
-                  nullable: true
-                },
+                data: [
+                  %Adbc.Column{
+                    name: "num",
+                    type: :s64,
+                    metadata: nil,
+                    nullable: true
+                  },
+                  %Adbc.Column{
+                    name: "bool",
+                    type: :s64,
+                    metadata: nil,
+                    nullable: true
+                  }
+                ],
                 num_rows: nil
               }} = Connection.query(conn, "SELECT 123 as num, true as bool")
 
@@ -335,22 +295,14 @@ defmodule Adbc.Connection.Test do
 
       assert {:ok,
               results = %Adbc.Result{
-                data: %Adbc.Column{
-                  data: _,
-                  name: "",
-                  type:
-                    {:struct,
-                     [
-                       %Adbc.Column{
-                         name: "num",
-                         type: :s64,
-                         metadata: nil,
-                         nullable: true
-                       }
-                     ]},
-                  metadata: nil,
-                  nullable: true
-                },
+                data: [
+                  %Adbc.Column{
+                    name: "num",
+                    type: :s64,
+                    metadata: nil,
+                    nullable: true
+                  }
+                ],
                 num_rows: nil
               }} = Connection.query(conn, "SELECT 123 + ? as num", [456])
 
@@ -370,7 +322,7 @@ defmodule Adbc.Connection.Test do
     test "use reference type results as query parameter", %{db: db} do
       conn = start_supervised!({Connection, database: db})
 
-      assert {:ok, results = %Adbc.Result{data: column}} =
+      assert {:ok, results = %Adbc.Result{data: [column]}} =
                Connection.query(conn, "SELECT 123 + ? as num", [456])
 
       assert %Adbc.Result{
@@ -434,22 +386,14 @@ defmodule Adbc.Connection.Test do
 
       assert {:ok,
               results = %Adbc.Result{
-                data: %Adbc.Column{
-                  data: _,
-                  name: "",
-                  type:
-                    {:struct,
-                     [
-                       %Adbc.Column{
-                         name: "num",
-                         type: :s64,
-                         metadata: nil,
-                         nullable: true
-                       }
-                     ]},
-                  metadata: nil,
-                  nullable: true
-                },
+                data: [
+                  %Adbc.Column{
+                    name: "num",
+                    type: :s64,
+                    metadata: nil,
+                    nullable: true
+                  }
+                ],
                 num_rows: nil
               }} = Connection.query(conn, ref, [456])
 
@@ -473,22 +417,14 @@ defmodule Adbc.Connection.Test do
 
       assert {:ok,
               results = %Adbc.Result{
-                data: %Adbc.Column{
-                  data: _,
-                  name: "",
-                  type:
-                    {:struct,
-                     [
-                       %Adbc.Column{
-                         name: "num",
-                         type: :s64,
-                         metadata: nil,
-                         nullable: true
-                       }
-                     ]},
-                  metadata: nil,
-                  nullable: true
-                },
+                data: [
+                  %Adbc.Column{
+                    name: "num",
+                    type: :s64,
+                    metadata: nil,
+                    nullable: true
+                  }
+                ],
                 num_rows: nil
               }} = Connection.query(conn, ref_a, [456])
 
@@ -506,22 +442,14 @@ defmodule Adbc.Connection.Test do
 
       assert {:ok,
               results = %Adbc.Result{
-                data: %Adbc.Column{
-                  data: _,
-                  name: "",
-                  type:
-                    {:struct,
-                     [
-                       %Adbc.Column{
-                         name: "num",
-                         type: :s64,
-                         metadata: nil,
-                         nullable: true
-                       }
-                     ]},
-                  metadata: nil,
-                  nullable: true
-                },
+                data: [
+                  %Adbc.Column{
+                    name: "num",
+                    type: :s64,
+                    metadata: nil,
+                    nullable: true
+                  }
+                ],
                 num_rows: nil
               }} = Connection.query(conn, ref_b, [456])
 
@@ -545,22 +473,14 @@ defmodule Adbc.Connection.Test do
 
       assert results =
                %Adbc.Result{
-                 data: %Adbc.Column{
-                   data: _,
-                   name: "",
-                   type:
-                     {:struct,
-                      [
-                        %Adbc.Column{
-                          name: "num",
-                          type: :s64,
-                          metadata: nil,
-                          nullable: true
-                        }
-                      ]},
-                   metadata: nil,
-                   nullable: true
-                 },
+                 data: [
+                   %Adbc.Column{
+                     name: "num",
+                     type: :s64,
+                     metadata: nil,
+                     nullable: true
+                   }
+                 ],
                  num_rows: nil
                } = Connection.query!(conn, "SELECT 123 as num")
 
@@ -578,28 +498,20 @@ defmodule Adbc.Connection.Test do
 
       assert results =
                %Adbc.Result{
-                 data: %Adbc.Column{
-                   data: _,
-                   name: "",
-                   type:
-                     {:struct,
-                      [
-                        %Adbc.Column{
-                          name: "num",
-                          type: :s64,
-                          metadata: nil,
-                          nullable: true
-                        },
-                        %Adbc.Column{
-                          name: "bool",
-                          type: :s64,
-                          metadata: nil,
-                          nullable: true
-                        }
-                      ]},
-                   metadata: nil,
-                   nullable: true
-                 },
+                 data: [
+                   %Adbc.Column{
+                     name: "num",
+                     type: :s64,
+                     metadata: nil,
+                     nullable: true
+                   },
+                   %Adbc.Column{
+                     name: "bool",
+                     type: :s64,
+                     metadata: nil,
+                     nullable: true
+                   }
+                 ],
                  num_rows: nil
                } = Connection.query!(conn, "SELECT 123 as num, true as bool")
 
@@ -622,22 +534,14 @@ defmodule Adbc.Connection.Test do
 
       assert results =
                %Adbc.Result{
-                 data: %Adbc.Column{
-                   data: _,
-                   name: "",
-                   type:
-                     {:struct,
-                      [
-                        %Adbc.Column{
-                          name: "num",
-                          type: :s64,
-                          metadata: nil,
-                          nullable: true
-                        }
-                      ]},
-                   metadata: nil,
-                   nullable: true
-                 },
+                 data: [
+                   %Adbc.Column{
+                     name: "num",
+                     type: :s64,
+                     metadata: nil,
+                     nullable: true
+                   }
+                 ],
                  num_rows: nil
                } = Connection.query!(conn, "SELECT 123 + ? as num", [456])
 
@@ -669,28 +573,20 @@ defmodule Adbc.Connection.Test do
 
       assert results =
                %Adbc.Result{
-                 data: %Adbc.Column{
-                   data: _,
-                   name: "",
-                   type:
-                     {:struct,
-                      [
-                        %Adbc.Column{
-                          name: "num",
-                          type: :s64,
-                          metadata: nil,
-                          nullable: true
-                        },
-                        %Adbc.Column{
-                          name: "bool",
-                          type: :s64,
-                          metadata: nil,
-                          nullable: true
-                        }
-                      ]},
-                   metadata: nil,
-                   nullable: true
-                 },
+                 data: [
+                   %Adbc.Column{
+                     name: "num",
+                     type: :s64,
+                     metadata: nil,
+                     nullable: true
+                   },
+                   %Adbc.Column{
+                     name: "bool",
+                     type: :s64,
+                     metadata: nil,
+                     nullable: true
+                   }
+                 ],
                  num_rows: nil
                } =
                Connection.query!(conn, "SELECT 123 as num, true as bool", [],
@@ -716,22 +612,14 @@ defmodule Adbc.Connection.Test do
 
       assert results =
                %Adbc.Result{
-                 data: %Adbc.Column{
-                   data: _,
-                   name: "",
-                   type:
-                     {:struct,
-                      [
-                        %Adbc.Column{
-                          name: "num",
-                          type: :s64,
-                          metadata: nil,
-                          nullable: true
-                        }
-                      ]},
-                   metadata: nil,
-                   nullable: true
-                 },
+                 data: [
+                   %Adbc.Column{
+                     name: "num",
+                     type: :s64,
+                     metadata: nil,
+                     nullable: true
+                   }
+                 ],
                  num_rows: nil
                } =
                Connection.query!(conn, "SELECT 123 + ? as num", [456],

@@ -24,7 +24,6 @@ static int get_struct_schema(ErlNifEnv *env, struct ArrowSchema * schema, struct
     children.resize(schema->n_children);
     for (int64_t child_i = 0; child_i < schema->n_children; child_i++) {
         struct ArrowSchema * child_schema = schema->children[child_i];
-        struct ArrowArray * child_array = array->children[child_i];
         std::vector<ERL_NIF_TERM> childrens;
         ERL_NIF_TERM child_type;
         ERL_NIF_TERM child_metadata;
@@ -42,6 +41,7 @@ static int get_struct_schema(ErlNifEnv *env, struct ArrowSchema * schema, struct
                 error = erlang::nif::error(env, "out of memory");
                 return 1;
             }
+            struct ArrowArray * child_array = array->children[child_i];
             ArrowSchemaDeepCopy(child_schema, record->val.schema);
             ArrowArrayMove(child_array, record->val.values);
             memset(array->children[child_i], 0, sizeof(struct ArrowArray));

@@ -15,6 +15,9 @@ defmodule Adbc.MixProject do
       docs: docs(),
       description: "Apache Arrow ADBC bindings for Elixir",
       compilers: [:elixir_make] ++ Mix.compilers(),
+      make_env: %{
+        "CMAKE_BUILD_TYPE" => (String.ends_with?(@version, "-dev") && "Debug") || "Release"
+      },
       make_precompiler: {:nif, CCPrecompiler},
       make_precompiler_url: "#{@github_url}/releases/download/v#{@version}/@{artefact_filename}",
       make_precompiler_filename: "adbc_nif",

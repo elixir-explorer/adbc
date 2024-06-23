@@ -410,10 +410,7 @@ defmodule Adbc.Connection do
   defp merge_columns(chucked_results) do
     Enum.zip_with(chucked_results, fn columns ->
       Enum.reduce(columns, fn column, merged_column ->
-        merged_data =
-          List.wrap(merged_column.data) ++ List.wrap(column.data)
-
-        %{merged_column | data: merged_data}
+        %{merged_column | data: merged_column.data ++ column.data}
       end)
     end)
   end

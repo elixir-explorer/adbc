@@ -119,7 +119,8 @@ ERL_NIF_TERM make_adbc_column(ErlNifEnv *env, struct ArrowSchema * schema, ERL_N
 
     if (data_ref) {
         keys.emplace_back(kAtomDataKey);
-        values.emplace_back(data_ref.value());
+        ERL_NIF_TERM data_ref_list = enif_make_list1(env, data_ref.value());
+        values.emplace_back(data_ref_list);
     }
 
     ERL_NIF_TERM adbc_column;

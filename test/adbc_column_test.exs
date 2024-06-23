@@ -276,7 +276,7 @@ defmodule Adbc.Column.Test do
                nullable: true,
                metadata: nil,
                data: [
-                 inner1 = %Adbc.Column{
+                 %Adbc.Column{
                    name: "item",
                    type: :s32,
                    nullable: false,

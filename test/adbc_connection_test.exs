@@ -402,6 +402,24 @@ defmodule Adbc.Connection.Test do
                  }
                ]
              } = Adbc.Result.materialize(results)
+
+      assert {:ok,
+              results = %Adbc.Result{
+                data: _,
+                num_rows: nil
+              }} = Connection.query(conn, "SELECT ? + ? as num", [column, column])
+
+      assert %Adbc.Result{
+               data: [
+                 %Adbc.Column{
+                   name: "num",
+                   type: :s64,
+                   nullable: true,
+                   metadata: nil,
+                   data: [1158]
+                 }
+               ]
+             } = Adbc.Result.materialize(results)
     end
 
     test "fails on invalid query", %{db: db} do

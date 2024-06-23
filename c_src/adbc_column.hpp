@@ -1499,36 +1499,20 @@ int adbc_column_to_arrow_type_struct(ErlNifEnv *env, ERL_NIF_TERM values, struct
                     return 1;
                 }
 
-                // we don;t need the following check at the moment
-                // because we only support one reference
-                // However, I'll keep the code here for future reference
-                //
-                // auto iter = record_locked.find(record->val.lock);
-                // if (iter != record_locked.end()) {
-                //     snprintf(error_out->message, sizeof(error_out->message), "ArrowArray cannot be used as a binding parameter more than once");
-                //     return 1;
-                // }
-                if (record->val.lock == nullptr) {
-                    snprintf(error_out->message, sizeof(error_out->message), "invalid ArrowArray found at index %lld", processed);
-                    return 1;
-                }
-
-                enif_rwlock_rwlock(record->val.lock);
-                if (record->val.value_moved) {
-                    snprintf(error_out->message, sizeof(error_out->message), "ArrowArray at index %lld is already used (value moved after used as a binding parameter)", processed);
-                    return 1;
-                }
+                // note: we have ArrowSchemaDeepCopy but a shallow copy + setting `release` to nullptr seems to be fine
                 if (strcmp(record->val.schema->format, "+s") == 0 && record->val.schema->n_children == 1) {
-                    ArrowArrayMove(record->val.values->children[0], array_out->children[processed]);
-                    ArrowSchemaMove(record->val.schema->children[0], schema_out->children[processed]);
-                    array_out->length = record->val.values->children[0]->length;
+                    // ArrowSchemaDeepCopy(record->val.schema->children[0], schema_out->children[processed]);
+                    memcpy(schema_out->children[processed], record->val.schema->children[0], sizeof(struct ArrowSchema));
+                    schema_out->children[processed]->release = nullptr;
+                    memcpy(array_out->children[processed], record->val.values->children[0], sizeof(struct ArrowArray));
+                    array_out->children[processed]->release = nullptr;
                 } else {
-                    ArrowArrayMove(record->val.values, array_out->children[processed]);
-                    ArrowSchemaMove(record->val.schema, schema_out->children[processed]);
-                    array_out->length = record->val.values->length;
+                    // ArrowSchemaDeepCopy(record->val.schema, schema_out->children[processed]);
+                    memcpy(schema_out->children[processed], record->val.schema, sizeof(struct ArrowSchema));
+                    schema_out->children[processed]->release = nullptr;
+                    memcpy(array_out->children[processed], record->val.values, sizeof(struct ArrowArray));
+                    array_out->children[processed]->release = nullptr;
                 }
-                record->val.value_moved = true;
-                enif_rwlock_rwunlock(record->val.lock);
 
                 processed++;
                 continue;

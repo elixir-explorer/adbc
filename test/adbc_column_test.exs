@@ -252,7 +252,7 @@ defmodule Adbc.Column.Test do
   describe "list view" do
     test "nested list view to list" do
       list_view = %Adbc.Column{
-        name: nil,
+        name: "my_array",
         type: :list_view,
         nullable: true,
         metadata: nil,
@@ -271,12 +271,12 @@ defmodule Adbc.Column.Test do
       }
 
       assert %Adbc.Column{
-               name: nil,
+               name: "my_array",
                type: :list,
                nullable: true,
                metadata: nil,
                data: [
-                 inner1 = %Adbc.Column{
+                 %Adbc.Column{
                    name: "item",
                    type: :s32,
                    nullable: false,
@@ -308,6 +308,9 @@ defmodule Adbc.Column.Test do
                ]
              } = Adbc.Column.to_list(list_view)
 
+      assert %{"my_array" => [[12, -7, 25], nil, [0, -127, 127, 50], [], ~c"2\f"]} ==
+               Adbc.Result.to_map(%Adbc.Result{data: [list_view]})
+
       nested_list_view = %Adbc.Column{
         name: nil,
         type: :list_view,
@@ -327,7 +330,7 @@ defmodule Adbc.Column.Test do
                  # => [inner3, inner4]
                  %Adbc.Column{
                    metadata: nil,
-                   name: nil,
+                   name: "my_array",
                    nullable: true,
                    type: :list,
                    data: [
@@ -354,11 +357,11 @@ defmodule Adbc.Column.Test do
                  # => inner1
                  %Adbc.Column{
                    metadata: nil,
-                   name: nil,
+                   name: "my_array",
                    nullable: true,
                    type: :list,
                    data: [
-                     ^inner1 = %Adbc.Column{
+                     %Adbc.Column{
                        name: "item",
                        type: :s32,
                        nullable: false,
@@ -369,7 +372,13 @@ defmodule Adbc.Column.Test do
                  },
                  # offsets=0, sizes=0
                  # => []
-                 %Adbc.Column{data: [], metadata: nil, name: nil, nullable: true, type: :list},
+                 %Adbc.Column{
+                   data: [],
+                   metadata: nil,
+                   name: "my_array",
+                   nullable: true,
+                   type: :list
+                 },
                  # offsets=3, sizes=2
                  # => [inner4, inner5]
                  %Adbc.Column{
@@ -390,7 +399,7 @@ defmodule Adbc.Column.Test do
                      }
                    ],
                    metadata: nil,
-                   name: nil,
+                   name: "my_array",
                    nullable: true,
                    type: :list
                  }

@@ -15,11 +15,30 @@ defmodule Adbc.Result do
           num_rows: non_neg_integer() | nil,
           data: [%Adbc.Column{}]
         }
+
+  @doc """
+  `materialize/1` converts the result set's data from reference type to regular Elixir terms.
+  """
+  @spec materialize(%Adbc.Result{} | {:ok, %Adbc.Result{}} | {:error, String.t()}) ::
+          %Adbc.Result{} | {:ok, %Adbc.Result{}} | {:error, String.t()}
+  def materialize(%Adbc.Result{data: data} = result) when is_list(data) do
+    %{result | data: Enum.map(data, &Adbc.Column.materialize/1)}
+  end
+
+  # allow for the result to be wrapped in an `{:ok, result}` tuple
+  # and also allow error tuples to pass through
+  # easier to use in pipelines
+  def materialize({:ok, %Adbc.Result{data: data} = result}) when is_list(data) do
+    {:ok, %{result | data: Enum.map(data, &Adbc.Column.materialize/1)}}
+  end
+
+  def materialize({:error, reason}), do: {:error, reason}
+
   @doc """
   Returns a map of columns as a result.
   """
   def to_map(result = %Adbc.Result{}) do
-    Map.new(to_list(result).data, fn %Adbc.Column{name: name, type: type, data: data} ->
+    Map.new(to_list(materialize(result)).data, fn %Adbc.Column{name: name, type: type, data: data} ->
       case type do
         :list -> {name, Enum.map(data, &list_to_map/1)}
         _ -> {name, data}
@@ -34,6 +53,8 @@ defmodule Adbc.Result do
   def to_list(result = %Adbc.Result{data: data}) when is_list(data) do
     %{result | data: Enum.map(data, &Adbc.Column.to_list/1)}
   end
+
+  defp list_to_map(nil), do: nil
 
   defp list_to_map(%Adbc.Column{name: name, type: type, data: data}) do
     case type do

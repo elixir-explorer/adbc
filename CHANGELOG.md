@@ -5,8 +5,51 @@
 #### Breaking changes
 * To avoid allocating data twice for inputs, the results now by default will return references in the data field of `Adbc.Column`. 
   
-  If you need to use the in the Elixir world, you can use `Adbc.Result.materialize/1` and 
+  If you need to use them in the Elixir world, you can use `Adbc.Result.materialize/1` and 
   `Adbc.Column.materialize/1` to convert the data to regular Elixir terms.
+
+  ```elixir
+  iex> {:ok, results} = Connection.query(conn, "SELECT 123 as num, 456.78 as fp")
+  {:ok,
+    results = %Adbc.Result{
+      data: [
+          %Adbc.Column{
+            name: "num",
+            type: :s64,
+            metadata: nil,
+            nullable: true,
+            data: [#Reference<0.351247108.3006922760.20174>]
+          },
+          %Adbc.Column{
+            name: "fp",
+            type: :f64,
+            metadata: nil,
+            nullable: true,
+            data: [#Reference<0.351247108.3006922760.20175>]
+          }
+      ],
+      num_rows: nil
+  }}
+  iex> Adbc.Result.materialize(results)
+  %Adbc.Result{
+    data: [
+      %Adbc.Column{
+        name: "num",
+        type: :s64,
+        nullable: true,
+        metadata: nil,
+        data: [123]
+      },
+      %Adbc.Column{
+        name: "fp",
+        type: :f64,
+        nullable: true,
+        metadata: nil,
+        data: [456.78]
+      }
+    ]
+  }
+  ```
 
 ## v0.5.0
 

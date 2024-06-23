@@ -411,12 +411,7 @@ defmodule Adbc.Connection do
     Enum.zip_with(chucked_results, fn columns ->
       Enum.reduce(columns, fn column, merged_column ->
         merged_data =
-          case {is_list(merged_column.data), is_list(column.data)} do
-            {true, true} -> merged_column.data ++ column.data
-            {true, false} -> merged_column.data ++ [column.data]
-            {false, true} -> [merged_column.data] ++ column.data
-            {false, false} -> [merged_column.data] ++ [column.data]
-          end
+          List.wrap(merged_column.data) ++ List.wrap(column.data)
 
         %{merged_column | data: merged_data}
       end)

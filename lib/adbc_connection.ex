@@ -415,7 +415,7 @@ defmodule Adbc.Connection do
         data
       end)
 
-    %{Enum.at(results, 0) | data: list_of_data}
+    %{hd(results) | data: list_of_data}
   end
 
   ## Callbacks

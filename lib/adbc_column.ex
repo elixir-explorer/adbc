@@ -1152,8 +1152,24 @@ defmodule Adbc.Column do
   """
   @spec materialize(%Adbc.Column{data: reference() | [reference()] | list() | map()}) ::
           %Adbc.Column{} | {:error, String.t()}
-  def materialize(%Adbc.Column{data: data_ref, type: type} = self)
+  def materialize(%Adbc.Column{data: data_ref} = self)
       when is_reference(data_ref) or is_list(data_ref) do
+    if is_list(data_ref) do
+      if Enum.all?(data_ref, &is_reference/1) do
+        do_materialize(self)
+      else
+        self
+      end
+    else
+      do_materialize(self)
+    end
+  end
+
+  def materialize(%Adbc.Column{} = self) do
+    self
+  end
+
+  defp do_materialize(%Adbc.Column{data: data_ref, type: type} = self) do
     with {:ok, results} <- Adbc.Nif.adbc_column_materialize(data_ref) do
       materialized =
         Enum.reduce(results, [], fn result, acc ->
@@ -1171,10 +1187,6 @@ defmodule Adbc.Column do
 
       handle_decimal(%{self | data: materialized, type: type})
     end
-  end
-
-  def materialize(%Adbc.Column{} = self) do
-    self
   end
 
   defp handle_decimal(%Adbc.Column{type: {:decimal, bits, _, scale}, data: decimal_data} = column) do

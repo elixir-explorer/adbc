@@ -19,7 +19,8 @@ defmodule Adbc.Result do
   @doc """
   `materialize/1` converts the result set's data from reference type to regular Elixir terms.
   """
-  @spec materialize(%Adbc.Result{} | {:ok, %Adbc.Result{}} | {:error, String.t()}) :: %Adbc.Result{} | {:ok, %Adbc.Result{}} | {:error, String.t()}
+  @spec materialize(%Adbc.Result{} | {:ok, %Adbc.Result{}} | {:error, String.t()}) ::
+          %Adbc.Result{} | {:ok, %Adbc.Result{}} | {:error, String.t()}
   def materialize(%Adbc.Result{data: data} = result) when is_list(data) do
     %{result | data: Enum.map(data, &Adbc.Column.materialize/1)}
   end

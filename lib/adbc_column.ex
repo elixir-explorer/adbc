@@ -1150,7 +1150,7 @@ defmodule Adbc.Column do
   @doc """
   `materialize/1` converts a column's data from reference type to regular Elixir terms.
   """
-  @spec materialize(%Adbc.Column{data: reference() | [reference()]}) ::
+  @spec materialize(%Adbc.Column{data: reference() | [reference()] | list() | map()}) ::
           %Adbc.Column{} | {:error, String.t()}
   def materialize(%Adbc.Column{data: data_ref, type: type} = self)
       when is_reference(data_ref) or is_list(data_ref) do
@@ -1171,6 +1171,10 @@ defmodule Adbc.Column do
 
       handle_decimal(%{self | data: materialized, type: type})
     end
+  end
+
+  def materialize(%Adbc.Column{} = self) do
+    self
   end
 
   defp handle_decimal(%Adbc.Column{type: {:decimal, bits, _, scale}, data: decimal_data} = column) do

@@ -1,5 +1,13 @@
 # CHANGELOG
 
+## v0.6.0
+
+#### Breaking changes
+* To avoid allocating data twice for inputs, the results now by default will return references in the data field of `Adbc.Column`. 
+  
+  If you need to use the in the Elixir world, you can use `Adbc.Result.materialize/1` and 
+  `Adbc.Column.materialize/1` to convert the data to regular Elixir terms.
+
 ## v0.5.0
 
 #### Breaking changes

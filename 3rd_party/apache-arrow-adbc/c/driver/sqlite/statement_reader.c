@@ -15,6 +15,10 @@
 // specific language governing permissions and limitations
 // under the License.
 
+#if !defined(_WIN32)
+#define _POSIX_C_SOURCE 200112L
+#endif
+
 #include "statement_reader.h"
 
 #include <assert.h>
@@ -771,7 +775,7 @@ AdbcStatusCode StatementReaderInitializeInfer(int num_columns, size_t infer_rows
     CHECK_NA(INTERNAL, ArrowBitmapReserve(&validity[i], infer_rows), error);
     ArrowBufferInit(&data[i]);
     CHECK_NA(INTERNAL, ArrowBufferReserve(&data[i], infer_rows * sizeof(int64_t)), error);
-    memset(&binary[i], 0, sizeof(struct ArrowBuffer));
+    ArrowBufferInit(&binary[i]);
     current_type[i] = NANOARROW_TYPE_INT64;
   }
   return ADBC_STATUS_OK;

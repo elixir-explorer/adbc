@@ -15,18 +15,22 @@
 # specific language governing permissions and limitations
 # under the License.
 
-# Common definitions for the CMake projects in this repository.
-# Must define REPOSITORY_ROOT before including this.
+adbc_common_lib = library(
+    'adbc_driver_common',
+    sources: ['utils.c'],
+    include_directories: [root_dir],
+    dependencies: [nanoarrow_dep],
+    install: true,
+)
 
-# ------------------------------------------------------------
-# Version definitions
-
-set(ADBC_VERSION "1.1.0")
-string(REGEX MATCH "^[0-9]+\\.[0-9]+\\.[0-9]+" ADBC_BASE_VERSION "${ADBC_VERSION}")
-string(REPLACE "." ";" _adbc_version_list "${ADBC_BASE_VERSION}")
-list(GET _adbc_version_list 0 ADBC_VERSION_MAJOR)
-list(GET _adbc_version_list 1 ADBC_VERSION_MINOR)
-list(GET _adbc_version_list 2 ADBC_VERSION_PATCH)
-
-math(EXPR ADBC_SO_VERSION "${ADBC_VERSION_MAJOR} * 100 + ${ADBC_VERSION_MINOR}")
-set(ADBC_FULL_SO_VERSION "${ADBC_SO_VERSION}.${ADBC_VERSION_PATCH}.0")
+if get_option('tests')
+    exc = executable(
+        'adbc-driver-common-test',
+        'utils_test.cc',
+        'driver_test.cc',
+        include_directories: [root_dir],
+        link_with: [adbc_common_lib],
+        dependencies: [nanoarrow_dep, gtest_main_dep, gmock_dep],
+    )
+    test('adbc-driver-common', exc)
+endif

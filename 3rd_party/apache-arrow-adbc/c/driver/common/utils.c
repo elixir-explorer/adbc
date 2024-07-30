@@ -165,7 +165,7 @@ void AppendErrorDetail(struct AdbcError* error, const char* key, const uint8_t* 
       return;
     }
 
-    size_t* new_lengths = calloc(new_capacity, sizeof(size_t*));
+    size_t* new_lengths = calloc(new_capacity, sizeof(size_t));
     if (!new_lengths) {
       free(new_keys);
       free(new_values);
@@ -193,8 +193,10 @@ void AppendErrorDetail(struct AdbcError* error, const char* key, const uint8_t* 
     details->capacity = new_capacity;
   }
 
-  char* key_data = strdup(key);
+  char* key_data = malloc(strlen(key) + 1);
   if (!key_data) return;
+  memcpy(key_data, key, strlen(key) + 1);
+
   uint8_t* value_data = malloc(detail_length);
   if (!value_data) {
     free(key_data);

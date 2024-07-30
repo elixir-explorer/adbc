@@ -15,18 +15,25 @@
 # specific language governing permissions and limitations
 # under the License.
 
-# Common definitions for the CMake projects in this repository.
-# Must define REPOSITORY_ROOT before including this.
 
-# ------------------------------------------------------------
-# Version definitions
+adbc_validation_util_lib = library(
+    'adbc_validation_util',
+    'adbc_validation_util.cc',
+    include_directories: [root_dir, driver_dir],
+    link_with: [adbc_common_lib, adbc_framework_lib, adbc_driver_manager_lib],
+    dependencies: [nanoarrow_dep, gtest_dep, gmock_dep],
+    install: true,
+)
 
-set(ADBC_VERSION "1.1.0")
-string(REGEX MATCH "^[0-9]+\\.[0-9]+\\.[0-9]+" ADBC_BASE_VERSION "${ADBC_VERSION}")
-string(REPLACE "." ";" _adbc_version_list "${ADBC_BASE_VERSION}")
-list(GET _adbc_version_list 0 ADBC_VERSION_MAJOR)
-list(GET _adbc_version_list 1 ADBC_VERSION_MINOR)
-list(GET _adbc_version_list 2 ADBC_VERSION_PATCH)
-
-math(EXPR ADBC_SO_VERSION "${ADBC_VERSION_MAJOR} * 100 + ${ADBC_VERSION_MINOR}")
-set(ADBC_FULL_SO_VERSION "${ADBC_SO_VERSION}.${ADBC_VERSION_PATCH}.0")
+adbc_validation_lib = library(
+    'adbc_validation',
+    sources: [
+        'adbc_validation.cc',
+        'adbc_validation_connection.cc',
+        'adbc_validation_database.cc',
+        'adbc_validation_statement.cc',
+    ],
+    include_directories: [root_dir, driver_dir],
+    link_with: [adbc_common_lib, adbc_validation_util_lib, adbc_driver_manager_lib],
+    dependencies: [nanoarrow_dep, gtest_dep, gmock_dep],
+)

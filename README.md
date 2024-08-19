@@ -11,7 +11,7 @@ documentation for setting it up and the available drivers.
 First, add `:adbc` as a dependency in your `mix.exs`:
 
 ```elixir
-{:adbc, "~> 0.1"}
+{:adbc, "~> 0.6"}
 ```
 
 Now, in your config/config.exs, configure the drivers you

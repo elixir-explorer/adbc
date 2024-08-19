@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## v0.6.1
+
+#### Changes
+
+* Precompiling NIFs on `ubuntu-20.04` thus lowering the minimum required GLIBCXX version to `3.4.21`.
+
 ## v0.6.0
 
 #### Breaking changes

@@ -10,13 +10,13 @@ permissions:
 
 jobs:
   linux:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     env:
       MIX_ENV: prod
     strategy:
       matrix:
         otp_version: [25]
-    
+
     name: Linux GNU - OTP ${{ matrix.otp_version }}
 
     steps:

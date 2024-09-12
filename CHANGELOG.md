@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## v0.6.2
+
+#### Fixes
+
+* Handle `nil` values in `Adbc.Column.materialize/1` for decimal type (#103)
+
 ## v0.6.1
 
 #### Changes

@@ -1198,14 +1198,16 @@ defmodule Adbc.Column do
   end
 
   defp handle_decimal(decimal_data, bits, scale) do
-    Enum.map(decimal_data, fn data ->
-      <<decimal::signed-integer-size(bits)-little>> = data
+    Enum.map(decimal_data, fn
+      <<decimal::signed-integer-size(bits)-little>> ->
+        if decimal < 0 do
+          Decimal.new(-1, -decimal, -scale)
+        else
+          Decimal.new(1, decimal, -scale)
+        end
 
-      if decimal < 0 do
-        Decimal.new(-1, -decimal, -scale)
-      else
-        Decimal.new(1, decimal, -scale)
-      end
+      nil ->
+        nil
     end)
   end
 

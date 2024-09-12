@@ -41,6 +41,30 @@ defmodule Adbc.Column.Test do
       assert value == decode2 / :math.pow(10, scale)
     end
 
+    test "nil in data" do
+      bitwidth = 128
+      precision = 19
+      scale = 10
+
+      decimal_with_nil = %Adbc.Column{
+        data: [nil],
+        metadata: nil,
+        name: nil,
+        nullable: true,
+        type: {:decimal, bitwidth, precision, scale}
+      }
+
+      assert %Adbc.Column{
+               name: nil,
+               type: {:decimal, ^bitwidth, ^precision, ^scale},
+               nullable: true,
+               metadata: nil,
+               data: [nil],
+               length: nil,
+               offset: nil
+             } = Adbc.Column.materialize(decimal_with_nil)
+    end
+
     test "floats" do
       value = 12345
 

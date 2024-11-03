@@ -6,6 +6,7 @@
 
 * Updated to ADBC library 14, https://github.com/apache/arrow-adbc/releases/tag/apache-arrow-adbc-14
 * Updated to DuckDB 1.1.2, https://github.com/duckdb/duckdb/releases/tag/v1.1.2
+* Added precompiled binaries for `aarch64-linux-gnu`.
 
 ## v0.6.2
 

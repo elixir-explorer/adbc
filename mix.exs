@@ -26,6 +26,10 @@ defmodule Adbc.MixProject do
             "x86_64-linux-gnu" => {
               "x86_64-linux-gnu-gcc",
               "x86_64-linux-gnu-g++"
+            },
+            "aarch64-linux-gnu" => {
+              "aarch64-linux-gnu-gcc",
+              "aarch64-linux-gnu-g++"
             }
           },
           {:unix, :darwin} => %{

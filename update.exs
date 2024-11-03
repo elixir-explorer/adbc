@@ -12,12 +12,12 @@ Mix.install([{:req, "~> 0.4"}])
 defmodule Update do
   # To update duckdb driver, just bump this version
   # https://github.com/duckdb/duckdb/releases/
-  @duckdb_version "1.0.0"
+  @duckdb_version "1.1.2"
 
   # To update ADBC drivers, bump the tag and version accordingly
   # https://github.com/apache/arrow-adbc/releases
-  @adbc_driver_version "1.1.0"
-  @adbc_tag "apache-arrow-adbc-13"
+  @adbc_driver_version "1.2.0"
+  @adbc_tag "apache-arrow-adbc-14"
   @adbc_drivers ~w(sqlite postgresql flightsql snowflake)a
 
   def versions do
@@ -48,6 +48,7 @@ defmodule Update do
     {aarch64_linux_gnu, zip_files} = data_for(zip_files, ["linux", "aarch64"])
     {x86_64_linux_gnu, zip_files} = data_for(zip_files, ["linux", "amd64"])
     {x86_64_windows_msvc, zip_files} = data_for(zip_files, ["windows", "amd64"])
+    {aarch64_windows_msvc, zip_files} = data_for(zip_files, ["windows", "arm64"])
 
     if zip_files != [] do
       IO.puts("The following zip files for duckdb are not being used:\n\n#{inspect(zip_files)}")
@@ -59,7 +60,8 @@ defmodule Update do
         "x86_64-apple-darwin" => x86_64_apple_darwin,
         "aarch64-linux-gnu" => aarch64_linux_gnu,
         "x86_64-linux-gnu" => x86_64_linux_gnu,
-        "x86_64-windows-msvc" => x86_64_windows_msvc
+        "x86_64-windows-msvc" => x86_64_windows_msvc,
+        "aarch64-windows-msvc" => aarch64_windows_msvc,
       }
     }
   end

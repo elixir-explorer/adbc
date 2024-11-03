@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## v0.6.3
+
+#### Changes
+
+* Updated to ADBC library 14, https://github.com/apache/arrow-adbc/releases/tag/apache-arrow-adbc-14
+* Updated to DuckDB 1.1.2, https://github.com/duckdb/duckdb/releases/tag/v1.1.2
+
 ## v0.6.2
 
 #### Fixes

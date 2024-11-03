@@ -18,7 +18,7 @@
 project(
     'arrow-adbc',
     'c', 'cpp',
-    version: '1.1.0',
+    version: '1.2.0',
     license: 'Apache-2.0',
     meson_version: '>=1.3.0',
     default_options: [
@@ -32,27 +32,30 @@ project(
 add_project_arguments('-Wno-int-conversion', '-Wno-unused-parameter', language: 'c')
 add_project_arguments('-Wno-unused-parameter', '-Wno-reorder', language: 'cpp')
 
-root_dir = include_directories('..')
+c_dir = include_directories('.')
+include_dir = include_directories('include')
+install_headers('include/adbc.h')
+install_headers('include/arrow-adbc/adbc.h', subdir: 'arrow-adbc')
 driver_dir = include_directories('driver')
 nanoarrow_dep = dependency('nanoarrow')
 fmt_dep = dependency('fmt')
 
 if get_option('tests')
     gtest_main_dep = dependency('gtest_main')
-    # Seems to be some kind of bug with meson test
-    # gtest-port.h:1770 pthread_key_delete(key_)failed with error 22
-    # https://github.com/google/googletest/pull/4536 ???
-    gtest_dep = dependency('gtest')
     gmock_dep = dependency('gmock')
 else
-    gtest_dep = disabler()
+    gtest_main_dep = disabler()
     gmock_dep = disabler()
 endif
 
 needs_driver_manager = get_option('driver_manager') \
     or get_option('tests')
 
+pkg = import('pkgconfig')
+
 if needs_driver_manager
+    install_headers('include/adbc_driver_manager.h')
+    install_headers('include/arrow-adbc/adbc_driver_manager.h', subdir: 'arrow-adbc')
     subdir('driver_manager')
 endif
 
@@ -61,6 +64,10 @@ subdir('driver/framework')
 
 if get_option('tests')
   subdir('validation')
+endif
+
+if get_option('bigquery')
+  subdir('driver/bigquery')
 endif
 
 if get_option('flightsql')

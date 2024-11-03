@@ -25,11 +25,20 @@ adbc_postgres_driver_lib = library(
         'database.cc',
         'postgresql.cc',
         'result_helper.cc',
+        'result_reader.cc',
         'statement.cc',
     ],
-    include_directories: [root_dir],
+    include_directories: [include_dir, c_dir],
     link_with: [adbc_common_lib, adbc_framework_lib],
     dependencies: [nanoarrow_dep, fmt_dep, libpq_dep],
+)
+
+pkg.generate(
+    name: 'Apache Arrow Database Connectivity (ADBC) PostgreSQL driver',
+    description: 'The ADBC PostgreSQL driver provides an ADBC driver for PostgreSQL.',
+    url: 'https://github.com/apache/arrow-adbc',
+    libraries: [adbc_postgres_driver_lib],
+    filebase: 'adbc-driver-postgresql',
 )
 
 if get_option('tests')
@@ -54,14 +63,12 @@ if get_option('tests')
         exc = executable(
             'adbc-' + name + '-test',
             sources: conf['sources'],
-            include_directories: [root_dir, driver_dir],
+            include_directories: [include_dir, driver_dir, c_dir],
             link_with: [
                 adbc_common_lib,
                 adbc_postgres_driver_lib,
-                adbc_validation_lib,
-                adbc_validation_util_lib,
             ],
-            dependencies: [nanoarrow_dep, gtest_main_dep, gmock_dep, libpq_dep],
+            dependencies: [libpq_dep, adbc_validation_dep],
         )
         test('adbc-' + name, exc)
     endforeach

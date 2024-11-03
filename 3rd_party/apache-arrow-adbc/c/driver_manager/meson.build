@@ -19,6 +19,14 @@
 adbc_driver_manager_lib = library(
     'adbc_driver_manager',
     'adbc_driver_manager.cc',
-    include_directories: [root_dir],
+    include_directories: [include_dir],
     install: true,
+)
+
+pkg.generate(
+    name: 'Apache Arrow Database Connectivity (ADBC) driver manager',
+    description: 'ADBC driver manager provides API to use ADBC driver.',
+    url: 'https://github.com/apache/arrow-adbc',
+    libraries: [adbc_driver_manager_lib],
+    filebase: 'adbc-driver-manager',
 )

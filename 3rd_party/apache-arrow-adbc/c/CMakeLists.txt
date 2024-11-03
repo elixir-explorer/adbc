@@ -35,6 +35,10 @@ add_subdirectory(vendor/nanoarrow)
 add_subdirectory(driver/common)
 add_subdirectory(driver/framework)
 
+install(FILES "${REPOSITORY_ROOT}/c/include/adbc.h" DESTINATION include)
+install(FILES "${REPOSITORY_ROOT}/c/include/arrow-adbc/adbc.h"
+        DESTINATION include/arrow-adbc)
+
 if(ADBC_BUILD_TESTS)
   add_subdirectory(validation)
 endif()
@@ -54,6 +58,9 @@ if(ADBC_DRIVER_FLIGHTSQL)
 endif()
 
 if(ADBC_DRIVER_MANAGER)
+  install(FILES "${REPOSITORY_ROOT}/c/include/adbc_driver_manager.h" DESTINATION include)
+  install(FILES "${REPOSITORY_ROOT}/c/include/arrow-adbc/adbc_driver_manager.h"
+          DESTINATION include/arrow-adbc)
   add_subdirectory(driver_manager)
 endif()
 
@@ -67,6 +74,10 @@ endif()
 
 if(ADBC_DRIVER_SNOWFLAKE)
   add_subdirectory(driver/snowflake)
+endif()
+
+if(ADBC_DRIVER_BIGQUERY)
+  add_subdirectory(driver/bigquery)
 endif()
 
 if(ADBC_INTEGRATION_DUCKDB)
@@ -118,6 +129,10 @@ LIBRARY=$<TARGET_FILE:adbc_driver_${TARGET}_shared>" ${Python3_EXECUTABLE} -m pi
 
   if(ADBC_DRIVER_SNOWFLAKE)
     adbc_install_python_package(snowflake)
+  endif()
+
+  if(ADBC_DRIVER_BIGQUERY)
+    adbc_install_python_package(bigquery)
   endif()
 endif()
 

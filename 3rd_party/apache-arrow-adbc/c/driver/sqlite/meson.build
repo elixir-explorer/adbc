@@ -28,24 +28,30 @@ adbc_sqlite3_driver_lib = library(
         'sqlite.cc',
         'statement_reader.c',
     ],
-    include_directories: [root_dir],
+    include_directories: [include_dir, c_dir],
     link_with: [adbc_common_lib, adbc_framework_lib],
     dependencies: [nanoarrow_dep, fmt_dep, sqlite3_dep],
     c_args: ['-DSIZEOF_TIME_T=' + time_t_size.to_string()],
+)
+
+pkg.generate(
+    name: 'Apache Arrow Database Connectivity (ADBC) SQLite driver',
+    description: 'The ADBC SQLite driver provides an ADBC driver for SQLite.',
+    url: 'https://github.com/apache/arrow-adbc',
+    libraries: [adbc_sqlite3_driver_lib],
+    filebase: 'adbc-driver-sqlite',
 )
 
 if get_option('tests')
     exc = executable(
         'adbc-driver-sqlite-test',
         sources: ['sqlite_test.cc'],
-        include_directories: [root_dir, driver_dir],
+        include_directories: [include_dir, c_dir, driver_dir],
         link_with: [
             adbc_common_lib,
             adbc_sqlite3_driver_lib,
-            adbc_validation_lib,
-            adbc_validation_util_lib
         ],
-        dependencies: [nanoarrow_dep, gtest_main_dep, gmock_dep, sqlite3_dep],
+        dependencies: [sqlite3_dep, adbc_validation_dep],
         )
     test('adbc-driver-sqlite', exc)
 endif

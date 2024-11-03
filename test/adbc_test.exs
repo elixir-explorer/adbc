@@ -269,6 +269,27 @@ defmodule AdbcTest do
                ]
              } = Adbc.Result.materialize(results)
     end
+
+    test "query with parameters", %{db: _, conn: conn} do
+      assert {:ok, result} =
+               Adbc.Connection.query(
+                 conn,
+                 "SELECT $1 as x",
+                 [Adbc.Column.s32([1, 2, 3])]
+               )
+
+      assert %Adbc.Result{
+               data: [
+                 %Adbc.Column{
+                   data: [1, 2, 3],
+                   name: "x",
+                   type: :s32,
+                   metadata: nil,
+                   nullable: true
+                 }
+               ]
+             } = result |> Adbc.Result.materialize()
+    end
   end
 
   describe "duckdb smoke tests" do

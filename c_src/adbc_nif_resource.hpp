@@ -1,7 +1,7 @@
 #ifndef ADBC_NIF_RESOURCE_HPP
 #define ADBC_NIF_RESOURCE_HPP
 
-#include <adbc.h>
+#include <arrow-adbc/adbc.h>
 #include <atomic>
 #include <erl_nif.h>
 #include <memory>

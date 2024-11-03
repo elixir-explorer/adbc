@@ -1,7 +1,7 @@
 #include <cstdbool>
 #include <cstdio>
 #include <climits>
-#include <adbc.h>
+#include <arrow-adbc/adbc.h>
 #include <erl_nif.h>
 #include <nanoarrow/nanoarrow.h>
 #include "adbc_nif_resource.hpp"

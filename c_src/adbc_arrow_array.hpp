@@ -7,7 +7,7 @@
 #include <cstdbool>
 #include <cstdint>
 #include <vector>
-#include <adbc.h>
+#include <arrow-adbc/adbc.h>
 #include <erl_nif.h>
 #include "adbc_half_float.hpp"
 #include "adbc_arrow_metadata.hpp"

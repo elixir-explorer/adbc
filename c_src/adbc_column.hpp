@@ -7,7 +7,7 @@
 #include <functional>
 #include <type_traits>
 #include <optional>
-#include <adbc.h>
+#include <arrow-adbc/adbc.h>
 #include <erl_nif.h>
 #include <nanoarrow/nanoarrow.hpp>
 #include "adbc_consts.h"

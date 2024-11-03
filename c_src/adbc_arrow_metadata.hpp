@@ -4,7 +4,7 @@
 
 #include <stdio.h>
 #include <vector>
-#include <adbc.h>
+#include <arrow-adbc/adbc.h>
 #include <erl_nif.h>
 #include "adbc_consts.h"
 #include "nif_utils.hpp"

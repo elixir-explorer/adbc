@@ -49,7 +49,7 @@ set(SOURCE_FILES
 )
 
 include_directories("${ERTS_INCLUDE_DIR}")
-include_directories("${ADBC_SRC}")
+include_directories("${ADBC_SRC}/c/include")
 
 add_subdirectory("${ADBC_SRC}/c/vendor/nanoarrow")
 include_directories("${ADBC_SRC}/c/vendor")

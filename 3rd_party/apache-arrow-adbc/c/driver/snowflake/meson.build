@@ -47,18 +47,24 @@ adbc_driver_snowflake_lib = custom_target(
     install_dir : '.',
 )
 
+pkg.generate(
+    name: 'Apache Arrow Database Connectivity (ADBC) Snowflake driver',
+    description: 'The ADBC Snowflake driver provides an ADBC driver for Snowflake.',
+    url: 'https://github.com/apache/arrow-adbc',
+    libraries: [adbc_driver_snowflake_lib],
+    filebase: 'adbc-driver-snowflake',
+)
+
 if get_option('tests')
     exc = executable(
         'adbc-driver-snowflake-test',
         'snowflake_test.cc',
-        include_directories: [root_dir, driver_dir],
+        include_directories: [include_dir, c_dir, driver_dir],
         link_with: [
             adbc_common_lib,
-            adbc_validation_lib,
-            adbc_validation_util_lib,
-            adbc_driver_snowflake_lib
+            adbc_driver_snowflake_lib,
         ],
-        dependencies: [nanoarrow_dep, gmock_dep, gtest_main_dep],
+        dependencies: [adbc_validation_dep],
     )
     test('adbc-driver-snowflake', exc)
 endif

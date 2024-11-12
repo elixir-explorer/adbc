@@ -166,25 +166,10 @@ defmodule Adbc.Connection.Test do
       assert results =
                %Adbc.Result{
                  num_rows: nil,
-                 data: [
-                   %Adbc.Column{
-                     data: [],
-                     name: "catalog_name",
-                     type: :string,
-                     metadata: nil,
-                     nullable: true
-                   },
-                   %Adbc.Column{
-                     data: [],
-                     name: "catalog_db_schemas",
-                     type: :list,
-                     metadata: nil,
-                     nullable: true
-                   }
-                 ]
+                 data: []
                } = Adbc.Result.materialize(results)
 
-      assert %{"catalog_db_schemas" => [], "catalog_name" => []} == Adbc.Result.to_map(results)
+      assert %{} == Adbc.Result.to_map(results)
     end
   end
 

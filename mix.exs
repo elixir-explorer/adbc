@@ -14,33 +14,43 @@ defmodule Adbc.MixProject do
       package: package(),
       docs: docs(),
       description: "Apache Arrow ADBC bindings for Elixir",
-      compilers: [:elixir_make] ++ Mix.compilers(),
-      make_precompiler: {:nif, CCPrecompiler},
-      make_precompiler_url: "#{@github_url}/releases/download/v#{@version}/@{artefact_filename}",
-      make_precompiler_filename: "adbc_nif",
-      make_precompiler_nif_versions: [versions: ["2.16"]],
-      cc_precompiler: [
-        cleanup: "clean",
-        compilers: %{
-          {:unix, :linux} => %{
-            "x86_64-linux-gnu" => {
-              "x86_64-linux-gnu-gcc",
-              "x86_64-linux-gnu-g++"
+      compilers: [:elixir_make] ++ Mix.compilers()
+    ] ++ precompiled()
+  end
+
+  defp precompiled do
+    if System.get_env("ADBC_PREFER_PRECOMPILED", "true") == "true" do
+      [
+        make_precompiler: {:nif, CCPrecompiler},
+        make_precompiler_url:
+          "#{@github_url}/releases/download/v#{@version}/@{artefact_filename}",
+        make_precompiler_filename: "adbc_nif",
+        make_precompiler_nif_versions: [versions: ["2.16"]],
+        cc_precompiler: [
+          cleanup: "clean",
+          compilers: %{
+            {:unix, :linux} => %{
+              "x86_64-linux-gnu" => {
+                "x86_64-linux-gnu-gcc",
+                "x86_64-linux-gnu-g++"
+              },
+              "aarch64-linux-gnu" => {
+                "aarch64-linux-gnu-gcc",
+                "aarch64-linux-gnu-g++"
+              }
             },
-            "aarch64-linux-gnu" => {
-              "aarch64-linux-gnu-gcc",
-              "aarch64-linux-gnu-g++"
+            {:unix, :darwin} => %{
+              :include_default_ones => true
+            },
+            {:win32, :nt} => %{
+              :include_default_ones => true
             }
-          },
-          {:unix, :darwin} => %{
-            :include_default_ones => true
-          },
-          {:win32, :nt} => %{
-            :include_default_ones => true
           }
-        }
+        ]
       ]
-    ]
+    else
+      []
+    end
   end
 
   def application do

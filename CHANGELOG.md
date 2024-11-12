@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## v0.6.5
+
+#### Added
+
+- Added an environment variable `ADBC_PREFER_PRECOMPILED`. Set to `false` to force compile locally.
+
 ## v0.6.4
 
 #### Fixes

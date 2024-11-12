@@ -19,7 +19,9 @@ defmodule Adbc.MixProject do
   end
 
   defp precompiled do
-    if System.get_env("ADBC_PREFER_PRECOMPILED", "true") == "true" do
+    if System.get_env("ADBC_BUILD") in ["1", "true"] do
+      []
+    else
       [
         make_precompiler: {:nif, CCPrecompiler},
         make_precompiler_url:
@@ -48,8 +50,6 @@ defmodule Adbc.MixProject do
           }
         ]
       ]
-    else
-      []
     end
   end
 

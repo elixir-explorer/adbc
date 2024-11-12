@@ -59,6 +59,10 @@ And now you can make queries with:
 {:ok, _} = Adbc.Connection.query(conn, "SELECT 123")
 ```
 
+## Precompiled artifacts
+
+This project ships with precompiled artifacts. You can force a build by setting `ADBC_BUILD=1`.
+
 ## License
 
 Copyright 2023 Cocoa Xu, José Valim

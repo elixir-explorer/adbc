@@ -1,9 +1,13 @@
 name: precompile
 
 on:
+  workflow_dispatch:
   push:
     tags:
       - 'v*'
+
+env:
+  CI: true
 
 permissions:
   contents: write

@@ -44,9 +44,15 @@ MAKE_BUILD_FLAGS ?= -j$(DEFAULT_JOBS)
 .DEFAULT_GLOBAL := build
 
 build: $(NIF_SO_REL)
-	@echo > /dev/null
+	@ if [ "${CI}" = "true" ]; then \
+		file "$(NIF_SO)" ; \
+	fi
 
 clean:
+	@rm -rf "$(NIF_SO_REL)"
+	@rm -rf "$(NIF_SO)"
+	@rm -rf "$(CMAKE_ADBC_NIF_BUILD_DIR)"
+	@rm -rf "$(CMAKE_ADBC_BUILD_DIR)"
 	@rm -rf "$(PRIV_DIR)"
 
 priv_dir:

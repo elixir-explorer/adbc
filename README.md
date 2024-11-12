@@ -59,6 +59,14 @@ And now you can make queries with:
 {:ok, _} = Adbc.Connection.query(conn, "SELECT 123")
 ```
 
+## Precompiled artifacts
+
+This project ships with precompiled artifacts. You can force the artifacts to be built by setting `ADBC_BUILD=1` or via the following application configuration:
+
+```elixir
+config :elixir_make, :force_build, adbc: true
+```
+
 ## License
 
 Copyright 2023 Cocoa Xu, José Valim

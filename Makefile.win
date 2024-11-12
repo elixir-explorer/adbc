@@ -46,6 +46,9 @@ priv_dir:
 
 clean:
 	@ if exist "$(PRIV_DIR)" rmdir "$(PRIV_DIR)" /s /q
+	@ if exist "$(CMAKE_ADBC_BUILD_DIR)" rmdir "$(CMAKE_ADBC_BUILD_DIR)" /s /q
+	@ if exist "$(CMAKE_ADBC_NIF_BUILD_DIR)" rmdir "$(CMAKE_ADBC_NIF_BUILD_DIR)" /s /q
+	@ if exist "$(NIF_SO)" del "$(NIF_SO)"
 
 adbc: priv_dir
     @ if not exist "$(ADBC_DRIVER_COMMON_LIB)" ( \

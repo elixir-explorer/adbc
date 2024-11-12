@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## v0.6.4
+
+#### Fixes
+
+- Fixed the issue with the `clean` target in the Makefile not removing all relevant files (#109)
+
 ## v0.6.3
 
 #### Changes

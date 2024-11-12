@@ -79,10 +79,16 @@ class SqliteQuirks : public adbc_validation::DriverQuirks {
       case NANOARROW_TYPE_UINT32:
       case NANOARROW_TYPE_UINT64:
         return NANOARROW_TYPE_INT64;
+      case NANOARROW_TYPE_HALF_FLOAT:
       case NANOARROW_TYPE_FLOAT:
-      case NANOARROW_TYPE_DOUBLE:
         return NANOARROW_TYPE_DOUBLE;
       case NANOARROW_TYPE_LARGE_STRING:
+      case NANOARROW_TYPE_STRING_VIEW:
+        return NANOARROW_TYPE_STRING;
+      case NANOARROW_TYPE_LARGE_BINARY:
+      case NANOARROW_TYPE_FIXED_SIZE_BINARY:
+      case NANOARROW_TYPE_BINARY_VIEW:
+        return NANOARROW_TYPE_BINARY;
       case NANOARROW_TYPE_DATE32:
       case NANOARROW_TYPE_TIMESTAMP:
         return NANOARROW_TYPE_STRING;
@@ -328,6 +334,12 @@ class SqliteStatementTest : public ::testing::Test,
   void TestSqlIngestInterval() {
     GTEST_SKIP() << "Cannot ingest Interval (not implemented)";
   }
+  void TestSqlIngestListOfInt32() {
+    GTEST_SKIP() << "Cannot ingest list<int32> (not implemented)";
+  }
+  void TestSqlIngestListOfString() {
+    GTEST_SKIP() << "Cannot ingest list<string> (not implemented)";
+  }
 
  protected:
   void ValidateIngestedTemporalData(struct ArrowArrayView* values, ArrowType type,
@@ -439,8 +451,11 @@ class SqliteReaderTest : public ::testing::Test {
   }
 
   void Bind(struct ArrowArray* batch, struct ArrowSchema* schema) {
-    ASSERT_THAT(AdbcSqliteBinderSetArray(&binder, batch, schema, &error),
-                IsOkStatus(&error));
+    Handle<struct ArrowArrayStream> stream;
+    struct ArrowArray batch_internal = *batch;
+    batch->release = nullptr;
+    adbc_validation::MakeStream(&stream.value, schema, {batch_internal});
+    ASSERT_NO_FATAL_FAILURE(Bind(&stream.value));
   }
 
   void Bind(struct ArrowArrayStream* stream) {

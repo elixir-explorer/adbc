@@ -61,7 +61,11 @@ And now you can make queries with:
 
 ## Precompiled artifacts
 
-This project ships with precompiled artifacts. You can force a build by setting `ADBC_BUILD=1`.
+This project ships with precompiled artifacts. You can force the artifacts to be built by setting `ADBC_BUILD=1` or via the following application configuration:
+
+```elixir
+config :elixir_make, :force_build, adbc: true
+```
 
 ## License
 

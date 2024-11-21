@@ -69,6 +69,19 @@ class Status {
     impl_->details.push_back({std::move(key), std::move(value)});
   }
 
+  /// \brief Set the sqlstate of this status
+  void SetSqlState(std::string sqlstate) {
+    assert(impl_ != nullptr);
+    std::memset(impl_->sql_state, 0, sizeof(impl_->sql_state));
+    for (size_t i = 0; i < sqlstate.size(); i++) {
+      if (i >= sizeof(impl_->sql_state)) {
+        break;
+      }
+
+      impl_->sql_state[i] = sqlstate[i];
+    }
+  }
+
   /// \brief Export this status to an AdbcError.
   AdbcStatusCode ToAdbc(AdbcError* adbc_error) const {
     if (impl_ == nullptr) return ADBC_STATUS_OK;
@@ -112,7 +125,29 @@ class Status {
     return status;
   }
 
+  // Helpers to create statuses with known codes
+  static Status Ok() { return Status(); }
+
+#define STATUS_CTOR(NAME, CODE)                  \
+  template <typename... Args>                    \
+  static Status NAME(Args&&... args) {           \
+    std::stringstream ss;                        \
+    ([&] { ss << args; }(), ...);                \
+    return Status(ADBC_STATUS_##CODE, ss.str()); \
+  }
+
+  STATUS_CTOR(Internal, INTERNAL)
+  STATUS_CTOR(InvalidArgument, INVALID_ARGUMENT)
+  STATUS_CTOR(InvalidState, INVALID_STATE)
+  STATUS_CTOR(IO, IO)
+  STATUS_CTOR(NotFound, NOT_FOUND)
+  STATUS_CTOR(NotImplemented, NOT_IMPLEMENTED)
+  STATUS_CTOR(Unknown, UNKNOWN)
+
+#undef STATUS_CTOR
+
  private:
+  /// \brief Private Status implementation details
   struct Impl {
     // invariant: code is never OK
     AdbcStatusCode code;
@@ -133,6 +168,8 @@ class Status {
   template <typename DatabaseT, typename ConnectionT, typename StatementT>
   friend class Driver;
 
+  // Allow access to these for drivers transitioning to the framework
+ public:
   int CDetailCount() const { return impl_ ? static_cast<int>(impl_->details.size()) : 0; }
 
   AdbcErrorDetail CDetail(int index) const {
@@ -144,6 +181,7 @@ class Status {
             detail.second.size()};
   }
 
+ private:
   static void CRelease(AdbcError* error) {
     if (error->vendor_code == ADBC_ERROR_VENDOR_CODE_PRIVATE_DATA) {
       auto* error_obj = reinterpret_cast<Status*>(error->private_data);

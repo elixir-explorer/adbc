@@ -174,6 +174,14 @@ TEST(PostgresTypeTest, PostgresTypeSetSchema) {
                         &typnameMetadataValue);
   EXPECT_EQ(std::string(typnameMetadataValue.data, typnameMetadataValue.size_bytes),
             "numeric");
+  ArrowMetadataGetValue(schema->metadata, ArrowCharView("ARROW:extension:name"),
+                        &typnameMetadataValue);
+  EXPECT_EQ(std::string(typnameMetadataValue.data, typnameMetadataValue.size_bytes),
+            "arrow.opaque");
+  ArrowMetadataGetValue(schema->metadata, ArrowCharView("ARROW:extension:metadata"),
+                        &typnameMetadataValue);
+  EXPECT_EQ(std::string(typnameMetadataValue.data, typnameMetadataValue.size_bytes),
+            R"({"type_name": "numeric", "vendor_name": "PostgreSQL"})");
   schema.reset();
 
   ArrowSchemaInit(schema.get());
@@ -312,11 +320,10 @@ TEST(PostgresTypeTest, PostgresTypeFromSchema) {
   schema.reset();
 
   ArrowError error;
-  ASSERT_EQ(ArrowSchemaInitFromType(schema.get(), NANOARROW_TYPE_INTERVAL_MONTH_DAY_NANO),
+  ASSERT_EQ(ArrowSchemaInitFromType(schema.get(), NANOARROW_TYPE_INTERVAL_MONTHS),
             NANOARROW_OK);
   EXPECT_EQ(PostgresType::FromSchema(resolver, schema.get(), &type, &error), ENOTSUP);
-  EXPECT_STREQ(error.message,
-               "Can't map Arrow type 'interval_month_day_nano' to Postgres type");
+  EXPECT_STREQ(error.message, "Can't map Arrow type 'interval_months' to Postgres type");
   schema.reset();
 }
 
@@ -329,6 +336,11 @@ TEST(PostgresTypeTest, PostgresTypeResolver) {
   // Check error for type not found
   EXPECT_EQ(resolver.Find(123, &type, &error), EINVAL);
   EXPECT_STREQ(ArrowErrorMessage(&error), "Postgres type with oid 123 not found");
+
+  EXPECT_EQ(resolver.FindWithDefault(123, &type), NANOARROW_OK);
+  EXPECT_EQ(type.oid(), 123);
+  EXPECT_EQ(type.type_id(), PostgresTypeId::kUnnamedArrowOpaque);
+  EXPECT_EQ(type.typname(), "unnamed<oid:123>");
 
   // Check error for Array with unknown child
   item.oid = 123;

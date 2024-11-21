@@ -89,8 +89,11 @@ AdbcStatusCode AdbcSqliteBinderSet(struct AdbcSqliteBinder* binder,
       switch (value_view.type) {
         case NANOARROW_TYPE_STRING:
         case NANOARROW_TYPE_LARGE_STRING:
+        case NANOARROW_TYPE_STRING_VIEW:
         case NANOARROW_TYPE_BINARY:
         case NANOARROW_TYPE_LARGE_BINARY:
+        case NANOARROW_TYPE_FIXED_SIZE_BINARY:
+        case NANOARROW_TYPE_BINARY_VIEW:
           break;
         default:
           SetError(error, "Column %d dictionary has unsupported type %s", i,
@@ -105,14 +108,6 @@ AdbcStatusCode AdbcSqliteBinderSet(struct AdbcSqliteBinder* binder,
   return ADBC_STATUS_OK;
 }
 
-AdbcStatusCode AdbcSqliteBinderSetArray(struct AdbcSqliteBinder* binder,
-                                        struct ArrowArray* values,
-                                        struct ArrowSchema* schema,
-                                        struct AdbcError* error) {
-  AdbcSqliteBinderRelease(binder);
-  RAISE_ADBC(BatchToArrayStream(values, schema, &binder->params, error));
-  return AdbcSqliteBinderSet(binder, error);
-}  // NOLINT(whitespace/indent)
 AdbcStatusCode AdbcSqliteBinderSetArrayStream(struct AdbcSqliteBinder* binder,
                                               struct ArrowArrayStream* values,
                                               struct AdbcError* error) {
@@ -334,7 +329,9 @@ AdbcStatusCode AdbcSqliteBinderBindNext(struct AdbcSqliteBinder* binder, sqlite3
     } else {
       switch (binder->types[col]) {
         case NANOARROW_TYPE_BINARY:
-        case NANOARROW_TYPE_LARGE_BINARY: {
+        case NANOARROW_TYPE_LARGE_BINARY:
+        case NANOARROW_TYPE_FIXED_SIZE_BINARY:
+        case NANOARROW_TYPE_BINARY_VIEW: {
           struct ArrowBufferView value =
               ArrowArrayViewGetBytesUnsafe(binder->batch.children[col], binder->next_row);
           status = sqlite3_bind_blob(stmt, col + 1, value.data.as_char, value.size_bytes,
@@ -367,6 +364,7 @@ AdbcStatusCode AdbcSqliteBinderBindNext(struct AdbcSqliteBinder* binder, sqlite3
           status = sqlite3_bind_int64(stmt, col + 1, value);
           break;
         }
+        case NANOARROW_TYPE_HALF_FLOAT:
         case NANOARROW_TYPE_FLOAT:
         case NANOARROW_TYPE_DOUBLE: {
           double value = ArrowArrayViewGetDoubleUnsafe(binder->batch.children[col],
@@ -375,7 +373,8 @@ AdbcStatusCode AdbcSqliteBinderBindNext(struct AdbcSqliteBinder* binder, sqlite3
           break;
         }
         case NANOARROW_TYPE_STRING:
-        case NANOARROW_TYPE_LARGE_STRING: {
+        case NANOARROW_TYPE_LARGE_STRING:
+        case NANOARROW_TYPE_STRING_VIEW: {
           struct ArrowBufferView value =
               ArrowArrayViewGetBytesUnsafe(binder->batch.children[col], binder->next_row);
           status = sqlite3_bind_text(stmt, col + 1, value.data.as_char, value.size_bytes,

@@ -116,11 +116,24 @@ class PostgresQuirks : public adbc_validation::DriverQuirks {
   ArrowType IngestSelectRoundTripType(ArrowType ingest_type) const override {
     switch (ingest_type) {
       case NANOARROW_TYPE_INT8:
+      case NANOARROW_TYPE_UINT8:
         return NANOARROW_TYPE_INT16;
+      case NANOARROW_TYPE_UINT16:
+        return NANOARROW_TYPE_INT32;
+      case NANOARROW_TYPE_UINT32:
+      case NANOARROW_TYPE_UINT64:
+        return NANOARROW_TYPE_INT64;
+      case NANOARROW_TYPE_HALF_FLOAT:
+        return NANOARROW_TYPE_FLOAT;
       case NANOARROW_TYPE_DURATION:
         return NANOARROW_TYPE_INTERVAL_MONTH_DAY_NANO;
       case NANOARROW_TYPE_LARGE_STRING:
+      case NANOARROW_TYPE_STRING_VIEW:
         return NANOARROW_TYPE_STRING;
+      case NANOARROW_TYPE_LARGE_BINARY:
+      case NANOARROW_TYPE_FIXED_SIZE_BINARY:
+      case NANOARROW_TYPE_BINARY_VIEW:
+        return NANOARROW_TYPE_BINARY;
       case NANOARROW_TYPE_DECIMAL128:
       case NANOARROW_TYPE_DECIMAL256:
         return NANOARROW_TYPE_STRING;
@@ -886,11 +899,6 @@ class PostgresStatementTest : public ::testing::Test,
   void SetUp() override { ASSERT_NO_FATAL_FAILURE(SetUpTest()); }
   void TearDown() override { ASSERT_NO_FATAL_FAILURE(TearDownTest()); }
 
-  void TestSqlIngestUInt8() { GTEST_SKIP() << "Not implemented"; }
-  void TestSqlIngestUInt16() { GTEST_SKIP() << "Not implemented"; }
-  void TestSqlIngestUInt32() { GTEST_SKIP() << "Not implemented"; }
-  void TestSqlIngestUInt64() { GTEST_SKIP() << "Not implemented"; }
-
   void TestSqlPrepareErrorParamCountMismatch() { GTEST_SKIP() << "Not yet implemented"; }
   void TestSqlPrepareGetParameterSchema() { GTEST_SKIP() << "Not yet implemented"; }
   void TestSqlPrepareSelectParams() { GTEST_SKIP() << "Not yet implemented"; }
@@ -1139,10 +1147,11 @@ TEST_F(PostgresStatementTest, SqlIngestTimestampOverflow) {
                 IsOkStatus(&error));
     ASSERT_THAT(AdbcStatementPrepare(&statement, &error), IsOkStatus(&error));
     ASSERT_THAT(AdbcStatementExecuteQuery(&statement, nullptr, nullptr, &error),
-                IsStatus(ADBC_STATUS_INVALID_ARGUMENT, &error));
-    ASSERT_THAT(error.message,
-                ::testing::HasSubstr("Row #1 has value '9223372036854775807' which "
-                                     "exceeds PostgreSQL timestamp limits"));
+                IsStatus(ADBC_STATUS_INTERNAL, &error));
+    ASSERT_THAT(
+        error.message,
+        ::testing::HasSubstr(
+            "Row 0 timestamp value 9223372036854775807 with unit 0 would overflow"));
   }
 
   {
@@ -1169,10 +1178,11 @@ TEST_F(PostgresStatementTest, SqlIngestTimestampOverflow) {
                 IsOkStatus(&error));
     ASSERT_THAT(AdbcStatementPrepare(&statement, &error), IsOkStatus(&error));
     ASSERT_THAT(AdbcStatementExecuteQuery(&statement, nullptr, nullptr, &error),
-                IsStatus(ADBC_STATUS_INVALID_ARGUMENT, &error));
-    ASSERT_THAT(error.message,
-                ::testing::HasSubstr("Row #1 has value '-9223372036854775808' which "
-                                     "exceeds PostgreSQL timestamp limits"));
+                IsStatus(ADBC_STATUS_INTERNAL, &error));
+    ASSERT_THAT(
+        error.message,
+        ::testing::HasSubstr(
+            "Row 0 timestamp value -9223372036854775808 with unit 0 would overflow"));
   }
 }
 
@@ -1433,6 +1443,66 @@ TEST_F(PostgresStatementTest, ExecuteParameterizedQueryWithRowsAffected) {
     ASSERT_NO_FATAL_FAILURE(reader.GetSchema());
     ASSERT_NO_FATAL_FAILURE(reader.Next());
     ASSERT_EQ(reader.array->release, nullptr);
+  }
+}
+
+TEST_F(PostgresStatementTest, SqlExecuteCopyZeroRowOutputError) {
+  ASSERT_THAT(quirks()->DropTable(&connection, "adbc_test", &error), IsOkStatus(&error));
+  ASSERT_THAT(AdbcStatementNew(&connection, &statement, &error), IsOkStatus(&error));
+
+  {
+    ASSERT_THAT(AdbcStatementSetSqlQuery(
+                    &statement, "CREATE TABLE adbc_test (id int primary key, data jsonb)",
+                    &error),
+                IsOkStatus(&error));
+    adbc_validation::StreamReader reader;
+    ASSERT_THAT(AdbcStatementExecuteQuery(&statement, &reader.stream.value,
+                                          &reader.rows_affected, &error),
+                IsOkStatus(&error));
+  }
+
+  {
+    ASSERT_THAT(
+        AdbcStatementSetSqlQuery(
+            &statement, "insert into adbc_test (id, data) values (1, null)", &error),
+        IsOkStatus(&error));
+    adbc_validation::StreamReader reader;
+    ASSERT_THAT(AdbcStatementExecuteQuery(&statement, &reader.stream.value,
+                                          &reader.rows_affected, &error),
+                IsOkStatus(&error));
+  }
+
+  {
+    ASSERT_THAT(
+        AdbcStatementSetSqlQuery(
+            &statement, "insert into adbc_test (id, data) values (2, '1')", &error),
+        IsOkStatus(&error));
+    adbc_validation::StreamReader reader;
+    ASSERT_THAT(AdbcStatementExecuteQuery(&statement, &reader.stream.value,
+                                          &reader.rows_affected, &error),
+                IsOkStatus(&error));
+  }
+
+  {
+    ASSERT_THAT(
+        AdbcStatementSetSqlQuery(&statement,
+                                 "SELECT id, data from adbc_test JOIN "
+                                 "jsonb_array_elements(adbc_test.data) AS foo ON true",
+                                 &error),
+        IsOkStatus(&error));
+    adbc_validation::StreamReader reader;
+    ASSERT_THAT(AdbcStatementExecuteQuery(&statement, &reader.stream.value,
+                                          &reader.rows_affected, &error),
+                IsOkStatus());
+    ASSERT_NO_FATAL_FAILURE(reader.GetSchema());
+    ASSERT_EQ(reader.MaybeNext(), EINVAL);
+
+    AdbcStatusCode status = ADBC_STATUS_OK;
+    const struct AdbcError* detail =
+        AdbcErrorFromArrayStream(&reader.stream.value, &status);
+    ASSERT_NE(nullptr, detail);
+    ASSERT_EQ(ADBC_STATUS_INVALID_ARGUMENT, status);
+    ASSERT_EQ("22023", std::string_view(detail->sqlstate, 5));
   }
 }
 
@@ -1719,7 +1789,7 @@ TEST_P(PostgresTypeTest, SelectValue) {
   // check type
   ASSERT_NO_FATAL_FAILURE(reader.GetSchema());
   ASSERT_NO_FATAL_FAILURE(adbc_validation::CompareSchema(
-      &reader.schema.value, {{std::nullopt, GetParam().arrow_type, true}}));
+      &reader.schema.value, {{"", GetParam().arrow_type, true}}));
   if (GetParam().arrow_type == NANOARROW_TYPE_TIMESTAMP) {
     if (GetParam().sql_type.find("WITH TIME ZONE") == std::string::npos) {
       ASSERT_STREQ(reader.schema->children[0]->format, "tsu:");

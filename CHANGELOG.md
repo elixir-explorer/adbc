@@ -4,13 +4,17 @@
 
 #### Added
 
-- Added an environment variable `ADBC_PREFER_PRECOMPILED`. Set to `false` to force compile locally.
+* Added an environment variable `ADBC_PREFER_PRECOMPILED`. Set to `false` to force compile locally.
+
+#### Changed
+
+* Updated to ADBC library 15.
 
 ## v0.6.4
 
 #### Fixes
 
-- Fixed the issue with the `clean` target in the Makefile not removing all relevant files (#109)
+* Fixed the issue with the `clean` target in the Makefile not removing all relevant files (#109)
 
 ## v0.6.3
 

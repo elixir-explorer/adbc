@@ -1,5 +1,7 @@
 # Adbc
 
+[![Hex.pm](https://img.shields.io/hexpm/v/adbc.svg?style=flat&color=blue)](https://hex.pm/packages/adbc)
+
 Elixir bindings for Arrow Database Connectivity (ADBC).
 
 Adbc provides a standard database interface using the

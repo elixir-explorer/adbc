@@ -17,7 +17,7 @@ defmodule Update do
   # To update ADBC drivers, bump the tag and version accordingly
   # https://github.com/apache/arrow-adbc/releases
   @adbc_driver_version "1.3.0"
-  @adbc_tag "apache-arrow-adbc-15-rc1"
+  @adbc_tag "apache-arrow-adbc-15"
   @adbc_drivers ~w(sqlite postgresql flightsql snowflake bigquery)a
 
   def versions do

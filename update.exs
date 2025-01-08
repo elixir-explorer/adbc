@@ -16,8 +16,8 @@ defmodule Update do
 
   # To update ADBC drivers, bump the tag and version accordingly
   # https://github.com/apache/arrow-adbc/releases
-  @adbc_driver_version "1.3.0"
-  @adbc_tag "apache-arrow-adbc-15"
+  @adbc_driver_version "1.4.0"
+  @adbc_tag "apache-arrow-adbc-16-rc0"
   @adbc_drivers ~w(sqlite postgresql flightsql snowflake bigquery)a
 
   def versions do
@@ -61,7 +61,7 @@ defmodule Update do
         "aarch64-linux-gnu" => aarch64_linux_gnu,
         "x86_64-linux-gnu" => x86_64_linux_gnu,
         "x86_64-windows-msvc" => x86_64_windows_msvc,
-        "aarch64-windows-msvc" => aarch64_windows_msvc,
+        "aarch64-windows-msvc" => aarch64_windows_msvc
       }
     }
   end

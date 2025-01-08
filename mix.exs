@@ -1,7 +1,11 @@
+# Release steps:
+# 1. Push tag
+# 2. Once CI finishes, run MIX_ENV=prod mix elixir_make.checksum --all
+# 3. Publish to Hex
 defmodule Adbc.MixProject do
   use Mix.Project
 
-  @version "0.6.5"
+  @version "0.7.0"
   @github_url "https://github.com/elixir-explorer/adbc"
 
   def project do

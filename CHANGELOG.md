@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## v0.7.0
+
+#### Changed
+
+* Added an environment variable `ADBC_BUILD`. Set to `true` to force compile locally.
+* Updated to ADBC library 16-rc0.
+
 ## v0.6.5
 
 #### Added
@@ -39,9 +46,9 @@
 ## v0.6.0
 
 #### Breaking changes
-* To avoid allocating data twice for inputs, the results now by default will return references in the data field of `Adbc.Column`. 
-  
-  If you need to use them in the Elixir world, you can use `Adbc.Result.materialize/1` and 
+* To avoid allocating data twice for inputs, the results now by default will return references in the data field of `Adbc.Column`.
+
+  If you need to use them in the Elixir world, you can use `Adbc.Result.materialize/1` and
   `Adbc.Column.materialize/1` to convert the data to regular Elixir terms.
 
   ```elixir

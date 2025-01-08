@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
   push:
     tags:
-      - 'v*'
+      - "v*"
 
 env:
   CI: true
@@ -54,7 +54,7 @@ jobs:
             cache/adbc*.sha256
 
   macos:
-    runs-on: macos-12
+    runs-on: macos-13
     env:
       MIX_ENV: prod
       elixir_version: "1.16.2"
@@ -116,7 +116,7 @@ jobs:
     strategy:
       matrix:
         otp_version: [25]
-    
+
     name: Windows - OTP ${{ matrix.otp_version }}
 
     steps:

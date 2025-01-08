@@ -587,6 +587,12 @@ defmodule Adbc.Column do
     )
   end
 
+  defp coef_length(0), do: 1
+  defp coef_length(coef), do: coef_length(coef, 0)
+
+  defp coef_length(0, length), do: length
+  defp coef_length(coef, length), do: coef_length(Kernel.div(coef, 10), length + 1)
+
   defp preprocess_decimal(_bitwidth, _precision, _scale, [], acc), do: Enum.reverse(acc)
 
   defp preprocess_decimal(bitwidth, precision, scale, [nil | rest], acc) do
@@ -595,7 +601,7 @@ defmodule Adbc.Column do
 
   defp preprocess_decimal(bitwidth, precision, scale, [integer | rest], acc)
        when is_integer(integer) do
-    if Decimal.coef_length(integer) > precision do
+    if coef_length(integer) > precision do
       raise Adbc.Error,
             "`#{Integer.to_string(integer)}` cannot be fitted into a decimal#{Integer.to_string(bitwidth)} with the specified precision #{Integer.to_string(precision)}"
     else
@@ -623,7 +629,7 @@ defmodule Adbc.Column do
       raise Adbc.Error,
             "`#{Decimal.to_string(decimal)}` cannot be represented as a valid decimal#{Integer.to_string(bitwidth)} number"
     else
-      if Decimal.coef_length(decimal.coef) > precision do
+      if coef_length(decimal.coef) > precision do
         raise Adbc.Error,
               "`#{Decimal.to_string(decimal)}` cannot be fitted into a decimal#{Integer.to_string(bitwidth)} with the specified precision #{Integer.to_string(precision)}"
       else

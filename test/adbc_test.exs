@@ -338,6 +338,21 @@ defmodule AdbcTest do
                ]
              } = result |> Adbc.Result.materialize()
     end
+
+    test "top-level parameter values should have the same length/rows", %{db: _, conn: conn} do
+      values = [1, 2, 3]
+      not_in_values = 4
+
+      assert_raise ArgumentError,
+                   "Expected struct child 2 to have length >= 3 but found child with length 1",
+                   fn ->
+                     Adbc.Connection.query!(
+                       conn,
+                       "SELECT ($2 = ANY($1))::int",
+                       [Adbc.Column.s32(values), Adbc.Column.s32([not_in_values])]
+                     )
+                   end
+    end
   end
 
   describe "duckdb smoke tests" do

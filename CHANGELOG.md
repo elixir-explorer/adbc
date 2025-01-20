@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## v0.7.1
+
+#### Fixes
+
+* fix: using `ArrowArrayInitFromType` when building list of strings (#113)
+
 ## v0.7.0
 
 #### Changed

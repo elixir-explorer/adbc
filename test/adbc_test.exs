@@ -12,7 +12,8 @@ defmodule AdbcTest do
 
     test "returns errors" do
       assert {:error,
-              "unknown driver :unknown, expected one of :bigquery, :duckdb, :flightsql, :postgresql, " <> _} =
+              "unknown driver :unknown, expected one of :bigquery, :duckdb, :flightsql, :postgresql, " <>
+                _} =
                Adbc.download_driver(:unknown)
     end
   end
@@ -289,6 +290,68 @@ defmodule AdbcTest do
                  }
                ]
              } = result |> Adbc.Result.materialize()
+    end
+
+    test "query with parameters, operator in", %{db: _, conn: conn} do
+      values = [1, 2, 3]
+      not_in_values = 4
+
+      for v <- values do
+        assert {:ok, result} =
+                 Adbc.Connection.query(
+                   conn,
+                   "SELECT ($2 = ANY($1))::int",
+                   [Adbc.Column.list([Adbc.Column.s32(values)]), Adbc.Column.s32([v])]
+                 )
+
+        assert %Adbc.Result{
+                 data: [
+                   %Adbc.Column{
+                     data: [1],
+                     name: "int4",
+                     type: :s32,
+                     metadata: nil,
+                     nullable: true
+                   }
+                 ]
+               } = result |> Adbc.Result.materialize()
+      end
+
+      refute Enum.member?(values, not_in_values)
+
+      assert {:ok, result} =
+               Adbc.Connection.query(
+                 conn,
+                 "SELECT ($2 = ANY($1))::int",
+                 [Adbc.Column.list([Adbc.Column.s32(values)]), Adbc.Column.s32([not_in_values])]
+               )
+
+      assert %Adbc.Result{
+               data: [
+                 %Adbc.Column{
+                   data: [0],
+                   name: "int4",
+                   type: :s32,
+                   metadata: nil,
+                   nullable: true
+                 }
+               ]
+             } = result |> Adbc.Result.materialize()
+    end
+
+    test "top-level parameter values should have the same length/rows", %{db: _, conn: conn} do
+      values = [1, 2, 3]
+      not_in_values = 4
+
+      assert_raise ArgumentError,
+                   "Expected struct child 2 to have length >= 3 but found child with length 1",
+                   fn ->
+                     Adbc.Connection.query!(
+                       conn,
+                       "SELECT ($2 = ANY($1))::int",
+                       [Adbc.Column.s32(values), Adbc.Column.s32([not_in_values])]
+                     )
+                   end
     end
   end
 

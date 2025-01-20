@@ -43,6 +43,8 @@ MAKE_BUILD_FLAGS ?= -j$(DEFAULT_JOBS)
 
 .DEFAULT_GLOBAL := build
 
+all: adbc
+
 build: $(NIF_SO_REL)
 	@ if [ "${CI}" = "true" ]; then \
 		file "$(NIF_SO)" ; \

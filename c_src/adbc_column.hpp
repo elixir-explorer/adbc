@@ -423,7 +423,7 @@ int do_get_list_string(ErlNifEnv *env, ERL_NIF_TERM list, bool nullable, ArrowTy
 
     nanoarrow::UniqueArray tmp;
     struct ArrowArray* write_array = tmp.get();
-    NANOARROW_RETURN_NOT_OK(ArrowArrayInitFromSchema(write_array, schema_out, error_out));
+    NANOARROW_RETURN_NOT_OK(ArrowArrayInitFromType(write_array, nanoarrow_type));
     NANOARROW_RETURN_NOT_OK(ArrowArrayStartAppending(write_array));
     int ret = get_list_string(env, list, nullable, write_array, ArrowArrayAppendString);
     if (ret == 0) {

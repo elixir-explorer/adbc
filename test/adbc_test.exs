@@ -353,6 +353,36 @@ defmodule AdbcTest do
                      )
                    end
     end
+
+    test "list of strings", %{db: _, conn: conn} do
+      ids = ["1", "2", "3"]
+
+      assert {:ok, result} =
+               Adbc.Connection.query(
+                 conn,
+                 "SELECT $1",
+                 [Adbc.Column.list([Adbc.Column.string(ids)])]
+               )
+
+      assert %Adbc.Result{
+               data: [
+                 %Adbc.Column{
+                   data: [
+                     %Adbc.Column{
+                       data: ["1", "2", "3"],
+                       name: "item",
+                       type: :string,
+                       metadata: nil,
+                       nullable: true
+                     }
+                   ],
+                   type: :list,
+                   metadata: nil,
+                   nullable: true
+                 }
+               ]
+             } = result |> Adbc.Result.materialize()
+    end
   end
 
   describe "duckdb smoke tests" do

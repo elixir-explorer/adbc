@@ -1,10 +1,16 @@
 # CHANGELOG
 
+## v0.7.2
+
+#### Changed
+
+* Improve compatibility with latest Decimal
+
 ## v0.7.1
 
-#### Fixes
+#### Changed
 
-* fix: using `ArrowArrayInitFromType` when building list of strings (#113)
+* Use `ArrowArrayInitFromType` when building list of strings
 
 ## v0.7.0
 

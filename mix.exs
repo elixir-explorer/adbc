@@ -5,7 +5,7 @@
 defmodule Adbc.MixProject do
   use Mix.Project
 
-  @version "0.7.1"
+  @version "0.7.2"
   @github_url "https://github.com/elixir-explorer/adbc"
 
   def project do

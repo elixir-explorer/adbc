@@ -43,7 +43,7 @@ MAKE_BUILD_FLAGS ?= -j$(DEFAULT_JOBS)
 
 .DEFAULT_GLOBAL := build
 
-all: $(NIF_SO_REL)
+build: $(NIF_SO_REL)
 	@ if [ "${CI}" = "true" ]; then \
 		file "$(NIF_SO)" ; \
 	fi
@@ -59,6 +59,9 @@ priv_dir:
 	@ if [ ! -e "$(PRIV_DIR)" ]; then \
 		mkdir -p "$(PRIV_DIR)" ; \
 	fi
+
+# Used by Burrito
+all: adbc
 
 adbc: priv_dir
 	@ if [ ! -f "$(ADBC_DRIVER_COMMON_LIB)" ]; then \

@@ -43,7 +43,7 @@ MAKE_BUILD_FLAGS ?= -j$(DEFAULT_JOBS)
 
 .DEFAULT_GLOBAL := build
 
-build: $(NIF_SO_REL)
+all: $(NIF_SO_REL)
 	@ if [ "${CI}" = "true" ]; then \
 		file "$(NIF_SO)" ; \
 	fi

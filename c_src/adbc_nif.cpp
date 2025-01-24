@@ -1014,7 +1014,7 @@ static ErlNifFunc nif_functions[] = {
 
     {"adbc_arrow_array_stream_get_pointer", 1, adbc_arrow_array_stream_get_pointer, 0},
     {"adbc_arrow_array_stream_next", 1, adbc_arrow_array_stream_next, ERL_NIF_DIRTY_JOB_IO_BOUND},
-    {"adbc_arrow_array_stream_release", 1, adbc_arrow_array_stream_release, 0},
+    {"adbc_arrow_array_stream_release", 1, adbc_arrow_array_stream_release, ERL_NIF_DIRTY_JOB_IO_BOUND},
 
     {"adbc_column_materialize", 1, adbc_column_materialize, ERL_NIF_DIRTY_JOB_CPU_BOUND},
 };

@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## Unreleased
+
+#### Fixes
+
+* Assign NIFs to `ERL_NIF_DIRTY_JOB_{CPU,IO}_BOUND` accordingly (#119)
+
 ## v0.7.2
 
 #### Changed

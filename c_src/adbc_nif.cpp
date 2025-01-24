@@ -993,30 +993,30 @@ static ErlNifFunc nif_functions[] = {
     {"adbc_database_new", 0, adbc_database_new, 0},
     {"adbc_database_get_option", 3, adbc_database_get_option, 0},
     {"adbc_database_set_option", 4, adbc_database_set_option, 0},
-    {"adbc_database_init", 1, adbc_database_init, 0},
+    {"adbc_database_init", 1, adbc_database_init, ERL_NIF_DIRTY_JOB_IO_BOUND},
 
     {"adbc_connection_new", 0, adbc_connection_new, 0},
     {"adbc_connection_get_option", 3, adbc_connection_get_option, 0},
     {"adbc_connection_set_option", 4, adbc_connection_set_option, 0},
-    {"adbc_connection_init", 2, adbc_connection_init, 0},
-    {"adbc_connection_get_info", 2, adbc_connection_get_info, 0},
-    {"adbc_connection_get_objects", 7, adbc_connection_get_objects, 0},
-    {"adbc_connection_get_table_types", 1, adbc_connection_get_table_types, 0},
+    {"adbc_connection_init", 2, adbc_connection_init, ERL_NIF_DIRTY_JOB_IO_BOUND},
+    {"adbc_connection_get_info", 2, adbc_connection_get_info, ERL_NIF_DIRTY_JOB_IO_BOUND},
+    {"adbc_connection_get_objects", 7, adbc_connection_get_objects, ERL_NIF_DIRTY_JOB_IO_BOUND},
+    {"adbc_connection_get_table_types", 1, adbc_connection_get_table_types, ERL_NIF_DIRTY_JOB_IO_BOUND},
 
     {"adbc_statement_new", 1, adbc_statement_new, 0},
     {"adbc_statement_get_option", 3, adbc_statement_get_option, 0},
     {"adbc_statement_set_option", 4, adbc_statement_set_option, 0},
-    {"adbc_statement_execute_query", 1, adbc_statement_execute_query, 0},
-    {"adbc_statement_prepare", 1, adbc_statement_prepare, 0},
-    {"adbc_statement_set_sql_query", 2, adbc_statement_set_sql_query, 0},
-    {"adbc_statement_bind", 2, adbc_statement_bind, 0},
-    {"adbc_statement_bind_stream", 2, adbc_statement_bind_stream, 0},
+    {"adbc_statement_execute_query", 1, adbc_statement_execute_query, ERL_NIF_DIRTY_JOB_IO_BOUND},
+    {"adbc_statement_prepare", 1, adbc_statement_prepare, ERL_NIF_DIRTY_JOB_IO_BOUND},
+    {"adbc_statement_set_sql_query", 2, adbc_statement_set_sql_query, ERL_NIF_DIRTY_JOB_IO_BOUND},
+    {"adbc_statement_bind", 2, adbc_statement_bind, ERL_NIF_DIRTY_JOB_IO_BOUND},
+    {"adbc_statement_bind_stream", 2, adbc_statement_bind_stream, ERL_NIF_DIRTY_JOB_IO_BOUND},
 
     {"adbc_arrow_array_stream_get_pointer", 1, adbc_arrow_array_stream_get_pointer, 0},
-    {"adbc_arrow_array_stream_next", 1, adbc_arrow_array_stream_next, 0},
-    {"adbc_arrow_array_stream_release", 1, adbc_arrow_array_stream_release, 0},
+    {"adbc_arrow_array_stream_next", 1, adbc_arrow_array_stream_next, ERL_NIF_DIRTY_JOB_IO_BOUND},
+    {"adbc_arrow_array_stream_release", 1, adbc_arrow_array_stream_release, ERL_NIF_DIRTY_JOB_IO_BOUND},
 
-    {"adbc_column_materialize", 1, adbc_column_materialize, 0},
+    {"adbc_column_materialize", 1, adbc_column_materialize, ERL_NIF_DIRTY_JOB_CPU_BOUND},
 };
 
 ERL_NIF_INIT(Elixir.Adbc.Nif, nif_functions, on_load, on_reload, on_upgrade, NULL);

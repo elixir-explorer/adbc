@@ -70,7 +70,6 @@ defmodule Adbc.MixProject do
       {:elixir_make, "~> 0.8", runtime: false},
 
       # runtime
-      {:dll_loader_helper_beam, "~> 1.0"},
       {:castore, "~> 1.0", optional: true},
       {:decimal, "~> 2.1"},
 

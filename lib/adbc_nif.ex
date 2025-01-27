@@ -1,6 +1,8 @@
 defmodule Adbc.Nif do
   @moduledoc false
 
+  alias Adbc.Nif.DLLLoader
+
   @on_load :load_nif
   def load_nif do
     nif_file = ~c"#{:code.priv_dir(:adbc)}/adbc_nif"
@@ -8,7 +10,7 @@ defmodule Adbc.Nif do
     :ok =
       case :os.type() do
         {:win32, _} ->
-          :dll_loader_helper_beam.add_dll_directory("#{:code.priv_dir(:adbc)}/bin")
+          DLLLoader.add_dll_directory()
 
         _ ->
           :ok

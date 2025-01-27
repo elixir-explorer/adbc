@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## Unreleased
+
+#### Fixes
+
+* Embedding dll loader as another NIF to avoid failures when running in release mode (#120)
+
 ## v0.7.3
 
 #### Fixes

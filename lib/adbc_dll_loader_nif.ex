@@ -1,7 +1,10 @@
-defmodule Adbc.Nif.DLLLoader do
+defmodule Adbc.DLLLoaderNif do
+  # We don't use on_load callbacks because this module
+  # needs to be invoked from Adbc.Nif and if both have
+  # @on_load the order is not guaranteed in a release.
   @moduledoc false
-  @on_load :__on_load__
-  def __on_load__ do
+
+  def init do
     case :os.type() do
       {:win32, _} ->
         priv_dir = :code.priv_dir(:adbc)
@@ -16,12 +19,6 @@ defmodule Adbc.Nif.DLLLoader do
   end
 
   def add_dll_directory do
-    case :os.type() do
-      {:win32, _} ->
-        :erlang.nif_error(:not_loaded)
-
-      _ ->
-        :ok
-    end
+    :erlang.nif_error(:not_loaded)
   end
 end

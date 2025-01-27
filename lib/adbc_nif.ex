@@ -1,20 +1,10 @@
 defmodule Adbc.Nif do
   @moduledoc false
 
-  alias Adbc.Nif.DLLLoader
-
   @on_load :load_nif
   def load_nif do
+    :ok = Adbc.DLLLoaderNif.init()
     nif_file = ~c"#{:code.priv_dir(:adbc)}/adbc_nif"
-
-    :ok =
-      case :os.type() do
-        {:win32, _} ->
-          DLLLoader.add_dll_directory()
-
-        _ ->
-          :ok
-      end
 
     case :erlang.load_nif(nif_file, 0) do
       :ok -> :ok

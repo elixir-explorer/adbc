@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## v0.7.6
+
+#### Fixes
+
+* Fixed the issue introduced in #122
+
 ## v0.7.5
 
 #### Fixes

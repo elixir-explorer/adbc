@@ -16,7 +16,7 @@ defmodule Adbc.Nif.DLLLoader do
   def add_dll_directory do
     case :os.type() do
       {:win32, _} ->
-        :erlang.nif_error(:undef)
+        :erlang.nif_error(:not_loaded)
 
       _ ->
         :ok

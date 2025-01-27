@@ -139,18 +139,18 @@ defmodule Adbc.Column do
   @spec set_metadata(%Adbc.Column{}, String.t(), String.t()) :: %Adbc.Column{}
   def set_metadata(buffer = %Adbc.Column{metadata: metadata}, key, value)
       when (is_binary(key) or is_atom(key)) and (is_binary(value) or is_atom(value)) do
-    %Adbc.Column{buffer | metadata: Map.put(metadata, to_string(key), to_string(value))}
+    %{buffer | metadata: Map.put(metadata, to_string(key), to_string(value))}
   end
 
   @spec delete_metadata(%Adbc.Column{}, String.t()) :: %Adbc.Column{}
   def delete_metadata(buffer = %Adbc.Column{metadata: metadata}, key)
       when is_binary(key) or is_atom(key) do
-    %Adbc.Column{buffer | metadata: Map.delete(metadata, to_string(key))}
+    %{buffer | metadata: Map.delete(metadata, to_string(key))}
   end
 
   @spec delete_all_metadata(%Adbc.Column{}) :: %Adbc.Column{}
   def delete_all_metadata(buffer = %Adbc.Column{}) do
-    %Adbc.Column{buffer | metadata: %{}}
+    %{buffer | metadata: %{}}
   end
 
   @doc """

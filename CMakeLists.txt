@@ -77,10 +77,10 @@ if(WIN32)
     file(GLOB adbc_dll_loader_sources CONFIGURE_DEPENDS "${C_SRC}/dll_loader/*.cpp")
     add_library(adbc_dll_loader SHARED ${adbc_dll_loader_sources})
     set_property(TARGET adbc_dll_loader PROPERTY CXX_STANDARD 17)
-    target_include_directories(adbc_dll_loader PUBLIC $ENV{ERTS_INCLUDE_DIR})
+    target_include_directories(adbc_dll_loader PUBLIC ${ERTS_INCLUDE_DIR})
     install(
         TARGETS adbc_dll_loader
-        DESTINATION "$ENV{PRIV_DIR}"
+        DESTINATION "${PRIV_DIR}"
     )
     SET_TARGET_PROPERTIES(adbc_dll_loader PROPERTIES PREFIX "")
 endif()

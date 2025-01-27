@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## v0.7.5
+
+#### Fixes
+
+* Creating `bin` directory if it does not exist on Windows before adding it to the DLL searching path (#123)
+
 ## v0.7.4
 
 #### Fixes

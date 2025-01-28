@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## v0.7.8
+
+#### Fixes
+
+* Initialize DLL on nif load (#126)
+
 ## v0.7.7
 
 #### Fixes

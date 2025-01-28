@@ -5,11 +5,6 @@
 #### Fixes
 
 * Initialize DLL on nif load (#126)
-
-## v0.7.7
-
-#### Fixes
-
 * Fixed the issue introduced in #122
 * Creating `bin` directory if it does not exist on Windows before adding it to the DLL searching path (#123)
 * Embedding dll loader as another NIF to avoid failures when running in release mode (#120)

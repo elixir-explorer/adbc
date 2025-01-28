@@ -16,4 +16,8 @@ defmodule Adbc.DLLLoaderNif do
         :ok
     end
   end
+
+  def nop do
+    0
+  end
 end

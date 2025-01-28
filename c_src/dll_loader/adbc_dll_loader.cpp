@@ -9,6 +9,13 @@
 #include <winbase.h>
 #include <wchar.h>
 
+ERL_NIF_TERM nop(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
+  (void)(env);
+  (void)(argc);
+  (void)(argv);
+  return enif_make_int(env, 0);
+}
+
 int upgrade(ErlNifEnv *env, void **priv_data, void **old_priv_data, ERL_NIF_TERM load_info) {
   // Silence "unused var" warnings.
   (void)(env);
@@ -75,6 +82,8 @@ int load(ErlNifEnv *,void **,ERL_NIF_TERM) {
   return 0;
 }
 
-static ErlNifFunc nif_functions[] = {};
+static ErlNifFunc nif_functions[] = {
+  {"nop", 0, nop, 0}
+};
 
 ERL_NIF_INIT(Elixir.Adbc.DLLLoaderNif, nif_functions, load, NULL, upgrade, NULL);

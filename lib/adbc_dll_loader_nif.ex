@@ -11,17 +11,13 @@ defmodule Adbc.DLLLoaderNif do
         File.mkdir_p!(Path.join(priv_dir, "bin"))
         path = :filename.join(priv_dir, ~c"adbc_dll_loader")
         :erlang.load_nif(path, 0)
-        add_dll_directory()
 
       _ ->
         :ok
     end
   end
 
-  def add_dll_directory do
-    case :os.type() do
-      {:win32, _} -> :erlang.nif_error(:not_loaded)
-      _ -> :ok
-    end
+  def __unused__ do
+    0
   end
 end

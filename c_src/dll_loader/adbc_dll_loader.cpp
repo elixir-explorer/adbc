@@ -104,4 +104,4 @@ static ErlNifFunc nif_functions[] = {
   F(add_dll_directory, 0)
 };
 
-ERL_NIF_INIT(Elixir.Adbc.Nif.DLLLoader, nif_functions, load, NULL, upgrade, NULL);
+ERL_NIF_INIT(Elixir.Adbc.DLLLoaderNif, nif_functions, load, NULL, upgrade, NULL);

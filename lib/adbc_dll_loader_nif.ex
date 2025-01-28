@@ -4,7 +4,7 @@ defmodule Adbc.DLLLoaderNif do
   # @on_load the order is not guaranteed in a release.
   @moduledoc false
 
-  def add_dll_directory do
+  def init do
     case :os.type() do
       {:win32, _} ->
         priv_dir = :code.priv_dir(:adbc)

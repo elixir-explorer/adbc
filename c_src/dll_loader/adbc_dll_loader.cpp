@@ -23,7 +23,8 @@ int load(ErlNifEnv *,void **,ERL_NIF_TERM) {
   wchar_t dll_path_c[65536];
   char err_msg[128] = { '\0' };
   HMODULE hm = NULL;
-  if (GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT, (LPCWSTR)&add_dll_directory, &hm) == 0) {
+
+  if (GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT, (LPCWSTR)&load, &hm) == 0) {
     int ret = GetLastError();
     snprintf(err_msg, sizeof(err_msg) - 1, "GetModuleHandle failed, error = %d\r\n", ret);
     return error(env, err_msg);

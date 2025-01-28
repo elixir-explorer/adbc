@@ -3,7 +3,7 @@ defmodule Adbc.Nif do
 
   @on_load :load_nif
   def load_nif do
-    :ok = Adbc.DLLLoaderNif.add_dll_directory()
+    :ok = Adbc.DLLLoaderNif.init()
     nif_file = ~c"#{:code.priv_dir(:adbc)}/adbc_nif"
 
     case :erlang.load_nif(nif_file, 0) do

@@ -4,7 +4,8 @@ defmodule Adbc.DLLLoaderNif do
   # @on_load the order is not guaranteed in a release.
   @moduledoc false
 
-  def init do
+  @on_load :load_nif
+  def load_nif do
     case :os.type() do
       {:win32, _} ->
         priv_dir = :code.priv_dir(:adbc)
@@ -19,6 +20,9 @@ defmodule Adbc.DLLLoaderNif do
   end
 
   def add_dll_directory do
-    :erlang.nif_error(:not_loaded)
+    case :os.type() do
+      {:win32, _} -> :erlang.nif_error(:not_loaded)
+      _ -> :ok
+    end
   end
 end

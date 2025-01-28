@@ -16,4 +16,8 @@ defmodule Adbc.DLLLoaderNif do
         :ok
     end
   end
+
+  def __unused__ do
+    0
+  end
 end

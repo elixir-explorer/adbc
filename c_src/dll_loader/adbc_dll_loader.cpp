@@ -25,15 +25,15 @@ int load(ErlNifEnv *,void **,ERL_NIF_TERM) {
   HMODULE hm = NULL;
 
   if (GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT, (LPCWSTR)&load, &hm) == 0) {
-    int ret = GetLastError();
-    snprintf(err_msg, sizeof(err_msg) - 1, "GetModuleHandle failed, error = %d\r\n", ret);
-    return error(env, err_msg);
+      int ret = GetLastError();
+      printf("GetModuleHandle failed, error = %d\n", ret);
+      return 1;
   }
 
   if (GetModuleFileNameW(hm, (LPWSTR)dll_path_c, sizeof(dll_path_c)) == 0) {
-    int ret = GetLastError();
-    snprintf(err_msg, sizeof(err_msg) - 1, "GetModuleFileName failed, error = %d\r\n", ret);
-    return error(env, err_msg);
+      int ret = GetLastError();
+      printf("GetModuleFileName failed, error = %d\n", ret);
+      return 1;
   }
 
   std::wstring dll_path = dll_path_c;
@@ -56,6 +56,7 @@ int load(ErlNifEnv *,void **,ERL_NIF_TERM) {
 
   SetDefaultDllDirectories(LOAD_LIBRARY_SEARCH_DEFAULT_DIRS | LOAD_LIBRARY_SEARCH_USER_DIRS);
   DLL_DIRECTORY_COOKIE ret = AddDllDirectory(directory_pcwstr);
+
   if (ret == 0) {
     DWORD last_error = GetLastError();
     LPTSTR error_text = nullptr;

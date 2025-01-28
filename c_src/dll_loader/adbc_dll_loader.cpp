@@ -75,4 +75,4 @@ int load(ErlNifEnv *,void **,ERL_NIF_TERM) {
 
 static ErlNifFunc nif_functions[] = {};
 
-ERL_NIF_INIT(Elixir.Adbc.Nif.DLLLoader, nif_functions, load, NULL, upgrade, NULL);
+ERL_NIF_INIT(Elixir.Adbc.DLLLoaderNif, nif_functions, load, NULL, upgrade, NULL);

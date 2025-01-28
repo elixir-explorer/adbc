@@ -9,26 +9,17 @@
 #include <winbase.h>
 #include <wchar.h>
 
-#define NIF(NAME) ERL_NIF_TERM NAME(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
+int upgrade(ErlNifEnv *env, void **priv_data, void **old_priv_data, ERL_NIF_TERM load_info) {
+  // Silence "unused var" warnings.
+  (void)(env);
+  (void)(priv_data);
+  (void)(old_priv_data);
+  (void)(load_info);
 
-// Helper for returning `{:error, msg}` from NIF.
-ERL_NIF_TERM error(ErlNifEnv *env, const char *msg)
-{
-  ERL_NIF_TERM atom = enif_make_atom(env, "error");
-  ERL_NIF_TERM msg_term = enif_make_string(env, msg, ERL_NIF_LATIN1);
-  return enif_make_tuple2(env, atom, msg_term);
+  return 0;
 }
 
-// Helper for returning `{:ok, term}` from NIF.
-ERL_NIF_TERM ok(ErlNifEnv *env)
-{
-  return enif_make_atom(env, "ok");
-}
-
-NIF(add_dll_directory) {
-  static bool path_updated = false;
-  if (path_updated) return ok(env);
-
+int load(ErlNifEnv *,void **,ERL_NIF_TERM) {
   wchar_t dll_path_c[65536];
   char err_msg[128] = { '\0' };
   HMODULE hm = NULL;
@@ -68,40 +59,20 @@ NIF(add_dll_directory) {
     DWORD last_error = GetLastError();
     LPTSTR error_text = nullptr;
     FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_IGNORE_INSERTS, NULL, HRESULT_FROM_WIN32(last_error), MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), (LPTSTR)&error_text, 0, NULL);
+
     if (error_text != nullptr) {
-      ERL_NIF_TERM ret_term = error(env, error_text);
-      LocalFree(error_text);
-      return ret_term;
+        printf("Error: %s\n", error_text);
+        LocalFree(error_text);
     } else {
-      ERL_NIF_TERM ret_term = error(env, "error happened when adding adbc driver runtime path, but cannot get formatted error message");
-      return ret_term;
+        printf("Error: error happened when adding adbc driver runtime path, but cannot get formatted error message\n");
     }
-  }
-  path_updated = true;
-  return ok(env);
-}
 
-int upgrade(ErlNifEnv *env, void **priv_data, void **old_priv_data, ERL_NIF_TERM load_info) {
-  // Silence "unused var" warnings.
-  (void)(env);
-  (void)(priv_data);
-  (void)(old_priv_data);
-  (void)(load_info);
+    return 1;
+  }
 
   return 0;
 }
 
-int load(ErlNifEnv *,void **,ERL_NIF_TERM) {
-  return 0;
-}
-
-#define F(NAME, ARITY)    \
-  {                       \
-#NAME, ARITY, NAME, 0 \
-  }
-
-static ErlNifFunc nif_functions[] = {
-  F(add_dll_directory, 0)
-};
+static ErlNifFunc nif_functions[] = {};
 
 ERL_NIF_INIT(Elixir.Adbc.Nif.DLLLoader, nif_functions, load, NULL, upgrade, NULL);

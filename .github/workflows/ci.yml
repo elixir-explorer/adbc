@@ -77,52 +77,21 @@ jobs:
       ELIXIR_VERSION: "1.15.7"
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - name: Cache OTP
-        uses: actions/cache@v4
-        id: cache-otp
-        with:
-          path: ./cache/otp
-          key: ${{ runner.os }}-otp-${{ env.OTP_VERSION }}
-
-      - name: Download OTP
-        if: steps.cache-otp.outputs.cache-hit != 'true'
+      - name: Install OTP and Elixir
         run: |
-          mkdir -p ./cache/otp
-          curl -fSL https://github.com/cocoa-xu/otp-build/releases/download/v${{ env.OTP_VERSION }}/otp-x86_64-apple-darwin.tar.gz -o ./cache/otp/otp-v${{ env.OTP_VERSION }}-x86_64-apple-darwin.tar.gz
-          cd ./cache/otp
-          tar -xzf otp-v${{ env.OTP_VERSION }}-x86_64-apple-darwin.tar.gz
-
-      - name: Cache Elixir
-        id: cache-elixir
-        uses: actions/cache@v4
-        with:
-          path: ./cache/elixir
-          key: ${{ runner.os }}-elixir-${{ env.ELIXIR_VERSION }}
-
-      - name: Download and Compile Elixir
-        if: steps.cache-elixir.outputs.cache-hit != 'true'
-        run: |
-          export PATH=$(pwd)/./cache/otp/usr/local/bin:$(pwd)/./cache/elixir/elixir-${{ env.ELIXIR_VERSION }}/bin:${PATH}
-          export ERL_ROOTDIR=$(pwd)/./cache/otp/usr/local/lib/erlang
-          mkdir -p ./cache/elixir
-          curl -fSL https://github.com/elixir-lang/elixir/archive/refs/tags/v${{ env.ELIXIR_VERSION }}.tar.gz -o ./cache/elixir/elixir-${{ env.ELIXIR_VERSION }}.tar.gz
-          cd ./cache/elixir
-          tar -xzf elixir-${{ env.ELIXIR_VERSION }}.tar.gz
-          cd elixir-${{ env.ELIXIR_VERSION }}
-          make -j$(sysctl -n hw.ncpu) install
-
-      - name: macOS setup
-        run: |
-          export PATH=$(pwd)/./cache/otp/usr/local/bin:$(pwd)/./cache/elixir/elixir-${{ env.ELIXIR_VERSION }}/bin:${PATH}
-          export ERL_ROOTDIR=$(pwd)/./cache/otp/usr/local/lib/erlang
-          mix local.hex --force
-          mix local.rebar --force
+          curl -fsSO https://elixir-lang.org/install.sh
+          sh install.sh "elixir@${ELIXIR_VERSION}" "otp@${OTP_VERSION}"
 
       - name: Compile and Test
         run: |
-          export PATH=$(pwd)/./cache/otp/usr/local/bin:$(pwd)/./cache/elixir/elixir-${{ env.ELIXIR_VERSION }}/bin:${PATH}
-          export ERL_ROOTDIR=$(pwd)/./cache/otp/usr/local/lib/erlang
+          export OTP_MAIN_VER="${OTP_VERSION%%.*}"
+          export PATH=$HOME/.elixir-install/installs/otp/${OTP_VERSION}/bin:$PATH
+          export PATH=$HOME/.elixir-install/installs/elixir/${ELIXIR_VERSION}-otp-${OTP_MAIN_VER}/bin:$PATH
+
+          mix local.hex --force
+          mix local.rebar --force
           mix deps.get
           mix test --exclude postgresql

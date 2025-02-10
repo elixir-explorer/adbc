@@ -57,48 +57,31 @@ jobs:
     runs-on: macos-13
     env:
       MIX_ENV: prod
-      elixir_version: "1.16.2"
-    strategy:
-      matrix:
-        job:
-          - { otp_version: "25.3.2.8", elixir: "1.16.2" }
+      ELIXIR_VERSION: "1.16.2"
+      OTP_VERSION: "25.3.2.8"
 
-    name: macOS - OTP ${{ matrix.job.otp_version }}
+    name: macOS
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install erlang and elixir
+      - name: Install OTP and Elixir
         run: |
-          export ROOT_DIR=$(pwd)
-
-          mkdir -p ./cache/otp
-          curl -fSL https://github.com/cocoa-xu/otp-build/releases/download/v${{ matrix.job.otp_version }}/otp-x86_64-apple-darwin.tar.gz -o ./cache/otp/otp-v${{ matrix.job.otp_version }}-x86_64-apple-darwin.tar.gz
-          cd ./cache/otp
-          tar -xzf otp-v${{ matrix.job.otp_version }}-x86_64-apple-darwin.tar.gz
-          cd ${ROOT_DIR}
-
-          export PATH=$(pwd)/cache/otp/usr/local/bin:$(pwd)/./cache/elixir/elixir-${{ matrix.job.elixir }}/bin:${PATH}
-          export ERL_ROOTDIR=$(pwd)/cache/otp/usr/local/lib/erlang
-
-          mkdir -p ./cache/elixir
-          curl -fSL https://github.com/elixir-lang/elixir/archive/refs/tags/v${{ matrix.job.elixir }}.tar.gz -o ./cache/elixir/elixir-${{ matrix.job.elixir }}.tar.gz
-          cd ./cache/elixir
-          tar -xzf elixir-${{ matrix.job.elixir }}.tar.gz
-          cd elixir-${{ matrix.job.elixir }}
-          make compile
-          make -j$(sysctl -n hw.ncpu) install
-
-          mix local.hex --force
-          mix local.rebar --force
+          curl -fsSO https://elixir-lang.org/install.sh
+          sh install.sh "elixir@${ELIXIR_VERSION}" "otp@${OTP_VERSION}"
 
       - name: Precompile
         run: |
-          export PATH=$(pwd)/cache/otp/usr/local/bin:$(pwd)/./cache/elixir/elixir-${{ matrix.job.elixir }}/bin:${PATH}
-          export ERL_ROOTDIR=$(pwd)/cache/otp/usr/local/lib/erlang
+          export OTP_MAIN_VER="${OTP_VERSION%%.*}"
+          export PATH=$HOME/.elixir-install/installs/otp/${OTP_VERSION}/bin:$PATH
+          export PATH=$HOME/.elixir-install/installs/elixir/${ELIXIR_VERSION}-otp-${OTP_MAIN_VER}/bin:$PATH
+
           export ELIXIR_MAKE_CACHE_DIR=$(pwd)/cache
           mkdir -p "${ELIXIR_MAKE_CACHE_DIR}"
+
+          mix local.hex --force
+          mix local.rebar --force
           mix deps.get
           mix elixir_make.precompile
 

@@ -51,7 +51,7 @@ defmodule Adbc.IPC.Test do
                ]
              } = Adbc.Result.materialize(results)
 
-      Enum.all?(Enum.zip(f32_values, f32), fn {a, b} -> abs(a - b) < 0.001 end)
+      assert Enum.all?(Enum.zip(f32_values, f32), fn {a, b} -> abs(a - b) < 0.001 end)
     end
 
     test "it returns empty Adbc.Result when im-memory IPC contains only schema" do

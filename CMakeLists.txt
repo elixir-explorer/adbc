@@ -42,6 +42,7 @@ include_directories("${PRIV_DIR}/include")
 
 if(WIN32)
     string(REPLACE "\\" "/" C_SRC "${C_SRC}")
+    string(REPLACE "\\" "/" NANOARROW_SRC "${NANOARROW_SRC}")
 endif()
 set(SOURCE_FILES
     "${C_SRC}/nif_utils.cpp"

@@ -10,6 +10,8 @@ defmodule Adbc.Column do
 
   import Bitwise
 
+  @type t() :: %__MODULE__{}
+
   @type s8 :: -128..127
   @type u8 :: 0..255
   @type s16 :: -32768..32767
@@ -79,12 +81,12 @@ defmodule Adbc.Column do
           validity: [boolean()],
           offsets: [non_neg_integer()],
           sizes: [non_neg_integer()],
-          values: %Adbc.Column{}
+          values: t()
         }
   @valid_run_end_types [:s16, :s32, :s64]
   @type dictionary_data_t :: %{
-          key: %Adbc.Column{},
-          value: %Adbc.Column{}
+          key: t(),
+          value: t()
         }
   @type data_type ::
           :boolean
@@ -111,8 +113,8 @@ defmodule Adbc.Column do
           | interval_t
           | :run_end_encoded
           | :dictionary
-  @spec column(data_type(), list() | list_view_data_t() | dictionary_data_t(), Keyword.t()) ::
-          %Adbc.Column{}
+  @spec column(data_type(), list() | list_view_data_t() | dictionary_data_t(), Keyword.t()) :: t()
+
   def column(type, data, opts \\ [])
       when (is_atom(type) or is_tuple(type)) and
              (is_list(data) or (type in @list_view_types and is_map(data)) or

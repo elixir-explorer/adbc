@@ -4,6 +4,7 @@ defmodule Adbc.IPC do
   """
 
   import Adbc.Helper, only: [error_to_exception: 1]
+  alias Adbc.ArrayStream
 
   @doc """
   Load IPC from a file.
@@ -24,17 +25,19 @@ defmodule Adbc.IPC do
       {:error, reason} ->
         {:error, error_to_exception(reason)}
 
-      data ->
-        data
+      stream_ref when is_reference(stream_ref) ->
+        stream_ref
+        |> ArrayStream.stream_results(nil)
+        |> tap(fn _ -> Adbc.Nif.adbc_arrow_array_stream_release(stream_ref) end)
     end
   end
 
   @doc """
   Dump Adbc.Result to in-memory IPC data.
   """
-  @spec dump_ipc(list()) :: binary | {:error, Adbc.Error.t()}
-  def dump_ipc(result) do
-    case Adbc.Nif.adbc_ipc_dump_binary(result) do
+  @spec dump_ipc(list(Adbc.Column.t())) :: binary | {:error, Adbc.Error.t()}
+  def dump_ipc(columns) when is_list(columns) do
+    case Adbc.Nif.adbc_ipc_dump_binary(columns) do
       {:error, reason} ->
         {:error, error_to_exception(reason)}
 

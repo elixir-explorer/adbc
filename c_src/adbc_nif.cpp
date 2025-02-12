@@ -621,6 +621,7 @@ static ERL_NIF_TERM adbc_arrow_array_stream_release(ErlNifEnv *env, int argc, co
 
     res_type * res = nullptr;
     if ((res = res_type::get_resource(env, argv[0], error)) == nullptr) {
+        printf("wrng?????\r\n");
         return error;
     }
 
@@ -822,74 +823,37 @@ static ERL_NIF_TERM adbc_statement_bind_stream(ErlNifEnv *env, int argc, const E
 }
 
 static ERL_NIF_TERM adbc_ipc_load_binary(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
-    struct ArrowIpcDecoder decoder{};
-    struct ArrowError arrow_error{};
-    struct ArrowBufferView data{};
+    using array_stream_type = NifRes<struct ArrowArrayStream>;
+
+    nanoarrow::UniqueBuffer input_buffer;
     ERL_NIF_TERM error{};
     std::vector<ERL_NIF_TERM> out_terms;
 
     ErlNifBinary binary{};
-    if (!erlang::nif::get(env, argv[0], &binary)) {
-        return enif_make_badarg(env);
-    }
-    data.data.as_uint8 = binary.data;
-    data.size_bytes = binary.size;
+    if (!erlang::nif::get(env, argv[0], &binary)) return enif_make_badarg(env);
 
-    ArrowErrorCode code = ArrowIpcDecoderInit(&decoder);
+    ArrowErrorCode code = ArrowBufferAppend(input_buffer.get(), binary.data, binary.size);
     if (code != NANOARROW_OK) {
-        return erlang::nif::error(env, "failed to initialize Arrow IPC decoder");
+        return erlang::nif::error(env, "Failed to append binary data to Arrow IPC input buffer");
     }
-    
-    code = ArrowIpcDecoderVerifyHeader(&decoder, data, &arrow_error);
+
+    struct ArrowIpcInputStream input;
+    code = ArrowIpcInputStreamInitBuffer(&input, input_buffer.get());
     if (code != NANOARROW_OK) {
-        ArrowIpcDecoderReset(&decoder);
-        return nif_error_from_arrow_error(env, &arrow_error);
-    }
-    
-    code = ArrowIpcDecoderDecodeHeader(&decoder, data, &arrow_error);
-    if (code != NANOARROW_OK) {
-        ArrowIpcDecoderReset(&decoder);
-        return nif_error_from_arrow_error(env, &arrow_error);
+        return erlang::nif::error(env, "Failed to initialize Arrow IPC array stream");
     }
 
-    struct ArrowSchema schema{};
-    code = ArrowIpcDecoderDecodeSchema(&decoder, &schema, &arrow_error);
-    if (code != NANOARROW_OK) {
-        ArrowIpcDecoderReset(&decoder);
-        return nif_error_from_arrow_error(env, &arrow_error);
-    }
-
-    struct ArrowBufferView body{};
-    body.data.as_uint8 = data.data.as_uint8 + decoder.header_size_bytes;
-    body.size_bytes = binary.size - decoder.header_size_bytes;
-    printf("body.size_bytes: %zu\n", body.size_bytes);
-    printf("decoder.header_size_bytes: %zu\n", decoder.header_size_bytes);
-    printf("decoder.body_size_bytes: %zu\n", decoder.body_size_bytes);
-
-    struct ArrowArray array{};
-    code = ArrowIpcDecoderDecodeArray(&decoder, data, 0, &array, NANOARROW_VALIDATION_LEVEL_MINIMAL, &arrow_error);
-    if (code != NANOARROW_OK) {
-        ArrowIpcDecoderReset(&decoder);
-        return nif_error_from_arrow_error(env, &arrow_error);
-    }
-
-    code = arrow_schema_to_nif_term(env, &schema, &array, out_terms, error);
-    // the outter array should be released because we have moved the values 
-    // for each column to the corresponding reference in `Adbc.Column.data`
-    if (array.release) {
-        array.release(&array);
-    }
-    
-    ArrowIpcDecoderReset(&decoder);
-
-    if (code != 0) {
-        // error is already set in arrow_schema_to_nif_term
-        // we don't need to release the schema in private data here
-        // it will be released when the stream resource is GC'd
+    auto array_stream = array_stream_type::allocate_resource(env, error);
+    if (array_stream == nullptr) {
         return error;
-    } else {
-        return erlang::nif::ok(env, out_terms[0]);
     }
+
+    code = ArrowIpcArrayStreamReaderInit(&array_stream->val, &input, nullptr);
+    if (code != NANOARROW_OK) {
+        return erlang::nif::error(env, "Failed to initialize Arrow IPC array stream reader");
+    }
+
+    return array_stream->make_resource(env);
 }
 
 static ERL_NIF_TERM adbc_ipc_dump_binary(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
@@ -898,7 +862,6 @@ static ERL_NIF_TERM adbc_ipc_dump_binary(ErlNifEnv *env, int argc, const ERL_NIF
     }
 
     AdbcStatusCode code{};
-    // struct ArrowArray values{};
     struct ArrowSchema schema{};
     struct ArrowError arrow_error{};
     nanoarrow::UniqueBuffer output;
@@ -914,7 +877,6 @@ static ERL_NIF_TERM adbc_ipc_dump_binary(ErlNifEnv *env, int argc, const ERL_NIF
         return erlang::nif::error(env, "Failed to initialize Arrow IPC writer");
     }
 
-    // values.release = nullptr;
     schema.release = nullptr;
     nanoarrow::UniqueArray array;
     nanoarrow::UniqueArrayView array_view;
@@ -937,20 +899,17 @@ static ERL_NIF_TERM adbc_ipc_dump_binary(ErlNifEnv *env, int argc, const ERL_NIF
         goto cleanup;
     }
 
-    printf("before ArrowIpcWriterWriteSchema: %lld\n", output->size_bytes);
     code = ArrowIpcWriterWriteSchema(writer.get(), &schema, &arrow_error);
     if (code != NANOARROW_OK) {
         ret = nif_error_from_arrow_error(env, &arrow_error);
         goto cleanup;
     }
-    printf("after ArrowIpcWriterWriteSchema: %lld\n", output->size_bytes);
 
     code = ArrowIpcWriterWriteArrayView(writer.get(), array_view.get(), &arrow_error);
     if (code != NANOARROW_OK) {
         ret = nif_error_from_arrow_error(env, &arrow_error);
         goto cleanup;
     }
-    printf("after ArrowIpcWriterWriteArrayView: %lld\n", output->size_bytes);
 
     // write `nullptr` to end the stream
     code = ArrowIpcWriterWriteArrayView(writer.get(), nullptr, &arrow_error);
@@ -958,18 +917,6 @@ static ERL_NIF_TERM adbc_ipc_dump_binary(ErlNifEnv *env, int argc, const ERL_NIF
         ret = nif_error_from_arrow_error(env, &arrow_error);
         goto cleanup;
     }
-
-    // code = ArrowIpcEncoderEncodeSimpleRecordBatch(&encoder, array_view.get(), output.get(), &arrow_error);
-    // if (code != NANOARROW_OK) {
-    //     ret = nif_error_from_arrow_error(env, &arrow_error);
-    //     goto cleanup;
-    // }
-
-    // code = ArrowIpcEncoderFinalizeBuffer(&encoder, true, output.get());
-    // if (code != NANOARROW_OK) {
-    //     ret = nif_error_from_arrow_error(env, &arrow_error);
-    //     goto cleanup;
-    // }
 
     ErlNifBinary binary;
     if (!enif_alloc_binary(output->size_bytes, &binary)) {
@@ -983,7 +930,6 @@ static ERL_NIF_TERM adbc_ipc_dump_binary(ErlNifEnv *env, int argc, const ERL_NIF
     ret = erlang::nif::ok(env, enif_make_binary(env, &binary));
 
 cleanup:
-    // if (values.release) values.release(&values);
     if (schema.release) schema.release(&schema);
     return ret;
 }

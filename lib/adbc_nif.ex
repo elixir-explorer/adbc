@@ -67,4 +67,8 @@ defmodule Adbc.Nif do
   def adbc_arrow_array_stream_release(_arrow_array_stream), do: :erlang.nif_error(:not_loaded)
 
   def adbc_column_materialize(_data_ref), do: :erlang.nif_error(:not_loaded)
+
+  def adbc_ipc_load_binary(_binary), do: :erlang.nif_error(:not_loaded)
+
+  def adbc_ipc_dump_binary(_data), do: :erlang.nif_error(:not_loaded)
 end

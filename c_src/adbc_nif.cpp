@@ -621,7 +621,6 @@ static ERL_NIF_TERM adbc_arrow_array_stream_release(ErlNifEnv *env, int argc, co
 
     res_type * res = nullptr;
     if ((res = res_type::get_resource(env, argv[0], error)) == nullptr) {
-        printf("wrng?????\r\n");
         return error;
     }
 

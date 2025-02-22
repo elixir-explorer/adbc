@@ -11,11 +11,11 @@ defmodule Adbc.IPC.Test do
 
   describe "load" do
     test "it returns empty Adbc.Result when im-memory IPC contains only schema" do
-      assert {:ok, %Adbc.Result{data: [], num_rows: nil}} = IPC.load(@valid_schema_only)
+      assert {:ok, %Adbc.Result{data: [], num_rows: nil}} = IPC.load_stream(@valid_schema_only)
     end
 
     test "it returns Adbc.Error when loading invalid in-memory ipc data" do
-      assert {:error, error} = IPC.load(@invalid_data)
+      assert {:error, error} = IPC.load_stream(@invalid_data)
 
       if IPC.endianness() == :little do
         assert Exception.message(error) ==
@@ -42,7 +42,7 @@ defmodule Adbc.IPC.Test do
                     nullable: true
                   }
                 ]
-              }} = IPC.load(@iris_ipc_stream)
+              }} = IPC.load_stream(@iris_ipc_stream)
 
       assert %Adbc.Result{
                num_rows: nil,
@@ -76,7 +76,7 @@ defmodule Adbc.IPC.Test do
   describe "dump" do
     test "it can dump columns as in-memory IPC format data" do
       assert {:ok, _data} =
-               IPC.dump([Adbc.Column.s64([1, 2, 3]), Adbc.Column.f32([1.1, 2.2, 3.3])])
+               IPC.dump_stream([Adbc.Column.s64([1, 2, 3]), Adbc.Column.f32([1.1, 2.2, 3.3])])
     end
   end
 end

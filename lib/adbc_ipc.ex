@@ -15,21 +15,26 @@ defmodule Adbc.IPC do
   end
 
   @doc """
-  Load IPC from a file.
+  Load IPC stream from a file.
+
+  Note: this function is intended to load raw IPC stream data that is dumped
+  to a file using `dump_stream/1` or the same data from other libraries.
+
+  It is NOT intended to load Arrow IPC files.
   """
-  @spec load_file(Path.t()) :: term() | {:error, File.posix()}
-  def load_file(filepath) do
+  @spec load_stream_file(Path.t()) :: term() | {:error, File.posix()}
+  def load_stream_file(filepath) do
     with {:ok, data} <- File.read(filepath) do
-      load(data)
+      load_stream(data)
     end
   end
 
   @doc """
-  Load from in-memory IPC data.
+  Load from in-memory IPC stream data.
   """
-  @spec load(binary) :: term() | {:error, Adbc.Error.t()}
-  def load(data) do
-    case Adbc.Nif.adbc_ipc_load_binary(data) do
+  @spec load_stream(binary) :: term() | {:error, Adbc.Error.t()}
+  def load_stream(data) do
+    case Adbc.Nif.adbc_ipc_load_stream_binary(data) do
       {:error, reason} ->
         {:error, error_to_exception(reason)}
 
@@ -41,11 +46,11 @@ defmodule Adbc.IPC do
   end
 
   @doc """
-  Dump Adbc.Result to in-memory IPC data.
+  Dump Adbc.Result to in-memory IPC stream data.
   """
-  @spec dump(list(Adbc.Column.t())) :: binary | {:error, Adbc.Error.t()}
-  def dump(columns) when is_list(columns) do
-    case Adbc.Nif.adbc_ipc_dump_binary(columns) do
+  @spec dump_stream(list(Adbc.Column.t())) :: binary | {:error, Adbc.Error.t()}
+  def dump_stream(columns) when is_list(columns) do
+    case Adbc.Nif.adbc_ipc_dump_stream_binary(columns) do
       {:error, reason} ->
         {:error, error_to_exception(reason)}
 

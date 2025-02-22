@@ -821,7 +821,7 @@ static ERL_NIF_TERM adbc_statement_bind_stream(ErlNifEnv *env, int argc, const E
     return erlang::nif::ok(env);
 }
 
-static ERL_NIF_TERM adbc_ipc_load_binary(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
+static ERL_NIF_TERM adbc_ipc_load_stream_binary(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
     using array_stream_type = NifRes<struct ArrowArrayStream>;
 
     nanoarrow::UniqueBuffer input_buffer;
@@ -855,7 +855,7 @@ static ERL_NIF_TERM adbc_ipc_load_binary(ErlNifEnv *env, int argc, const ERL_NIF
     return array_stream->make_resource(env);
 }
 
-static ERL_NIF_TERM adbc_ipc_dump_binary(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
+static ERL_NIF_TERM adbc_ipc_dump_stream_binary(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
     if (!enif_is_list(env, argv[0])) {
         return enif_make_badarg(env);
     }
@@ -1153,8 +1153,8 @@ static ErlNifFunc nif_functions[] = {
 
     {"adbc_ipc_system_endianness", 0, adbc_ipc_system_endianness, 0},
 
-    {"adbc_ipc_load_binary", 1, adbc_ipc_load_binary, ERL_NIF_DIRTY_JOB_CPU_BOUND},
-    {"adbc_ipc_dump_binary", 1, adbc_ipc_dump_binary, ERL_NIF_DIRTY_JOB_CPU_BOUND},
+    {"adbc_ipc_load_stream_binary", 1, adbc_ipc_load_stream_binary, ERL_NIF_DIRTY_JOB_CPU_BOUND},
+    {"adbc_ipc_dump_stream_binary", 1, adbc_ipc_dump_stream_binary, ERL_NIF_DIRTY_JOB_CPU_BOUND},
 };
 
 ERL_NIF_INIT(Elixir.Adbc.Nif, nif_functions, on_load, on_reload, on_upgrade, NULL);

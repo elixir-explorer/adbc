@@ -20,15 +20,15 @@ defmodule Adbc.IPC do
   @spec load_file(Path.t()) :: term() | {:error, File.posix()}
   def load_file(filepath) do
     with {:ok, data} <- File.read(filepath) do
-      load_ipc(data)
+      load(data)
     end
   end
 
   @doc """
   Load from in-memory IPC data.
   """
-  @spec load_ipc(binary) :: term() | {:error, Adbc.Error.t()}
-  def load_ipc(data) do
+  @spec load(binary) :: term() | {:error, Adbc.Error.t()}
+  def load(data) do
     case Adbc.Nif.adbc_ipc_load_binary(data) do
       {:error, reason} ->
         {:error, error_to_exception(reason)}
@@ -43,8 +43,8 @@ defmodule Adbc.IPC do
   @doc """
   Dump Adbc.Result to in-memory IPC data.
   """
-  @spec dump_ipc(list(Adbc.Column.t())) :: binary | {:error, Adbc.Error.t()}
-  def dump_ipc(columns) when is_list(columns) do
+  @spec dump(list(Adbc.Column.t())) :: binary | {:error, Adbc.Error.t()}
+  def dump(columns) when is_list(columns) do
     case Adbc.Nif.adbc_ipc_dump_binary(columns) do
       {:error, reason} ->
         {:error, error_to_exception(reason)}

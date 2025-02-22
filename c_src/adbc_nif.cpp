@@ -933,6 +933,14 @@ cleanup:
     return ret;
 }
 
+static ERL_NIF_TERM adbc_ipc_system_endianness(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
+    if (ArrowIpcSystemEndianness() == NANOARROW_IPC_ENDIANNESS_BIG) {
+        return kAtomBig;
+    } else {
+        return kAtomLittle;
+    }
+}
+
 static int on_load(ErlNifEnv *env, void **, ERL_NIF_TERM) {
     ErlNifResourceType *rt;
 
@@ -987,6 +995,8 @@ static int on_load(ErlNifEnv *env, void **, ERL_NIF_TERM) {
     kAtomInfinity = erlang::nif::atom(env, "infinity");
     kAtomNegInfinity = erlang::nif::atom(env, "neg_infinity");
     kAtomNaN = erlang::nif::atom(env, "nan");
+    kAtomBig = erlang::nif::atom(env, "big");
+    kAtomLittle = erlang::nif::atom(env, "little");
     kAtomEndOfSeries = erlang::nif::atom(env, "end_of_series");
     kAtomStructKey = erlang::nif::atom(env, "__struct__");
     kAtomValidity = erlang::nif::atom(env, "validity");
@@ -1140,6 +1150,8 @@ static ErlNifFunc nif_functions[] = {
     {"adbc_arrow_array_stream_release", 1, adbc_arrow_array_stream_release, ERL_NIF_DIRTY_JOB_IO_BOUND},
 
     {"adbc_column_materialize", 1, adbc_column_materialize, ERL_NIF_DIRTY_JOB_CPU_BOUND},
+
+    {"adbc_ipc_system_endianness", 0, adbc_ipc_system_endianness, 0},
 
     {"adbc_ipc_load_binary", 1, adbc_ipc_load_binary, ERL_NIF_DIRTY_JOB_CPU_BOUND},
     {"adbc_ipc_dump_binary", 1, adbc_ipc_dump_binary, ERL_NIF_DIRTY_JOB_CPU_BOUND},

@@ -7,6 +7,14 @@ defmodule Adbc.IPC do
   alias Adbc.ArrayStream
 
   @doc """
+  Return IPC endianness.
+  """
+  @spec endianness() :: :big | :little
+  def endianness do
+    Adbc.Nif.adbc_ipc_system_endianness()
+  end
+
+  @doc """
   Load IPC from a file.
   """
   @spec load_file(Path.t()) :: term() | {:error, File.posix()}

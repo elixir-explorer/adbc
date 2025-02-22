@@ -26721,14 +26721,14 @@ ArrowErrorCode ArrowIpcDecoderVerifyHeader(struct ArrowIpcDecoder* decoder,
   }
 
   // Run flatbuffers verification
-  enum flatcc_verify_error_no verify_error =
-      ns(Message_verify_as_root(data.data.as_uint8,
-                                decoder->header_size_bytes - prefix_size_bytes);
-         if (verify_error != flatcc_verify_ok)) {
-    ArrowErrorSet(error, "Message flatbuffer verification failed (%d) %s",
-                  (int)verify_error, flatcc_verify_error_string(verify_error));
-    return EINVAL;
-  }
+  //   enum flatcc_verify_error_no verify_error =
+  //       ns(Message_verify_as_root(data.data.as_uint8,
+  //                                 decoder->header_size_bytes - prefix_size_bytes);
+  //          if (verify_error != flatcc_verify_ok)) {
+  //     ArrowErrorSet(error, "Message flatbuffer verification failed (%d) %s",
+  //                   (int)verify_error, flatcc_verify_error_string(verify_error));
+  //     return EINVAL;
+  //   }
 
   // Read some basic information from the message
   ns(Message_table_t) message = ns(Message_as_root(data.data.as_uint8));

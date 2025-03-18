@@ -204,11 +204,10 @@ defmodule Adbc.Connection do
 
   The result is an Arrow dataset with the following schema:
 
-
-  | Field Name                 |  Field Type    | Null Contstraint  |
-  | -------------------------- | ---------------|------------------ |
-  | `info_name`                |  `uint32`      | not null          |
-  | `info_value`               |  `INFO_SCHEMA` |                   |
+  | Field Name                 |  Field Type    | Null Constraint  |
+  | -------------------------- | ---------------|----------------- |
+  | `info_name`                |  `uint32`      | not null         |
+  | `info_value`               |  `INFO_SCHEMA` |                  |
 
   `INFO_SCHEMA` is a dense union with members:
 

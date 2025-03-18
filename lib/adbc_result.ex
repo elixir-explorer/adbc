@@ -25,15 +25,6 @@ defmodule Adbc.Result do
     %{result | data: Enum.map(data, &Adbc.Column.materialize/1)}
   end
 
-  # allow for the result to be wrapped in an `{:ok, result}` tuple
-  # and also allow error tuples to pass through
-  # easier to use in pipelines
-  def materialize({:ok, %Adbc.Result{data: data} = result}) when is_list(data) do
-    {:ok, %{result | data: Enum.map(data, &Adbc.Column.materialize/1)}}
-  end
-
-  def materialize({:error, reason}), do: {:error, reason}
-
   @doc """
   Returns a map of columns as a result.
   """

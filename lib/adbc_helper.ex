@@ -97,9 +97,6 @@ defmodule Adbc.Helper do
       certs = otp_cacerts() ->
         [cacerts: certs]
 
-      Application.spec(:castore, :vsn) ->
-        [cacertfile: Application.app_dir(:castore, "priv/cacerts.pem")]
-
       true ->
         IO.warn("""
         No certificate trust store was found.
@@ -110,11 +107,9 @@ defmodule Adbc.Helper do
         installed certificate trust store one of the
         following actions may be taken:
 
-        1. Use OTP 25+ on an OS that has built-in certificate
-           trust store.
+        1. Use OTP 25+ on an OS that has built-in certificate trust store.
 
-        2. Install the hex package `castore`. It will
-           be automatically detected after recompilation.
+        2. Set ADBC_CACERTS_PATH environment variable pointing to a certificate.
 
         """)
 
@@ -122,13 +117,9 @@ defmodule Adbc.Helper do
     end
   end
 
-  if System.otp_release() >= "25" do
-    defp otp_cacerts do
-      :public_key.cacerts_get()
-    rescue
-      _ -> nil
-    end
-  else
-    defp otp_cacerts, do: nil
+  defp otp_cacerts do
+    :public_key.cacerts_get()
+  rescue
+    _ -> nil
   end
 end

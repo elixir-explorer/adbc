@@ -1391,22 +1391,21 @@ defmodule Adbc.Column do
     end
 
     {_, _, decoded} =
-      Enum.reduce(encoded, {run_end_start_index, values_start_index, []}, fn run_end,
-                                                                             {index, value_index,
-                                                                              acc} ->
-        real_end =
-          if run_end > offset + length do
-            offset + length
-          else
-            run_end
-          end
+      Enum.reduce(encoded, {run_end_start_index, values_start_index, []}, fn
+        run_end, {index, value_index, acc} ->
+          real_end =
+            if run_end > offset + length do
+              offset + length
+            else
+              run_end
+            end
 
-        if is_map(values.data) do
-          {run_end, value_index + 1, List.duplicate(to_list(values), real_end - index) ++ acc}
-        else
-          {run_end, value_index + 1,
-           List.duplicate(Enum.at(values.data, value_index), real_end - index) ++ acc}
-        end
+          if is_map(values.data) do
+            {run_end, value_index + 1, List.duplicate(to_list(values), real_end - index) ++ acc}
+          else
+            {run_end, value_index + 1,
+             List.duplicate(Enum.at(values.data, value_index), real_end - index) ++ acc}
+          end
       end)
 
     %Adbc.Column{

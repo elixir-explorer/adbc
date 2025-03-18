@@ -4,7 +4,8 @@ defmodule Adbc.Result do
 
   It has two fields:
 
-    * `:data` - a list of `Adbc.Column`
+    * `:data` - a list of `Adbc.Column`. The `Adbc.Column` may
+      not yet have been materialized
 
     * `:num_rows` - the number of rows returned, if returned
       by the database
@@ -29,7 +30,10 @@ defmodule Adbc.Result do
   Returns a map of columns as a result.
   """
   def to_map(result = %Adbc.Result{}) do
-    Map.new(to_list(materialize(result)).data, fn %Adbc.Column{name: name, type: type, data: data} ->
+    Map.new(result.data, fn column ->
+      %Adbc.Column{name: name, type: type, data: data} =
+        column |> Adbc.Column.materialize() |> Adbc.Column.to_list()
+
       case type do
         :list -> {name, Enum.map(data, &list_to_map/1)}
         _ -> {name, data}
@@ -68,5 +72,20 @@ defmodule Adbc.Result do
           {name, data}
         end
     end
+  end
+end
+
+defimpl Table.Reader, for: Adbc.Result do
+  def init(result) do
+    data =
+      Enum.map(result.data, fn column ->
+        column
+        |> Adbc.Column.materialize()
+        |> Adbc.Column.to_list()
+        |> Map.fetch!(:data)
+      end)
+
+    names = Enum.map(result.data, & &1.name)
+    {:columns, %{columns: names, count: result.num_rows}, data}
   end
 end

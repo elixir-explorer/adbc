@@ -99,7 +99,7 @@ static ERL_NIF_TERM adbc_get_option(ErlNifEnv *env, const ERL_NIF_TERM argv[], G
             } else {
                 code = get_bytes(&resource->val, key.c_str(), out_value, &value_len, &adbc_error);
             }
-            
+
             if (code != ADBC_STATUS_OK) {
                 return nif_error_from_adbc_error(env, &adbc_error);
             }
@@ -530,7 +530,7 @@ static ERL_NIF_TERM adbc_arrow_array_stream_next(ErlNifEnv *env, int argc, const
     }
     schema = (struct ArrowSchema *)res->private_data;
     code = arrow_schema_to_nif_term(env, schema, &array, out_terms, error);
-    // the outter array should be released because we have moved the values 
+    // the outter array should be released because we have moved the values
     // for each column to the corresponding reference in `Adbc.Column.data`
     if (array.release) {
         array.release(&array);
@@ -599,7 +599,7 @@ static ERL_NIF_TERM adbc_column_materialize(ErlNifEnv *env, int argc, const ERL_
 
         materialized.emplace_back(ret);
     }
-    
+
     ERL_NIF_TERM ret = enif_make_list_from_array(env, materialized.data(), materialized.size());
     return erlang::nif::ok(env, ret);
 }
@@ -871,8 +871,6 @@ static int on_load(ErlNifEnv *env, void **, ERL_NIF_TERM) {
     kAtomSizes = erlang::nif::atom(env, "sizes");
     kAtomValues = erlang::nif::atom(env, "values");
     kAtomRunEnds = erlang::nif::atom(env, "run_ends");
-    kAtomOffset = erlang::nif::atom(env, "offset");
-    kAtomLength = erlang::nif::atom(env, "length");
 
     kAtomDecimal = erlang::nif::atom(env, "decimal");
     kAtomFixedSizeBinary = erlang::nif::atom(env, "fixed_size_binary");
@@ -889,7 +887,7 @@ static int on_load(ErlNifEnv *env, void **, ERL_NIF_TERM) {
     kAtomMonth = erlang::nif::atom(env, "month");
     kAtomDayTime = erlang::nif::atom(env, "day_time");
     kAtomMonthDayNano = erlang::nif::atom(env, "month_day_nano");
-    
+
     kAtomCalendarKey = erlang::nif::atom(env, "calendar");
     kAtomCalendarISO = erlang::nif::atom(env, "Elixir.Calendar.ISO");
 
@@ -911,6 +909,8 @@ static int on_load(ErlNifEnv *env, void **, ERL_NIF_TERM) {
     kAtomNullableKey = erlang::nif::atom(env, "nullable");
     kAtomMetadataKey = erlang::nif::atom(env, "metadata");
     kAtomDataKey = erlang::nif::atom(env, "data");
+    kAtomLengthKey = erlang::nif::atom(env, "length");
+    kAtomOffsetKey = erlang::nif::atom(env, "offset");
 
     kAdbcColumnTypeBool = erlang::nif::atom(env, "boolean");
     kAdbcColumnTypeS8 = erlang::nif::atom(env, "s8");

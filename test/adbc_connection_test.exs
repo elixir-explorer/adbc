@@ -219,10 +219,13 @@ defmodule Adbc.Connection.Test do
                     type: :s64,
                     metadata: nil,
                     nullable: true
-                  }
+                  } = column
                 ],
                 num_rows: nil
               }} = Connection.query(conn, "SELECT 123 as num")
+
+      # Ensure matching struct fields
+      assert map_size(column) == map_size(Adbc.Column.s64([]))
 
       assert %Adbc.Result{
                data: [
@@ -232,9 +235,12 @@ defmodule Adbc.Connection.Test do
                    nullable: true,
                    metadata: nil,
                    data: [123]
-                 }
+                 } = column
                ]
              } = Adbc.Result.materialize(results)
+
+      # Ensure matching struct fields
+      assert map_size(column) == map_size(Adbc.Column.s64([]))
 
       assert {:ok,
               results = %Adbc.Result{

@@ -101,35 +101,7 @@ int AdbcColumnNifTerm::from_term(ErlNifEnv *env, ERL_NIF_TERM adbc_column, bool 
 ERL_NIF_TERM make_adbc_column(ErlNifEnv *env, struct ArrowSchema * schema, ERL_NIF_TERM type_term, ERL_NIF_TERM metadata, std::optional<ERL_NIF_TERM> data_ref = std::nullopt) {
     ERL_NIF_TERM nullable_term = schema->flags & ARROW_FLAG_NULLABLE ? kAtomTrue : kAtomFalse;
     ERL_NIF_TERM name_term = erlang::nif::make_binary(env, schema->name == nullptr ? "" : schema->name);
-
-    std::vector<ERL_NIF_TERM> keys = {
-        kAtomStructKey,
-        kAtomNameKey,
-        kAtomTypeKey,
-        kAtomNullableKey,
-        kAtomMetadataKey,
-    };
-    std::vector<ERL_NIF_TERM> values = {
-        kAtomAdbcColumnModule,
-        name_term,
-        type_term,
-        nullable_term,
-        metadata,
-    };
-
-    if (data_ref) {
-        keys.emplace_back(kAtomDataKey);
-        ERL_NIF_TERM data_ref_list = enif_make_list1(env, data_ref.value());
-        values.emplace_back(data_ref_list);
-    }
-
-    ERL_NIF_TERM adbc_column;
-    enif_make_map_from_arrays(env, keys.data(), values.data(), (unsigned)values.size(), &adbc_column);
-    return adbc_column;
-}
-
-ERL_NIF_TERM make_adbc_column(ErlNifEnv *env, struct ArrowSchema * schema, struct ArrowArray * array, ERL_NIF_TERM name_term, ERL_NIF_TERM type_term, bool nullable, ERL_NIF_TERM metadata, ERL_NIF_TERM data) {
-    ERL_NIF_TERM nullable_term = nullable ? kAtomTrue : kAtomFalse;
+    ERL_NIF_TERM data_ref_list = data_ref ? enif_make_list1(env, data_ref.value()) : kAtomNil;
 
     std::vector<ERL_NIF_TERM> keys = {
         kAtomStructKey,
@@ -138,6 +110,8 @@ ERL_NIF_TERM make_adbc_column(ErlNifEnv *env, struct ArrowSchema * schema, struc
         kAtomNullableKey,
         kAtomMetadataKey,
         kAtomDataKey,
+        kAtomLengthKey,
+        kAtomOffsetKey,
     };
     std::vector<ERL_NIF_TERM> values = {
         kAtomAdbcColumnModule,
@@ -145,15 +119,47 @@ ERL_NIF_TERM make_adbc_column(ErlNifEnv *env, struct ArrowSchema * schema, struc
         type_term,
         nullable_term,
         metadata,
-        data,
+        data_ref_list,
+        kAtomNil,
+        kAtomNil
     };
 
+    ERL_NIF_TERM adbc_column;
+    enif_make_map_from_arrays(env, keys.data(), values.data(), (unsigned)values.size(), &adbc_column);
+    return adbc_column;
+}
+
+ERL_NIF_TERM make_adbc_column(ErlNifEnv *env, struct ArrowSchema * schema, struct ArrowArray * array, ERL_NIF_TERM name_term, ERL_NIF_TERM type_term, bool nullable, ERL_NIF_TERM metadata, ERL_NIF_TERM data) {
+    ERL_NIF_TERM nullable_term = nullable ? kAtomTrue : kAtomFalse;
+    ERL_NIF_TERM length = kAtomNil;
+    ERL_NIF_TERM offset = kAtomNil;
+
     if (enif_is_identical(type_term, kAdbcColumnTypeRunEndEncoded) && array != nullptr) {
-        keys.emplace_back(kAtomLength);
-        values.emplace_back(enif_make_int64(env, array->length));
-        keys.emplace_back(kAtomOffset);
-        values.emplace_back(enif_make_int64(env, array->offset));
+      length = enif_make_int64(env, array->length);
+      offset = enif_make_int64(env, array->offset);
     }
+
+    std::vector<ERL_NIF_TERM> keys = {
+        kAtomStructKey,
+        kAtomNameKey,
+        kAtomTypeKey,
+        kAtomNullableKey,
+        kAtomMetadataKey,
+        kAtomDataKey,
+        kAtomLengthKey,
+        kAtomOffsetKey
+    };
+
+    std::vector<ERL_NIF_TERM> values = {
+        kAtomAdbcColumnModule,
+        name_term,
+        type_term,
+        nullable_term,
+        metadata,
+        data,
+        length,
+        offset
+    };
 
     ERL_NIF_TERM adbc_column;
     enif_make_map_from_arrays(env, keys.data(), values.data(), (unsigned)values.size(), &adbc_column);
@@ -265,7 +271,7 @@ int do_get_list_half_float(ErlNifEnv *env, ERL_NIF_TERM list, bool nullable, Arr
     nanoarrow::UniqueArray tmp;
     struct ArrowArray* write_array = tmp.get();
     NANOARROW_RETURN_NOT_OK(ArrowArrayInitFromSchema(write_array, schema_out, error_out));
-    
+
     struct ArrowArrayPrivateData* private_data = (struct ArrowArrayPrivateData*)write_array->private_data;
     auto storage_type = private_data->storage_type;
     private_data->storage_type = NANOARROW_TYPE_UINT16;

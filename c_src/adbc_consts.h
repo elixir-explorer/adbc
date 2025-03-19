@@ -42,8 +42,6 @@ static ERL_NIF_TERM kAtomOffsets;
 static ERL_NIF_TERM kAtomSizes;
 static ERL_NIF_TERM kAtomValues;
 static ERL_NIF_TERM kAtomRunEnds;
-static ERL_NIF_TERM kAtomOffset;
-static ERL_NIF_TERM kAtomLength;
 
 static ERL_NIF_TERM kAtomDecimal;
 static ERL_NIF_TERM kAtomFixedSizeBinary;
@@ -82,6 +80,8 @@ static ERL_NIF_TERM kAtomTypeKey;
 static ERL_NIF_TERM kAtomNullableKey;
 static ERL_NIF_TERM kAtomMetadataKey;
 static ERL_NIF_TERM kAtomDataKey;
+static ERL_NIF_TERM kAtomLengthKey;
+static ERL_NIF_TERM kAtomOffsetKey;
 
 // https://arrow.apache.org/docs/format/CDataInterface.html
 static ERL_NIF_TERM kAdbcColumnTypeBool;

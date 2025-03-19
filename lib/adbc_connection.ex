@@ -11,6 +11,7 @@ defmodule Adbc.Connection do
 
   use GenServer
   import Adbc.Helper, only: [error_to_exception: 1]
+  alias Adbc.ArrayStream
 
   @doc """
   Starts a connection process.
@@ -159,7 +160,7 @@ defmodule Adbc.Connection do
   def query(conn, query, params \\ [], statement_options \\ [])
       when (is_binary(query) or is_reference(query)) and is_list(params) and
              is_list(statement_options) do
-    stream(conn, {:query, query, params, statement_options}, &stream_results/2)
+    stream(conn, {:query, query, params, statement_options}, &ArrayStream.stream_results/2)
   end
 
   @doc """
@@ -228,7 +229,7 @@ defmodule Adbc.Connection do
   @spec get_info(t(), list(non_neg_integer())) ::
           {:ok, result_set} | {:error, Exception.t()}
   def get_info(conn, info_codes \\ []) when is_list(info_codes) do
-    stream(conn, {:adbc_connection_get_info, [info_codes]}, &stream_results/2)
+    stream(conn, {:adbc_connection_get_info, [info_codes]}, &ArrayStream.stream_results/2)
   end
 
   @doc """
@@ -331,7 +332,7 @@ defmodule Adbc.Connection do
       opts[:column_name]
     ]
 
-    stream(conn, {:adbc_connection_get_objects, args}, &stream_results/2)
+    stream(conn, {:adbc_connection_get_objects, args}, &ArrayStream.stream_results/2)
   end
 
   @doc """
@@ -364,7 +365,7 @@ defmodule Adbc.Connection do
   @spec get_table_types(t) ::
           {:ok, result_set} | {:error, Exception.t()}
   def get_table_types(conn) do
-    stream(conn, {:adbc_connection_get_table_types, []}, &stream_results/2)
+    stream(conn, {:adbc_connection_get_table_types, []}, &ArrayStream.stream_results/2)
   end
 
   defp command(conn, command) do
@@ -390,29 +391,6 @@ defmodule Adbc.Connection do
 
   defp normalize_rows(-1), do: nil
   defp normalize_rows(rows) when is_integer(rows) and rows >= 0, do: rows
-
-  defp stream_results(reference, num_rows), do: stream_results(reference, [], num_rows)
-
-  defp stream_results(reference, acc, num_rows) do
-    case Adbc.Nif.adbc_arrow_array_stream_next(reference) do
-      {:ok, result} ->
-        stream_results(reference, [result | acc], num_rows)
-
-      :end_of_series ->
-        {:ok, %Adbc.Result{data: merge_columns(Enum.reverse(acc)), num_rows: num_rows}}
-
-      {:error, reason} ->
-        {:error, error_to_exception(reason)}
-    end
-  end
-
-  defp merge_columns(chucked_results) do
-    Enum.zip_with(chucked_results, fn columns ->
-      Enum.reduce(columns, fn column, merged_column ->
-        %{merged_column | data: merged_column.data ++ column.data}
-      end)
-    end)
-  end
 
   ## Callbacks
 

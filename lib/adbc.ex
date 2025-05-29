@@ -17,7 +17,8 @@ defmodule Adbc do
       config :adbc, :drivers, [:sqlite]
 
   If you are using a notebook or scripting, you can also use
-  `Adbc.download_driver!/1` to dynamically download one.
+  `Adbc.download_driver!/1` to dynamically download one. See
+  the function for more information on downloading drivers.
 
   Then start the database and the relevant connection processes
   in your supervision tree:
@@ -108,10 +109,10 @@ defmodule Adbc do
   """
 
   @doc """
-  Downloads a driver.
+  Downloads a driver and returns the download status.
 
-  See `Adbc` module doc for all supports drivers.
-  It returns `:ok` or `{:error, binary}`.
+  It returns `:ok` or `{:error, binary}`. See `download_driver!/1`
+  for more information.
   """
   @spec download_driver(atom, keyword) :: :ok | {:error, binary}
   def download_driver(driver, opts \\ []) when is_atom(driver) and is_list(opts) do
@@ -121,8 +122,30 @@ defmodule Adbc do
   @doc """
   Downloads a driver and raises in case of errors.
 
-  See `Adbc` module doc for all supports drivers.
   It returns `:ok`.
+
+  See `Adbc` module documentation for all supported drivers.
+
+  ## Options
+
+    * `:version` - the version of the asset being downloaded
+    * `:url` - the url to find the precompiled asset
+
+  For example, to download the latest DuckDB driver, you must find its
+  [latest release on GitHub](https://github.com/duckdb/duckdb/releases/),
+  and pass the version and the precompiled asset to your OS. For example,
+  if the latest version is v1.3.0, you can invoke:
+
+      Adbc.download_driver!(:duckdb,
+        version: "1.3.0",
+        url: "https://github.com/duckdb/duckdb/releases/download/v1.3.0/libduckdb-osx-universal.zip"
+      )
+
+  You can also pass download options when configuring the `:adbc`:
+
+      config :adbc, :drivers,
+        [{:duckdb, version: ..., url: ...}]
+
   """
   @spec download_driver!(atom, keyword) :: :ok
   def download_driver!(driver, opts \\ []) when is_atom(driver) and is_list(opts) do
@@ -134,5 +157,8 @@ defmodule Adbc do
 end
 
 for driver <- Application.compile_env(:adbc, :drivers, []) do
-  Adbc.download_driver!(driver)
+  case driver do
+    {driver, opts} -> Adbc.download_driver!(driver, opts)
+    driver -> Adbc.download_driver!(driver)
+  end
 end

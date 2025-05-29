@@ -85,11 +85,13 @@ function(arrow_install_cmake_package PACKAGE_NAME EXPORT_NAME)
   set(INSTALL_CMAKEDIR "${CMAKE_INSTALL_LIBDIR}/cmake/${PACKAGE_NAME}")
   install(FILES "${BUILT_CONFIG_CMAKE}" "${BUILT_CONFIG_VERSION_CMAKE}"
           DESTINATION "${INSTALL_CMAKEDIR}")
-  set(TARGETS_CMAKE "${PACKAGE_NAME}Targets.cmake")
-  install(EXPORT ${EXPORT_NAME}
-          DESTINATION "${INSTALL_CMAKEDIR}"
-          NAMESPACE "${PACKAGE_NAME}::"
-          FILE "${TARGETS_CMAKE}")
+  if(EXPORT_NAME)
+    set(TARGETS_CMAKE "${PACKAGE_NAME}Targets.cmake")
+    install(EXPORT ${EXPORT_NAME}
+            DESTINATION "${INSTALL_CMAKEDIR}"
+            NAMESPACE "${PACKAGE_NAME}::"
+            FILE "${TARGETS_CMAKE}")
+  endif()
 endfunction()
 
 # \arg OUTPUTS list to append built targets to
@@ -310,7 +312,7 @@ function(ADD_ARROW_LIB LIB_NAME)
   if(BUILD_STATIC)
     add_library(${LIB_NAME}_static STATIC ${LIB_DEPS})
     target_compile_features(${LIB_NAME}_static PRIVATE cxx_std_11)
-    set_property(TARGET ${LIB_NAME}_shared PROPERTY CXX_STANDARD_REQUIRED ON)
+    set_property(TARGET ${LIB_NAME}_static PROPERTY CXX_STANDARD_REQUIRED ON)
     adbc_configure_target(${LIB_NAME}_static)
     if(EXTRA_DEPS)
       add_dependencies(${LIB_NAME}_static ${EXTRA_DEPS})

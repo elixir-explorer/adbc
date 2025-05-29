@@ -270,7 +270,7 @@ int get_arrow_struct(ErlNifEnv *env, struct ArrowSchema * schema, struct ArrowAr
     return get_arrow_struct(env, schema, values, 0, -1, level, children, error);
 }
 
-int get_arrow_dictionary(ErlNifEnv *env, 
+int get_arrow_dictionary(ErlNifEnv *env,
     struct ArrowSchema * index_schema, struct ArrowArray * index_array,
     struct ArrowSchema * value_schema, struct ArrowArray * value_array,
     int64_t offset, int64_t count, uint64_t level, std::vector<ERL_NIF_TERM> &children, ERL_NIF_TERM &error) {
@@ -300,7 +300,7 @@ int get_arrow_dictionary(ErlNifEnv *env,
     return 0;
 }
 
-int get_arrow_dictionary(ErlNifEnv *env, 
+int get_arrow_dictionary(ErlNifEnv *env,
     struct ArrowSchema * index_schema, struct ArrowArray * index_array,
     struct ArrowSchema * value_schema, struct ArrowArray * value_array,
     uint64_t level, std::vector<ERL_NIF_TERM> &children, ERL_NIF_TERM &error) {
@@ -361,7 +361,7 @@ ERL_NIF_TERM get_arrow_array_map_children(ErlNifEnv *env, struct ArrowSchema * s
     if (arrow_array_to_nif_term(env, value_schema, value_values, offset, count, level + 1, nif_values, value_type, value_metadata, error) == 1) {
         return erlang::nif::error(env, "failed to get map values");
     }
-    
+
     ERL_NIF_TERM map_keys[] = {
         kAtomKey,
         kAtomValue
@@ -544,7 +544,7 @@ ERL_NIF_TERM get_arrow_run_end_encoded(ErlNifEnv *env, struct ArrowSchema * sche
             }
         }
     }
-    
+
     ERL_NIF_TERM run_ends_keys[] = { kAtomRunEnds, kAtomValues };
     ERL_NIF_TERM run_ends_values[] = { children[0], children[1] };
     ERL_NIF_TERM run_ends_data;
@@ -788,12 +788,12 @@ int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct 
         if (schema->dictionary != nullptr && values->dictionary != nullptr) {
             // NANOARROW_TYPE_DICTIONARY
             //
-            // For dictionary-encoded arrays, the ArrowSchema.format string 
-            // encodes the index type. The dictionary value type can be read 
+            // For dictionary-encoded arrays, the ArrowSchema.format string
+            // encodes the index type. The dictionary value type can be read
             // from the ArrowSchema.dictionary structure.
             //
-            // The same holds for ArrowArray structure: while the parent 
-            // structure points to the index data, the ArrowArray.dictionary 
+            // The same holds for ArrowArray structure: while the parent
+            // structure points to the index data, the ArrowArray.dictionary
             // points to the dictionary values array.
             term_type = kAdbcColumnTypeDictionary;
 
@@ -813,7 +813,7 @@ int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct 
             return 1;
         }
     }
-    
+
     bool is_struct = false;
     bool format_processed = true;
     if (format_len == 1) {
@@ -1471,10 +1471,10 @@ int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct 
                 }
             } else if (format_len >= 4 && format[1] == 's' && format[3] == ':') {
                 // according to the arrow spec:
-                //   The timezone string is appended as-is after the colon character :, 
+                //   The timezone string is appended as-is after the colon character :,
                 //   without any quotes. If the timezone is empty, the colon : must still be included.
                 // so the format length for timestamps must be >= 4
-            
+
                 // possible format strings:
                 // tss: - timestamp [seconds]
                 // tsm: - timestamp [milliseconds]
@@ -1520,7 +1520,7 @@ int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct 
                         term_timezone = erlang::nif::make_binary(env, timezone);
                     }
                     term_type = enif_make_tuple3(env, kAtomTimestamp, term_unit, term_timezone);
-                    
+
                     using value_type = int64_t;
                     if (count == -1) count = values->length;
                     if (count > values->length) count = values->length - offset;
@@ -1637,7 +1637,7 @@ int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct 
                 // N is optional and defaults to 128
                 int precision = 0;
                 int scale = 0;
-                int bits = 128;
+                int bits = 0;
                 int * d[3] = {&precision, &scale, &bits};
                 int index = 0;
                 for (size_t i = 2; i < format_len; i++) {
@@ -1655,6 +1655,7 @@ int arrow_array_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema, struct 
                 }
 
                 if (format_processed) {
+                    if (bits == 0) bits = 128;
                     term_type = kAdbcColumnTypeDecimal(bits, precision, scale);
                     if (count == -1) count = values->length;
                     if (count > values->length) count = values->length - offset;

@@ -199,12 +199,12 @@ static int arrow_schema_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema,
     if (schema->dictionary != nullptr) {
         // NANOARROW_TYPE_DICTIONARY
         //
-        // For dictionary-encoded arrays, the ArrowSchema.format string 
-        // encodes the index type. The dictionary value type can be read 
+        // For dictionary-encoded arrays, the ArrowSchema.format string
+        // encodes the index type. The dictionary value type can be read
         // from the ArrowSchema.dictionary structure.
         //
-        // The same holds for ArrowArray structure: while the parent 
-        // structure points to the index data, the ArrowArray.dictionary 
+        // The same holds for ArrowArray structure: while the parent
+        // structure points to the index data, the ArrowArray.dictionary
         // points to the dictionary values array.
         type_term = kAdbcColumnTypeDictionary;
 
@@ -290,10 +290,10 @@ static int arrow_schema_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema,
                 format_processed = iter != primitiveFormatMapping.end();
             } else if (format_len >= 4 && format[1] == 's' && format[3] == ':') {
                 // according to the arrow spec:
-                //   The timezone string is appended as-is after the colon character :, 
+                //   The timezone string is appended as-is after the colon character :,
                 //   without any quotes. If the timezone is empty, the colon : must still be included.
                 // so the format length for timestamps must be >= 4
-            
+
                 // possible format strings:
                 // tss: - timestamp [seconds]
                 // tsm: - timestamp [milliseconds]
@@ -359,7 +359,7 @@ static int arrow_schema_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema,
                     n_items = n_items * 10 + (format[i] - '0');
                 }
                 type_term = kAdbcColumnTypeFixedSizeList(n_items);
-                
+
                 ERL_NIF_TERM elem_schema;
                 if (get_list_element_schema(env, schema, level, elem_schema, error) != 0) {
                     return 1;
@@ -392,7 +392,7 @@ static int arrow_schema_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema,
                 // N is optional and defaults to 128
                 int precision = 0;
                 int scale = 0;
-                int bits = 128;
+                int bits = 0;
                 int * d[3] = {&precision, &scale, &bits};
                 int index = 0;
                 for (size_t i = 2; i < format_len; i++) {
@@ -410,6 +410,7 @@ static int arrow_schema_to_nif_term(ErlNifEnv *env, struct ArrowSchema * schema,
                 }
 
                 if (format_processed) {
+                    if (bits == 0) bits = 128;
                     type_term = kAdbcColumnTypeDecimal(bits, precision, scale);
                     children_term = make_adbc_column(env, schema, type_term, metadata);
                 }

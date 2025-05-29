@@ -15,18 +15,27 @@
 # specific language governing permissions and limitations
 # under the License.
 
-# Common definitions for the CMake projects in this repository.
-# Must define REPOSITORY_ROOT before including this.
+@PACKAGE_INIT@
 
-# ------------------------------------------------------------
-# Version definitions
+set(ADBC_BUILD_SHARED @ADBC_BUILD_SHARED@)
+set(ADBC_BUILD_STATIC @ADBC_BUILD_STATIC@)
+set(ADBC_FULL_SO_VERSION "@ADBC_FULL_SO_VERSION@")
+set(ADBC_INSTALL_LIBDIR "@CMAKE_INSTALL_LIBDIR@")
+set(ADBC_SO_VERSION "@ADBC_SO_VERSION@")
+set(ADBC_VERSION "@ADBC_VERSION@")
 
-set(ADBC_VERSION "1.6.0")
-string(REGEX MATCH "^[0-9]+\\.[0-9]+\\.[0-9]+" ADBC_BASE_VERSION "${ADBC_VERSION}")
-string(REPLACE "." ";" _adbc_version_list "${ADBC_BASE_VERSION}")
-list(GET _adbc_version_list 0 ADBC_VERSION_MAJOR)
-list(GET _adbc_version_list 1 ADBC_VERSION_MINOR)
-list(GET _adbc_version_list 2 ADBC_VERSION_PATCH)
+@ADBC_GO_PACKAGE_INIT@
 
-math(EXPR ADBC_SO_VERSION "${ADBC_VERSION_MAJOR} * 100 + ${ADBC_VERSION_MINOR}")
-set(ADBC_FULL_SO_VERSION "${ADBC_SO_VERSION}.${ADBC_VERSION_PATCH}.0")
+if(ADBC_BUILD_SHARED)
+  adbc_add_shared_library(
+    AdbcDriverFlightSQL::adbc_driver_flightsql_shared
+    adbc_driver_flightsql)
+endif()
+
+if(ADBC_BUILD_STATIC)
+  adbc_add_shared_library(
+    AdbcDriverFlightSQL::adbc_driver_flightsql_static
+    adbc_driver_flightsql)
+endif()
+
+check_required_components(AdbcDriverFlightSQL)

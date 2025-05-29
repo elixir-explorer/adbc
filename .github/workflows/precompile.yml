@@ -26,7 +26,7 @@ jobs:
 
       - uses: erlef/setup-beam@v1
         with:
-          otp-version: "27.3"
+          otp-version: "25.3"
           elixir-version: "1.18.3"
 
       - name: Install system dependecies
@@ -55,7 +55,7 @@ jobs:
     env:
       MIX_ENV: prod
       ELIXIR_VERSION: "1.18.3"
-      OTP_VERSION: "27.3"
+      OTP_VERSION: "25.3"
 
     name: macOS
 
@@ -102,7 +102,7 @@ jobs:
 
       - uses: erlef/setup-beam@v1
         with:
-          otp-version: "27.3"
+          otp-version: "25.3"
           elixir-version: "1.18.3"
 
       - uses: ilammy/msvc-dev-cmd@v1

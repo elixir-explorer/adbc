@@ -55,8 +55,8 @@ jobs:
 
       - uses: erlef/setup-beam@v1
         with:
-          otp-version: 26
-          elixir-version: 1.15
+          otp-version: "26.3"
+          elixir-version: "1.15"
 
       - uses: ilammy/msvc-dev-cmd@v1
         with:
@@ -73,7 +73,7 @@ jobs:
     runs-on: macos-13
     env:
       MIX_ENV: test
-      OTP_VERSION: "26.2.1"
+      OTP_VERSION: "26.3"
       ELIXIR_VERSION: "1.15.7"
 
     steps:

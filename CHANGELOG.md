@@ -1,5 +1,18 @@
 # CHANGELOG
 
+## v0.7.9
+
+#### Changes
+
+* Update to latest ADBC
+* Update to latest DuckDB
+* Update to Erlang/OTP 25+
+
+#### Fixes
+
+* Ensure all arrow fields are correctly decoded
+* Properly handle decimal fields where the bits are set
+
 ## v0.7.8
 
 #### Fixes

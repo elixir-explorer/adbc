@@ -1,18 +1,19 @@
 # Release steps:
-# 1. Push tag
-# 2. Once CI finishes, run MIX_ENV=prod mix elixir_make.checksum --all
-# 3. Publish to Hex
+# 1. mix deps.update ex_doc
+# 2. Update CHANGELOG, commit, and push tag
+# 3. Once CI finishes, run MIX_ENV=prod mix elixir_make.checksum --all
+# 4. Publish to Hex with MIX_ENV=docs mix hex.publish
 defmodule Adbc.MixProject do
   use Mix.Project
 
-  @version "0.7.9"
+  @version "0.7.10-dev"
   @github_url "https://github.com/elixir-explorer/adbc"
 
   def project do
     [
       app: :adbc,
       version: @version,
-      elixir: "~> 1.12",
+      elixir: "~> 1.14",
       start_permanent: Mix.env() == :prod,
       deps: deps(),
       package: package(),

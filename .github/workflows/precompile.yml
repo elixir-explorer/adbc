@@ -54,8 +54,8 @@ jobs:
     runs-on: macos-13
     env:
       MIX_ENV: prod
-      ELIXIR_VERSION: "1.18.3"
       OTP_VERSION: "25.3"
+      ELIXIR_VERSION: "1.18.3"
 
     name: macOS
 

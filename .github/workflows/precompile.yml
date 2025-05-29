@@ -15,7 +15,13 @@ permissions:
 jobs:
   linux:
     runs-on: ubuntu-latest
+    container: ubuntu:20.04
     env:
+      ImageOS: ubuntu20
+      LANG: en_US.UTF-8
+      LANGUAGE: en_US:en
+      LC_ALL: en_US.UTF-8
+      DEBIAN_FRONTEND: noninteractive
       MIX_ENV: prod
 
     name: Linux GNU - OTP ${{ matrix.otp_version }}

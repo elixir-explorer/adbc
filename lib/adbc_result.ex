@@ -30,48 +30,9 @@ defmodule Adbc.Result do
   Returns a map of columns as a result.
   """
   def to_map(result = %Adbc.Result{}) do
-    Map.new(result.data, fn column ->
-      %Adbc.Column{name: name, type: type, data: data} =
-        column |> Adbc.Column.materialize() |> Adbc.Column.to_list()
-
-      case type do
-        :list -> {name, Enum.map(data, &list_to_map/1)}
-        _ -> {name, data}
-      end
+    Map.new(result.data, fn %Adbc.Column{name: name} = column ->
+      {name, column |> Adbc.Column.materialize() |> Adbc.Column.to_list()}
     end)
-  end
-
-  @doc """
-  Convert any list view in the result set to normal lists.
-  """
-  @spec to_list(%Adbc.Result{}) :: %Adbc.Result{}
-  def to_list(result = %Adbc.Result{data: data}) when is_list(data) do
-    %{result | data: Enum.map(data, &Adbc.Column.to_list/1)}
-  end
-
-  defp list_to_map(nil), do: nil
-
-  defp list_to_map(%Adbc.Column{name: name, type: type, data: data}) do
-    case type do
-      :list ->
-        list = Enum.map(data, &list_to_map/1)
-
-        if name == "item" do
-          list
-        else
-          {name, list}
-        end
-
-      :struct ->
-        Enum.map(data, &list_to_map/1)
-
-      _ ->
-        if name == "item" do
-          data
-        else
-          {name, data}
-        end
-    end
   end
 end
 
@@ -82,7 +43,6 @@ defimpl Table.Reader, for: Adbc.Result do
         column
         |> Adbc.Column.materialize()
         |> Adbc.Column.to_list()
-        |> Map.fetch!(:data)
       end)
 
     names = Enum.map(result.data, & &1.name)

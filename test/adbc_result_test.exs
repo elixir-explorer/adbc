@@ -73,27 +73,25 @@ defmodule Adbc.Result.Test do
   end
 
   test "implements table reader" do
-    assert result() |> Table.to_rows() |> Enum.to_list() == []
+    assert result() |> Table.to_rows() |> Enum.to_list() == [
+             %{
+               "end_time" => ~N[2024-05-31 13:00:00],
+               "start_time" => ~N[2024-05-31 12:00:00],
+               "time_series" => [[1], [2, 3], [3, 4], [4]]
+             },
+             %{
+               "end_time" => ~N[2024-05-31 13:30:00],
+               "start_time" => ~N[2024-05-31 12:30:00],
+               "time_series" => [[3, 4], [4], [5, 6], [6]]
+             }
+           ]
   end
 
   test "to_map with list views" do
     assert %{
              "start_time" => [~N[2024-05-31 12:00:00], ~N[2024-05-31 12:30:00]],
              "end_time" => [~N[2024-05-31 13:00:00], ~N[2024-05-31 13:30:00]],
-             "time_series" => [
-               [
-                 {"variable_sliding_window", [1]},
-                 {"variable_sliding_window", [2, 3]},
-                 {"variable_sliding_window", [3, 4]},
-                 {"variable_sliding_window", [4]}
-               ],
-               [
-                 {"variable_sliding_window", [3, 4]},
-                 {"variable_sliding_window", [4]},
-                 {"variable_sliding_window", [5, 6]},
-                 {"variable_sliding_window", [6]}
-               ]
-             ]
+             "time_series" => [[[1], [2, 3], [3, 4], [4]], [[3, 4], [4], [5, 6], [6]]]
            } == Result.to_map(result())
   end
 end

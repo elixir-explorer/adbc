@@ -294,46 +294,13 @@ defmodule Adbc.Column.Test do
         }
       }
 
-      assert %Adbc.Column{
-               name: "my_array",
-               type: :list,
-               nullable: true,
-               metadata: nil,
-               data: [
-                 %Adbc.Column{
-                   name: "item",
-                   type: :s32,
-                   nullable: false,
-                   metadata: nil,
-                   data: [12, -7, 25]
-                 },
-                 _inner2 = nil,
-                 inner3 = %Adbc.Column{
-                   name: "item",
-                   type: :s32,
-                   nullable: false,
-                   metadata: nil,
-                   data: [0, -127, 127, 50]
-                 },
-                 inner4 = %Adbc.Column{
-                   name: "item",
-                   type: :s32,
-                   nullable: false,
-                   metadata: nil,
-                   data: []
-                 },
-                 inner5 = %Adbc.Column{
-                   name: "item",
-                   type: :s32,
-                   nullable: false,
-                   metadata: nil,
-                   data: ~c"2\f"
-                 }
-               ]
-             } = Adbc.Column.to_list(list_view)
-
-      assert %{"my_array" => [[12, -7, 25], nil, [0, -127, 127, 50], [], ~c"2\f"]} ==
-               Adbc.Result.to_map(%Adbc.Result{data: [list_view]})
+      assert Adbc.Column.to_list(list_view) == [
+               [12, -7, 25],
+               nil,
+               [0, -127, 127, 50],
+               [],
+               ~c"2\f"
+             ]
 
       nested_list_view = %Adbc.Column{
         name: nil,
@@ -348,91 +315,13 @@ defmodule Adbc.Column.Test do
         }
       }
 
-      assert %Adbc.Column{
-               data: [
-                 # offsets=2, sizes=2
-                 # => [inner3, inner4]
-                 %Adbc.Column{
-                   metadata: nil,
-                   name: "my_array",
-                   nullable: true,
-                   type: :list,
-                   data: [
-                     ^inner3 = %Adbc.Column{
-                       name: "item",
-                       type: :s32,
-                       nullable: false,
-                       metadata: nil,
-                       data: [0, -127, 127, 50]
-                     },
-                     ^inner4 = %Adbc.Column{
-                       name: "item",
-                       type: :s32,
-                       nullable: false,
-                       metadata: nil,
-                       data: []
-                     }
-                   ]
-                 },
-                 # offsets=5, sizes=0
-                 # => nil
-                 nil,
-                 # offsets=0, sizes=1
-                 # => inner1
-                 %Adbc.Column{
-                   metadata: nil,
-                   name: "my_array",
-                   nullable: true,
-                   type: :list,
-                   data: [
-                     %Adbc.Column{
-                       name: "item",
-                       type: :s32,
-                       nullable: false,
-                       metadata: nil,
-                       data: [12, -7, 25]
-                     }
-                   ]
-                 },
-                 # offsets=0, sizes=0
-                 # => []
-                 %Adbc.Column{
-                   data: [],
-                   metadata: nil,
-                   name: "my_array",
-                   nullable: true,
-                   type: :list
-                 },
-                 # offsets=3, sizes=2
-                 # => [inner4, inner5]
-                 %Adbc.Column{
-                   data: [
-                     ^inner4 = %Adbc.Column{
-                       name: "item",
-                       type: :s32,
-                       nullable: false,
-                       metadata: nil,
-                       data: []
-                     },
-                     ^inner5 = %Adbc.Column{
-                       name: "item",
-                       type: :s32,
-                       nullable: false,
-                       metadata: nil,
-                       data: ~c"2\f"
-                     }
-                   ],
-                   metadata: nil,
-                   name: "my_array",
-                   nullable: true,
-                   type: :list
-                 }
-               ],
-               metadata: nil,
-               name: nil,
-               nullable: true,
-               type: :list
-             } = Adbc.Column.to_list(nested_list_view)
+      assert Adbc.Column.to_list(nested_list_view) == [
+               [[0, -127, 127, 50], []],
+               nil,
+               [[12, -7, 25]],
+               [],
+               [[], ~c"2\f"]
+             ]
     end
   end
 
@@ -476,25 +365,15 @@ defmodule Adbc.Column.Test do
         }
       }
 
-      assert %Adbc.Column{
-               data: [1.0, 1.0, 1.0, 1.0, nil, nil, 2.0],
-               metadata: nil,
-               name: "sample_run_end_encoded_array",
-               nullable: false,
-               type: :f32
-             } == Adbc.Column.to_list(run_end_array)
+      assert Adbc.Column.to_list(run_end_array) ==
+               [1.0, 1.0, 1.0, 1.0, nil, nil, 2.0]
 
       # change logical length = 6 and offset = 1
       #  [1.0, 1.0, 1.0, 1.0, null, null, 2.0]
       #        ^                          ^
       #        |- offset = 1              |- length = 6
-      assert %Adbc.Column{
-               data: [1.0, 1.0, 1.0, nil, nil, 2.0],
-               metadata: nil,
-               name: "sample_run_end_encoded_array",
-               nullable: false,
-               type: :f32
-             } == Adbc.Column.to_list(%{run_end_array | offset: 1, length: 6})
+      assert Adbc.Column.to_list(%{run_end_array | offset: 1, length: 6}) ==
+               [1.0, 1.0, 1.0, nil, nil, 2.0]
 
       # change logical length = 7 and offset = 1
       #  [1.0, 1.0, 1.0, 1.0, null, null, 2.0]
@@ -554,13 +433,7 @@ defmodule Adbc.Column.Test do
         }
       }
 
-      assert %Adbc.Column{
-               name: "inner_run_end_encoded_array",
-               type: :s32,
-               nullable: true,
-               metadata: nil,
-               data: [1, 1, 2]
-             } == Adbc.Column.to_list(inner_run_end_array)
+      assert Adbc.Column.to_list(inner_run_end_array) == [1, 1, 2]
 
       run_end_array = %Adbc.Column{
         name: "sample_run_end_encoded_array",
@@ -581,13 +454,7 @@ defmodule Adbc.Column.Test do
         }
       }
 
-      assert %Adbc.Column{
-               data: [1, 2, 2],
-               metadata: nil,
-               name: "sample_run_end_encoded_array",
-               nullable: false,
-               type: :s32
-             } == Adbc.Column.to_list(run_end_array)
+      assert Adbc.Column.to_list(run_end_array) == [1, 2, 2]
     end
   end
 
@@ -608,14 +475,7 @@ defmodule Adbc.Column.Test do
       value = Adbc.Column.string(["foo", "bar", "baz"], name: "value", nullable: false)
       dict = Adbc.Column.dictionary(key, value)
 
-      assert %Adbc.Column{
-               name: nil,
-               type: :string,
-               nullable: false,
-               metadata: nil,
-               data: ["foo", "bar", "foo", "bar", nil, "baz"]
-             } =
-               Adbc.Column.to_list(dict)
+      assert Adbc.Column.to_list(dict) == ["foo", "bar", "foo", "bar", nil, "baz"]
     end
   end
 end

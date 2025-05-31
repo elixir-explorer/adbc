@@ -1240,111 +1240,72 @@ defmodule Adbc.Column do
       ...>     sizes: [3, 0, 4, 0, 2]
       ...>   }
       ...> }
-      %Adbc.Column{
-        name: nil,
-        type: :list_view,
-        nullable: true,
-        metadata: nil,
-        data: %{
-          offsets: [4, 7, 0, 0, 3],
-          sizes: [3, 0, 4, 0, 2],
-          validity: [true, false, true, true, true],
-          values: %Adbc.Column{
-            name: "item",
-            type: :s32,
-            nullable: false,
-            metadata: nil,
-            data: [0, -127, 127, 50, 12, -7, 25]
-          }
-        }
-      }
       iex> Adbc.Column.to_list(list_view)
-      %Adbc.Column{
-        name: nil,
-        type: :list,
-        nullable: true,
-        metadata: nil,
-        data: [
-          %Adbc.Column{
-            name: "item",
-            type: :s32,
-            nullable: false,
-            metadata: nil,
-            data: [12, -7, 25]
-          },
-          nil,
-          %Adbc.Column{
-            name: "item",
-            type: :s32,
-            nullable: false,
-            metadata: nil,
-            data: [0, -127, 127, 50]
-          },
-          %Adbc.Column{
-            name: "item",
-            type: :s32,
-            nullable: false,
-            metadata: nil,
-            data: []
-          },
-          %Adbc.Column{
-            name: "item",
-            type: :s32,
-            nullable: false,
-            metadata: nil,
-            data: ~c"2\f"
-          }
-        ]
-      }
+      [[12, -7, 25], nil, [0, -127, 127, 50], [], ~c"2\f"]
   """
-  @spec to_list(%Adbc.Column{data: map()}) :: %Adbc.Column{}
-  def to_list(
-        column = %Adbc.Column{
-          type: type,
-          data: %{
-            validity: validity,
-            offsets: offsets,
-            sizes: sizes,
-            values: values = %Adbc.Column{}
-          }
+  @spec to_list(%Adbc.Column{}) :: [term()]
+  def to_list(%Adbc.Column{
+        type: type,
+        data: %{
+          validity: validity,
+          offsets: offsets,
+          sizes: sizes,
+          values: values = %Adbc.Column{}
         }
-      )
+      })
       when type in @list_view_types and is_list(validity) and is_list(offsets) and is_list(sizes) do
-    values =
+    list =
       if values.type in @list_view_types do
-        Adbc.Column.to_list(values)
+        to_list(values)
       else
-        values
+        values.data
       end
 
-    new_data =
-      Enum.map(Enum.zip([offsets, sizes, validity]), fn {offset, size, valid} ->
-        if valid do
-          %{
-            values
-            | data: Enum.map(Enum.slice(values.data, offset, size), &Adbc.Column.to_list/1)
-          }
-        else
-          nil
-        end
-      end)
-
-    %{column | data: new_data, type: :list}
+    Enum.zip_with([offsets, sizes, validity], fn [offset, size, valid] ->
+      if valid do
+        Enum.slice(list, offset, size)
+      else
+        nil
+      end
+    end)
   end
 
-  def to_list(
-        column = %Adbc.Column{
-          type: :run_end_encoded,
-          data: %{
-            run_ends: run_ends = %Adbc.Column{type: run_end_type},
-            values: values
-          },
-          length: length,
-          offset: offset
-        }
-      )
+  # defp list_to_map(nil), do: nil
+
+  # defp list_to_map(%Adbc.Column{name: name, type: type, data: data}) do
+  #   case type do
+  #     :list ->
+  #       list = Enum.map(data, &list_to_map/1)
+
+  #       if name == "item" do
+  #         list
+  #       else
+  #         {name, list}
+  #       end
+
+  #     :struct ->
+  #       Enum.map(data, &list_to_map/1)
+
+  #     _ ->
+  #       if name == "item" do
+  #         data
+  #       else
+  #         {name, data}
+  #       end
+  #   end
+  # end
+
+  def to_list(%Adbc.Column{
+        type: :run_end_encoded,
+        data: %{
+          run_ends: run_ends = %Adbc.Column{type: run_end_type, data: data},
+          values: values
+        },
+        length: length,
+        offset: offset
+      })
       when is_integer(offset) and offset >= 0 and is_integer(length) and length >= 1 do
-    values = Adbc.Column.to_list(values)
+    values = to_list(values)
 
     max_allowed_length =
       case run_end_type do
@@ -1367,13 +1328,13 @@ defmodule Adbc.Column do
             "Run end data exceeds maximum allowed length: #{length} + #{offset} > #{max_allowed_length}"
     end
 
-    run_end_len = Enum.count(run_ends.data)
+    run_end_len = Enum.count(data)
 
     {run_end_start_index, values_start_index, encoded} =
-      case Enum.drop_while(run_ends.data, &(&1 < offset)) do
+      case Enum.drop_while(data, &(&1 < offset)) do
         [] ->
           raise Adbc.Error,
-                "Last run end is #{hd(Enum.reverse(run_ends.data))} but it should >= #{offset + length} (offset: #{offset}, length: #{length})"
+                "Last run end is #{hd(Enum.reverse(data))} but it should >= #{offset + length} (offset: #{offset}, length: #{length})"
 
         encoded = [run_end_start_index | _] ->
           values_start_index = run_end_len - Enum.count(encoded)
@@ -1385,7 +1346,7 @@ defmodule Adbc.Column do
           end
       end
 
-    if offset + length > hd(Enum.reverse(run_ends.data)) do
+    if offset + length > hd(Enum.reverse(data)) do
       raise Adbc.Error,
             "Last run end is #{hd(Enum.reverse(run_ends.data))} but it should >= #{offset + length} (offset: #{offset}, length: #{length})"
     end
@@ -1400,41 +1361,30 @@ defmodule Adbc.Column do
               run_end
             end
 
-          if is_map(values.data) do
-            {run_end, value_index + 1, List.duplicate(to_list(values), real_end - index) ++ acc}
+          if is_map(values) do
+            {run_end, value_index + 1, List.duplicate(values, real_end - index) ++ acc}
           else
             {run_end, value_index + 1,
-             List.duplicate(Enum.at(values.data, value_index), real_end - index) ++ acc}
+             List.duplicate(Enum.at(values, value_index), real_end - index) ++ acc}
           end
       end)
 
-    %Adbc.Column{
-      name: column.name,
-      type: values.type,
-      nullable: column.nullable,
-      data: Enum.reverse(decoded),
-      metadata: nil
-    }
+    Enum.reverse(decoded)
   end
 
-  def to_list(column = %Adbc.Column{data: %{key: key, value: value}, type: :dictionary}) do
+  def to_list(%Adbc.Column{data: %{key: key, value: value}, type: :dictionary}) do
     value = to_list(value)
 
-    column_data =
-      Enum.map(key.data, fn
-        index when is_integer(index) ->
-          Enum.at(value.data, index)
+    Enum.map(key.data, fn
+      index when is_integer(index) ->
+        Enum.at(value, index)
 
-        nil ->
-          nil
-      end)
-
-    %{column | data: column_data, type: value.type}
+      nil ->
+        nil
+    end)
   end
 
-  def to_list(column = %Adbc.Column{data: data}) when is_list(data) do
-    %{column | data: Enum.map(data, &Adbc.Column.to_list/1)}
-  end
+  def to_list(%Adbc.Column{data: data, type: :list}), do: Enum.map(data, &to_list/1)
 
-  def to_list(v), do: v
+  def to_list(%Adbc.Column{data: data}), do: data
 end

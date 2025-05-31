@@ -79,6 +79,7 @@ defmodule Adbc.MixProject do
 
       # runtime
       {:decimal, "~> 2.1"},
+      {:table, "~> 0.1.2"},
 
       # docs
       {:ex_doc, "~> 0.29", only: :docs, runtime: false}

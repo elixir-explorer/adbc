@@ -12,7 +12,7 @@ Mix.install([{:req, "~> 0.4"}])
 defmodule Update do
   # To update duckdb driver, just bump this version
   # https://github.com/duckdb/duckdb/releases/
-  @duckdb_version "1.3.0"
+  @duckdb_version "1.3.2"
 
   # To update ADBC drivers, bump the tag and version accordingly
   # https://github.com/apache/arrow-adbc/releases

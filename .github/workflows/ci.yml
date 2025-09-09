@@ -47,7 +47,7 @@ jobs:
 
   windows:
     if: contains(github.event.pull_request.labels.*.name, 'skip ci') != true
-    runs-on: windows-latest
+    runs-on: windows-2022
     env:
       MIX_ENV: test
     steps:

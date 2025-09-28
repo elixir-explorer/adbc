@@ -141,7 +141,12 @@ defmodule Adbc do
         url: "https://github.com/duckdb/duckdb/releases/download/v1.3.0/libduckdb-osx-universal.zip"
       )
 
-  You can also pass download options when configuring the `:adbc`:
+  And then start the driver passing the version option:
+
+      {Adbc.Database, driver: :duckdb, version: "1.3.0"}
+
+  Note you can also configure the `:adbc` application to download
+  a custom driver during compilation too:
 
       config :adbc, :drivers,
         [{:duckdb, version: ..., url: ...}]

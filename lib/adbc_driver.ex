@@ -316,7 +316,7 @@ defmodule Adbc.Driver do
               {:ok, expected_filepath}
             else
               {:error,
-               "driver #{driver_name} is not available (see Adbc moduledocs to learn how to install a driver)"}
+               "driver #{driver_name} (version #{version}) is not available (see Adbc moduledocs to learn how to install a driver)"}
             end
 
           {:error, reason} ->

@@ -1386,5 +1386,11 @@ defmodule Adbc.Column do
 
   def to_list(%Adbc.Column{data: data, type: :list}), do: Enum.map(data, &to_list/1)
 
+  def to_list(%Adbc.Column{data: data, type: {:struct, _columns}}) do
+    %Adbc.Result{data: data, num_rows: nil}
+    |> Table.to_rows()
+    |> Enum.to_list()
+  end
+
   def to_list(%Adbc.Column{data: data}), do: data
 end

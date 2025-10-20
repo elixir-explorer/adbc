@@ -478,4 +478,63 @@ defmodule Adbc.Column.Test do
       assert Adbc.Column.to_list(dict) == ["foo", "bar", "foo", "bar", nil, "baz"]
     end
   end
+
+  describe "struct" do
+    test "to list" do
+      struct = %Adbc.Column{
+        name: "struct",
+        type:
+          {:struct,
+           [
+             %Adbc.Column{
+               name: "val1",
+               type: :s64,
+               nullable: true,
+               metadata: nil,
+               data: nil,
+               length: nil,
+               offset: nil
+             },
+             %Adbc.Column{
+               name: "val2",
+               type: :string,
+               nullable: true,
+               metadata: nil,
+               data: nil,
+               length: nil,
+               offset: nil
+             }
+           ]},
+        nullable: true,
+        metadata: nil,
+        data: [
+          %Adbc.Column{
+            name: "val1",
+            type: :s64,
+            nullable: true,
+            metadata: nil,
+            data: [298_258_424, 162_342_654],
+            length: nil,
+            offset: nil
+          },
+          %Adbc.Column{
+            name: "val2",
+            type: :string,
+            nullable: true,
+            metadata: nil,
+            data: ["hello world", "hello elixir"],
+            length: nil,
+            offset: nil
+          }
+        ],
+        length: nil,
+        offset: nil
+      }
+
+      assert Adbc.Column.to_list(struct) == [
+               %{"val1" => 298_258_424, "val2" => "hello world"},
+               %{"val1" => 162_342_654, "val2" => "hello elixir"}
+             ]
+    end
+  end
 end

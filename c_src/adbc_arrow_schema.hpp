@@ -157,8 +157,8 @@ static int get_list_element_schema(ErlNifEnv *env, struct ArrowSchema * schema, 
     }
 
     struct ArrowSchema * items_schema = schema->children[0];
-    if (strcmp("item", items_schema->name) != 0) {
-        return erlang::nif::error(env, "invalid ArrowSchema (list), its single child is not named item");
+    if (!(strcmp("item", items_schema->name) == 0 || strcmp("l", items_schema->name) == 0)) {
+        return erlang::nif::error(env, "invalid ArrowSchema (list), its single child is not named 'item' or 'l'");
     }
 
     std::vector<ERL_NIF_TERM> childrens;
@@ -167,7 +167,10 @@ static int get_list_element_schema(ErlNifEnv *env, struct ArrowSchema * schema, 
     if (arrow_schema_to_nif_term(env, items_schema, nullptr, level + 1, childrens, child_type, child_metadata, error) != 0) {
         return 1;
     }
-    element_schema = make_adbc_column(env, items_schema, child_type, child_metadata);
+
+    // Always use "item" as the canonical name for list elements, regardless of what
+    // the driver provides; using "item" appears to be conventional but duckdb uses "l"
+    element_schema = make_adbc_column(env, erlang::nif::make_binary(env, "item"), items_schema, child_type, child_metadata);
     return 0;
 }
 

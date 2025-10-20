@@ -4,9 +4,14 @@ defmodule Adbc.Connection.Test do
 
   alias Adbc.Connection
 
-  setup do
-    db = start_supervised!({Adbc.Database, driver: :sqlite, uri: ":memory:"})
-    %{db: db}
+  setup tags do
+    case Map.get(tags, :driver, :sqlite) do
+      :sqlite ->
+        %{db: start_supervised!({Adbc.Database, driver: :sqlite, uri: ":memory:"})}
+
+      :duckdb ->
+        %{db: start_supervised!({Adbc.Database, driver: :duckdb})}
+    end
   end
 
   describe "start_link" do
@@ -732,6 +737,98 @@ defmodule Adbc.Connection.Test do
 
     defp run_anything(conn) do
       {:ok, %{}} = Connection.get_table_types(conn)
+    end
+  end
+
+  describe "duckdb array handling" do
+    @describetag driver: :duckdb
+    test "handles empty string arrays without crashing", %{db: db} do
+      conn = start_supervised!({Connection, database: db})
+
+      # Create a table with array column containing empty arrays
+      {:ok, _} =
+        Connection.query(conn, """
+          CREATE TABLE test_arrays (
+            number INTEGER,
+            array_of_text TEXT[]
+          )
+        """)
+
+      # # Insert data with empty arrays
+      {:ok, _} =
+        Connection.query(conn, """
+          INSERT INTO test_arrays VALUES
+          (1, LIST_VALUE()),
+          (2, '["hello", "world"]'),
+          (4, '["single"]')
+        """)
+
+      assert results =
+               %Adbc.Result{
+                 num_rows: 0,
+                 data: [
+                   %Adbc.Column{
+                     name: "number",
+                     type: :s32,
+                     nullable: true,
+                     metadata: nil
+                   },
+                   %Adbc.Column{
+                     name: "array_of_text",
+                     type:
+                       {:list,
+                        %Adbc.Column{
+                          name: "item",
+                          type: :string,
+                          nullable: true,
+                          metadata: nil
+                        }},
+                     nullable: true,
+                     metadata: nil
+                   }
+                 ]
+               } = Connection.query!(conn, "SELECT * FROM test_arrays ORDER BY number")
+
+      assert %Adbc.Result{
+               data: [
+                 %Adbc.Column{
+                   name: "number",
+                   type: :s32,
+                   nullable: true,
+                   metadata: nil,
+                   data: [1, 2, 4]
+                 },
+                 %Adbc.Column{
+                   name: "array_of_text",
+                   type: :list,
+                   nullable: true,
+                   metadata: nil,
+                   data: [
+                     %Adbc.Column{
+                       name: "item",
+                       type: :string,
+                       nullable: true,
+                       metadata: nil,
+                       data: []
+                     },
+                     %Adbc.Column{
+                       name: "item",
+                       type: :string,
+                       nullable: true,
+                       metadata: nil,
+                       data: ["hello", "world"]
+                     },
+                     %Adbc.Column{
+                       name: "item",
+                       type: :string,
+                       nullable: true,
+                       metadata: nil,
+                       data: ["single"]
+                     }
+                   ]
+                 }
+               ]
+             } = Adbc.Result.materialize(results)
     end
   end
 end

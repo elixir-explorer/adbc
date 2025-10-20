@@ -129,6 +129,37 @@ ERL_NIF_TERM make_adbc_column(ErlNifEnv *env, struct ArrowSchema * schema, ERL_N
     return adbc_column;
 }
 
+// Overload that accepts a custom name (useful for normalizing names like "item" for lists)
+ERL_NIF_TERM make_adbc_column(ErlNifEnv *env, ERL_NIF_TERM name_term, struct ArrowSchema * schema, ERL_NIF_TERM type_term, ERL_NIF_TERM metadata, std::optional<ERL_NIF_TERM> data_ref = std::nullopt) {
+    ERL_NIF_TERM nullable_term = schema->flags & ARROW_FLAG_NULLABLE ? kAtomTrue : kAtomFalse;
+    ERL_NIF_TERM data_ref_list = data_ref ? enif_make_list1(env, data_ref.value()) : kAtomNil;
+
+    std::vector<ERL_NIF_TERM> keys = {
+        kAtomStructKey,
+        kAtomNameKey,
+        kAtomTypeKey,
+        kAtomNullableKey,
+        kAtomMetadataKey,
+        kAtomDataKey,
+        kAtomLengthKey,
+        kAtomOffsetKey,
+    };
+    std::vector<ERL_NIF_TERM> values = {
+        kAtomAdbcColumnModule,
+        name_term,
+        type_term,
+        nullable_term,
+        metadata,
+        data_ref_list,
+        kAtomNil,
+        kAtomNil
+    };
+
+    ERL_NIF_TERM adbc_column;
+    enif_make_map_from_arrays(env, keys.data(), values.data(), (unsigned)values.size(), &adbc_column);
+    return adbc_column;
+}
+
 ERL_NIF_TERM make_adbc_column(ErlNifEnv *env, struct ArrowSchema * schema, struct ArrowArray * array, ERL_NIF_TERM name_term, ERL_NIF_TERM type_term, bool nullable, ERL_NIF_TERM metadata, ERL_NIF_TERM data) {
     ERL_NIF_TERM nullable_term = nullable ? kAtomTrue : kAtomFalse;
     ERL_NIF_TERM length = kAtomNil;

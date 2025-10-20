@@ -580,8 +580,8 @@ ERL_NIF_TERM get_arrow_array_list_children(ErlNifEnv *env, struct ArrowSchema * 
     const uint8_t * bitmap_buffer = (const uint8_t *)values->buffers[bitmap_buffer_index];
     struct ArrowSchema * items_schema = schema->children[0];
     struct ArrowArray * items_values = values->children[0];
-    if (strcmp("item", items_schema->name) != 0) {
-        return erlang::nif::error(env, "invalid ArrowSchema (list), its single child is not named item");
+    if (!(strcmp("item", items_schema->name) == 0 || strcmp("l", items_schema->name) == 0)) {
+        return erlang::nif::error(env, "invalid ArrowSchema (list), its single child is not named `item` or `l`");
     }
 
     std::vector<ERL_NIF_TERM> children;
@@ -594,6 +594,8 @@ ERL_NIF_TERM get_arrow_array_list_children(ErlNifEnv *env, struct ArrowSchema * 
         bool items_nullable = (schema->flags & ARROW_FLAG_NULLABLE) || (values->null_count > 0);
 
         int has_error = 0;
+        // Use "item" as the canonical name for list elements
+        ERL_NIF_TERM item_name_term = erlang::nif::make_binary(env, "item");
         auto get_list_children_with_offsets = [&](auto offsets) -> void {
             for (int64_t i = offset; i < offset + count; i++) {
                 if (bitmap_buffer && items_nullable) {
@@ -619,7 +621,8 @@ ERL_NIF_TERM get_arrow_array_list_children(ErlNifEnv *env, struct ArrowSchema * 
                     if (enif_is_identical(childrens[1], kAtomNil)) {
                         children.emplace_back(kAtomNil);
                     } else {
-                        children.emplace_back(make_adbc_column(env, schema, values, childrens[0], children_type, children_nullable, children_metadata, childrens[1]));
+                        // Use "item" instead of childrens[0] (the schema's name)
+                        children.emplace_back(make_adbc_column(env, schema, values, item_name_term, children_type, children_nullable, children_metadata, childrens[1]));
                     }
                 }
             }
@@ -637,6 +640,9 @@ ERL_NIF_TERM get_arrow_array_list_children(ErlNifEnv *env, struct ArrowSchema * 
         if (count == -1) count = values->length;
         if (count > values->length) count = values->length - offset;
         bool items_nullable = (schema->flags & ARROW_FLAG_NULLABLE) || (values->null_count > 0);
+
+        // Use "item" as the canonical name for list elements
+        ERL_NIF_TERM item_name_term = erlang::nif::make_binary(env, "item");
         for (int64_t child_i = offset; child_i < offset + count; child_i++) {
             if (bitmap_buffer && items_nullable) {
                 uint8_t vbyte = bitmap_buffer[child_i / 8];
@@ -659,7 +665,8 @@ ERL_NIF_TERM get_arrow_array_list_children(ErlNifEnv *env, struct ArrowSchema * 
                 if (enif_is_identical(childrens[1], kAtomNil)) {
                     children.emplace_back(kAtomNil);
                 } else {
-                    children.emplace_back(make_adbc_column(env, schema, values, childrens[0], children_type, children_nullable, children_metadata, childrens[1]));
+                    // Use "item" instead of childrens[0] (the schema's name)
+                    children.emplace_back(make_adbc_column(env, schema, values, item_name_term, children_type, children_nullable, children_metadata, childrens[1]));
                 }
             }
         }
@@ -704,8 +711,8 @@ ERL_NIF_TERM get_arrow_array_list_view(ErlNifEnv *env, struct ArrowSchema * sche
 
     struct ArrowSchema * items_schema = schema->children[0];
     struct ArrowArray * items_values = values->children[0];
-    if (strcmp("item", items_schema->name) != 0) {
-        return erlang::nif::error(env, "invalid ArrowSchema (list), its single child is not named item");
+    if (!(strcmp("item", items_schema->name) == 0 || strcmp("l", items_schema->name) == 0)) {
+        return erlang::nif::error(env, "invalid ArrowSchema (list), its single child is not named `item` or `l`");
     }
     if (count == -1) count = values->length;
     if (count > values->length) count = values->length - offset;
@@ -733,7 +740,9 @@ ERL_NIF_TERM get_arrow_array_list_view(ErlNifEnv *env, struct ArrowSchema * sche
             values_term = kAtomNil;
         } else {
             bool nullable = items_schema->flags & ARROW_FLAG_NULLABLE || items_values->null_count > 0;
-            values_term = make_adbc_column(env, schema, values, childrens[0], children_type, nullable, children_metadata, childrens[1]);
+            // Use "item" as the canonical name for list elements
+            ERL_NIF_TERM item_name_term = erlang::nif::make_binary(env, "item");
+            values_term = make_adbc_column(env, schema, values, item_name_term, children_type, nullable, children_metadata, childrens[1]);
         }
     }
 

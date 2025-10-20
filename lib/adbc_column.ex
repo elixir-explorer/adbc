@@ -1270,31 +1270,6 @@ defmodule Adbc.Column do
     end)
   end
 
-  # defp list_to_map(nil), do: nil
-
-  # defp list_to_map(%Adbc.Column{name: name, type: type, data: data}) do
-  #   case type do
-  #     :list ->
-  #       list = Enum.map(data, &list_to_map/1)
-
-  #       if name == "item" do
-  #         list
-  #       else
-  #         {name, list}
-  #       end
-
-  #     :struct ->
-  #       Enum.map(data, &list_to_map/1)
-
-  #     _ ->
-  #       if name == "item" do
-  #         data
-  #       else
-  #         {name, data}
-  #       end
-  #   end
-  # end
-
   def to_list(%Adbc.Column{
         type: :run_end_encoded,
         data: %{

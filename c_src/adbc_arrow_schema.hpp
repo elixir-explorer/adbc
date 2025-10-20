@@ -170,7 +170,7 @@ static int get_list_element_schema(ErlNifEnv *env, struct ArrowSchema * schema, 
 
     // Always use "item" as the canonical name for list elements, regardless of what
     // the driver provides; using "item" appears to be conventional but duckdb uses "l"
-    element_schema = make_adbc_column(env, erlang::nif::make_binary(env, "item"), items_schema, child_type, child_metadata);
+    element_schema = make_adbc_column(env, items_schema, nullptr, erlang::nif::make_binary(env, "item"), child_type, items_schema->flags & ARROW_FLAG_NULLABLE, child_metadata, kAtomNil);
     return 0;
 }
 

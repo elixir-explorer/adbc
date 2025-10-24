@@ -1,5 +1,5 @@
-defmodule Adbc.Connection.Test do
-  use ExUnit.Case
+defmodule Adbc.ConnectionTest do
+  use ExUnit.Case, async: true
   doctest Adbc.Connection
 
   alias Adbc.Connection

@@ -1,5 +1,5 @@
-defmodule Adbc.SQLite.Test do
-  use ExUnit.Case
+defmodule Adbc.SQLiteTest do
+  use ExUnit.Case, async: true
 
   alias Adbc.Connection
 

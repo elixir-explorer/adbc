@@ -1,4 +1,4 @@
-defmodule Adbc.Result.Test do
+defmodule Adbc.ResultTest do
   use ExUnit.Case, async: true
   alias Adbc.Result
 

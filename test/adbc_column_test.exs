@@ -1,5 +1,5 @@
-defmodule Adbc.Column.Test do
-  use ExUnit.Case
+defmodule Adbc.ColumnTest do
+  use ExUnit.Case, async: true
   doctest Adbc.Column
 
   describe "decimals" do

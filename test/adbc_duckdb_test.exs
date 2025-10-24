@@ -52,6 +52,7 @@ defmodule Adbc.DuckDBTest do
            } = Adbc.Connection.query!(conn, "SELECT struct_pack(col1 := 1, col2 := 2)")
   end
 
+  @tag :unix
   test "decimal128", %{conn: conn} do
     d1 = Decimal.new("1.2345678912345678912345678912345678912")
     d2 = Decimal.new("-1.2345678912345678912345678912345678912")
@@ -170,6 +171,95 @@ defmodule Adbc.DuckDBTest do
                  nullable: true,
                  metadata: nil,
                  data: [^d7]
+               }
+             ]
+           } = Adbc.Result.materialize(results)
+  end
+
+  @tag :unix
+  @describetag driver: :duckdb
+  test "array handling", %{conn: conn} do
+    # Create a table with array column containing empty arrays
+    {:ok, _} =
+      Connection.query(conn, """
+        CREATE TABLE test_arrays (
+          number INTEGER,
+          array_of_text TEXT[]
+        )
+      """)
+
+    # # Insert data with empty arrays
+    {:ok, _} =
+      Connection.query(conn, """
+        INSERT INTO test_arrays VALUES
+        (1, LIST_VALUE()),
+        (2, '["hello", "world"]'),
+        (4, '["single"]')
+      """)
+
+    assert results =
+             %Adbc.Result{
+               num_rows: 0,
+               data: [
+                 %Adbc.Column{
+                   name: "number",
+                   type: :s32,
+                   nullable: true,
+                   metadata: nil
+                 },
+                 %Adbc.Column{
+                   name: "array_of_text",
+                   type:
+                     {:list,
+                      %Adbc.Column{
+                        name: "item",
+                        type: :string,
+                        nullable: true,
+                        metadata: nil
+                      }},
+                   nullable: true,
+                   metadata: nil
+                 }
+               ]
+             } = Connection.query!(conn, "SELECT * FROM test_arrays ORDER BY number")
+
+    assert %Adbc.Result{
+             data: [
+               %Adbc.Column{
+                 name: "number",
+                 type: :s32,
+                 nullable: true,
+                 metadata: nil,
+                 data: [1, 2, 4]
+               },
+               %Adbc.Column{
+                 name: "array_of_text",
+                 type: :list,
+                 nullable: true,
+                 metadata: nil,
+                 data: [
+                   %Adbc.Column{
+                     name: "item",
+                     type: :string,
+                     nullable: true,
+                     metadata: nil,
+                     data: []
+                   },
+                   %Adbc.Column{
+                     name: "item",
+                     type: :string,
+                     nullable: true,
+                     metadata: nil,
+                     data: ["hello", "world"]
+                   },
+                   %Adbc.Column{
+                     name: "item",
+                     type: :string,
+                     nullable: true,
+                     metadata: nil,
+                     data: ["single"]
+                   }
+                 ]
                }
              ]
            } = Adbc.Result.materialize(results)

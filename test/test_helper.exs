@@ -1,7 +1,7 @@
 Adbc.download_driver!(:sqlite)
 Adbc.download_driver!(:duckdb)
 
-exclude =
+pg_exclude =
   if System.find_executable("psql") do
     Adbc.download_driver!(:postgresql)
     []
@@ -9,4 +9,10 @@ exclude =
     [:postgresql]
   end
 
-ExUnit.start(exclude: exclude)
+windows_exclude =
+  case :os.type() do
+    {:win32, _} -> [:unix]
+    _ -> []
+  end
+
+ExUnit.start(exclude: pg_exclude ++ windows_exclude)

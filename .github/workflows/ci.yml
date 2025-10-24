@@ -18,7 +18,7 @@ concurrency:
 jobs:
   linux:
     if: contains(github.event.pull_request.labels.*.name, 'skip ci') != true
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-22.04
     env:
       MIX_ENV: test
 

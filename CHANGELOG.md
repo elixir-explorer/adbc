@@ -1,5 +1,16 @@
 # CHANGELOG
 
+## v0.8.0
+
+Require Erlang/OTP 26+.
+
+#### Enhancements
+
+* Support structs in `Adbc.Column.to_list`
+* Implement `Table.Reader` for `ADBC.Result`
+* Update to latest DuckDB
+* Allow version to be given on database start
+
 ## v0.7.9
 
 #### Changes

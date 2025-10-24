@@ -6,7 +6,7 @@
 defmodule Adbc.MixProject do
   use Mix.Project
 
-  @version "0.8.0-dev"
+  @version "0.8.0"
   @github_url "https://github.com/elixir-explorer/adbc"
 
   def project do
@@ -39,7 +39,7 @@ defmodule Adbc.MixProject do
           "lib",
           "include"
         ],
-        make_precompiler_nif_versions: [versions: ["2.16"]],
+        make_precompiler_nif_versions: [versions: ["2.17"]],
         cc_precompiler: [
           cleanup: "clean",
           compilers: %{

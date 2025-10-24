@@ -395,6 +395,13 @@ defmodule AdbcTest do
       %{db: db, conn: conn}
     end
 
+    test "error", %{conn: conn} do
+      assert {:error, %Adbc.Error{} = error} =
+               Adbc.Connection.query(conn, "SELECT * from $1", ["foo"])
+
+      assert Exception.message(error) =~ "Parser Error"
+    end
+
     test "decimal128", %{conn: conn} do
       d1 = Decimal.new("1.2345678912345678912345678912345678912")
       d2 = Decimal.new("-1.2345678912345678912345678912345678912")

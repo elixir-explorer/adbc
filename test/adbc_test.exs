@@ -402,6 +402,39 @@ defmodule AdbcTest do
       assert Exception.message(error) =~ "Parser Error"
     end
 
+    test "structs", %{conn: conn} do
+      assert %Adbc.Result{
+               data: [
+                 %Adbc.Column{
+                   name: "struct_pack(col1 := 1, col2 := 2)",
+                   type:
+                     {:struct,
+                      [
+                        %Adbc.Column{
+                          name: "col1",
+                          type: :s32,
+                          nullable: true,
+                          metadata: nil,
+                          data: nil,
+                          length: nil,
+                          offset: nil
+                        },
+                        %Adbc.Column{
+                          name: "col2",
+                          type: :s32,
+                          nullable: true,
+                          metadata: nil,
+                          data: nil,
+                          length: nil,
+                          offset: nil
+                        }
+                      ]}
+                 }
+               ],
+               num_rows: 0
+             } = Adbc.Connection.query!(conn, "SELECT struct_pack(col1 := 1, col2 := 2)")
+    end
+
     test "decimal128", %{conn: conn} do
       d1 = Decimal.new("1.2345678912345678912345678912345678912")
       d2 = Decimal.new("-1.2345678912345678912345678912345678912")

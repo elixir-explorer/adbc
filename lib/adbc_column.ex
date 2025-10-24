@@ -35,7 +35,7 @@ defmodule Adbc.Column do
   @type precision256 :: 1..76
   @type decimal128 :: {:decimal, 128, precision128(), integer()}
   @type decimal256 :: {:decimal, 256, precision256(), integer()}
-  @type decimal_t ::
+  @type decimal ::
           decimal128
           | decimal256
   @type time_unit ::
@@ -43,31 +43,31 @@ defmodule Adbc.Column do
           | :milliseconds
           | :microseconds
           | :nanoseconds
-  @type time32_t ::
+  @type time32 ::
           {:time32, :seconds}
           | {:time32, :milliseconds}
-  @type time64_t ::
+  @type time64 ::
           {:time64, :microseconds}
           | {:time64, :nanoseconds}
-  @type time_t :: time32_t() | time64_t()
-  @type timestamp_t ::
+  @type time :: time32() | time64()
+  @type timestamp ::
           {:timestamp, :seconds, String.t()}
           | {:timestamp, :milliseconds, String.t()}
           | {:timestamp, :microseconds, String.t()}
           | {:timestamp, :nanoseconds, String.t()}
-  @type duration_t ::
+  @type duration ::
           {:duration, :seconds}
           | {:duration, :milliseconds}
           | {:duration, :microseconds}
           | {:duration, :nanoseconds}
   @type interval_month :: s32()
-  @type interval_day_time :: {s32(), s32()}
+  @type interval_day_xime :: {s32(), s32()}
   @type interval_month_day_nano :: {s32(), s32(), s64()}
   @type interval_unit ::
           :month
           | :day_time
           | :month_day_nano
-  @type interval_t ::
+  @type interval ::
           {:interval, :month}
           | {:interval, :day_time}
           | {:interval, :month_day_nano}
@@ -75,14 +75,14 @@ defmodule Adbc.Column do
     :list_view,
     :large_list_view
   ]
-  @type list_view_data_t :: %{
+  @type list_view_data :: %{
           validity: [boolean()],
           offsets: [non_neg_integer()],
           sizes: [non_neg_integer()],
           values: %Adbc.Column{}
         }
   @valid_run_end_types [:s16, :s32, :s64]
-  @type dictionary_data_t :: %{
+  @type dictionary_data :: %{
           key: %Adbc.Column{},
           value: %Adbc.Column{}
         }
@@ -100,18 +100,18 @@ defmodule Adbc.Column do
           | :large_binary
           | :string
           | :large_string
-          | decimal_t
+          | decimal
           | {:fixed_size_binary, non_neg_integer()}
-          | :struct
+          | {:struct, %Adbc.Column{}}
           | :date32
           | :date64
-          | time_t
-          | timestamp_t
-          | duration_t
-          | interval_t
+          | time
+          | timestamp
+          | duration
+          | interval
           | :run_end_encoded
           | :dictionary
-  @spec column(data_type(), list() | list_view_data_t() | dictionary_data_t(), Keyword.t()) ::
+  @spec column(data_type(), list() | list_view_data() | dictionary_data(), Keyword.t()) ::
           %Adbc.Column{}
   def column(type, data, opts \\ [])
       when (is_atom(type) or is_tuple(type)) and
@@ -1009,7 +1009,7 @@ defmodule Adbc.Column do
   * `:metadata` - A map of metadata
   """
   @spec interval(
-          [interval_month() | interval_day_time() | interval_month_day_nano() | nil],
+          [interval_month() | interval_day_xime() | interval_month_day_nano() | nil],
           interval_unit(),
           Keyword.t()
         ) ::

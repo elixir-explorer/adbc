@@ -211,7 +211,7 @@ defmodule Adbc.SQLiteTest do
     } = Adbc.Result.to_map(list_result)
   end
 
-  test "insert with Adbc.Buffer", %{db: _, conn: conn} do
+  test "insert with Adbc.Column", %{conn: conn} do
     Connection.query(
       conn,
       """
@@ -393,6 +393,21 @@ defmodule Adbc.SQLiteTest do
                }
              ],
              num_rows: nil
+           } = Adbc.Result.materialize(results)
+  end
+
+  test "query with nil parameter", %{db: _, conn: conn} do
+    assert {:ok, results} = Connection.query(conn, "SELECT ? as name", [nil])
+
+    assert %Adbc.Result{
+             data: [
+               %Adbc.Column{
+                 name: "name",
+                 nullable: true,
+                 metadata: nil,
+                 data: [nil]
+               }
+             ]
            } = Adbc.Result.materialize(results)
   end
 end

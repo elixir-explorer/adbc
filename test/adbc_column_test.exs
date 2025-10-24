@@ -478,4 +478,166 @@ defmodule Adbc.Column.Test do
       assert Adbc.Column.to_list(dict) == ["foo", "bar", "foo", "bar", nil, "baz"]
     end
   end
+
+  describe "struct" do
+    test "to list" do
+      struct = %Adbc.Column{
+        name: "struct",
+        type:
+          {:struct,
+           [
+             %Adbc.Column{
+               name: "val1",
+               type: :s64,
+               nullable: true,
+               metadata: nil,
+               data: nil,
+               length: nil,
+               offset: nil
+             },
+             %Adbc.Column{
+               name: "val2",
+               type: :string,
+               nullable: true,
+               metadata: nil,
+               data: nil,
+               length: nil,
+               offset: nil
+             }
+           ]},
+        nullable: true,
+        metadata: nil,
+        data: [
+          %Adbc.Column{
+            name: "val1",
+            type: :s64,
+            nullable: true,
+            metadata: nil,
+            data: [298_258_424, 162_342_654],
+            length: nil,
+            offset: nil
+          },
+          %Adbc.Column{
+            name: "val2",
+            type: :string,
+            nullable: true,
+            metadata: nil,
+            data: ["hello world", "hello elixir"],
+            length: nil,
+            offset: nil
+          }
+        ],
+        length: nil,
+        offset: nil
+      }
+
+      assert Adbc.Column.to_list(struct) == [
+               %{"val1" => 298_258_424, "val2" => "hello world"},
+               %{"val1" => 162_342_654, "val2" => "hello elixir"}
+             ]
+    end
+
+    test "to list with list of structs" do
+      list_of_structs = %Adbc.Column{
+        name: "list_of_structs",
+        type: :list,
+        nullable: true,
+        metadata: nil,
+        data: [
+          %Adbc.Column{
+            name: "item",
+            type: :struct,
+            nullable: true,
+            metadata: nil,
+            data: [
+              %Adbc.Column{
+                name: "val1",
+                type: :string,
+                nullable: true,
+                metadata: nil,
+                data: ["hello1"],
+                length: nil,
+                offset: nil
+              },
+              %Adbc.Column{
+                name: "val2",
+                type: :string,
+                nullable: true,
+                metadata: nil,
+                data: ["world1"],
+                length: nil,
+                offset: nil
+              }
+            ],
+            length: nil,
+            offset: nil
+          },
+          %Adbc.Column{
+            name: "item",
+            type: :struct,
+            nullable: true,
+            metadata: nil,
+            data: [
+              %Adbc.Column{
+                name: "val1",
+                type: :string,
+                nullable: true,
+                metadata: nil,
+                data: ["hello2"],
+                length: nil,
+                offset: nil
+              },
+              %Adbc.Column{
+                name: "val2",
+                type: :string,
+                nullable: true,
+                metadata: nil,
+                data: ["world2"],
+                length: nil,
+                offset: nil
+              }
+            ],
+            length: nil,
+            offset: nil
+          },
+          %Adbc.Column{
+            name: "item",
+            type: :struct,
+            nullable: true,
+            metadata: nil,
+            data: [
+              %Adbc.Column{
+                name: "val1",
+                type: :string,
+                nullable: true,
+                metadata: nil,
+                data: ["hello3"],
+                length: nil,
+                offset: nil
+              },
+              %Adbc.Column{
+                name: "val2",
+                type: :string,
+                nullable: true,
+                metadata: nil,
+                data: ["world3"],
+                length: nil,
+                offset: nil
+              }
+            ],
+            length: nil,
+            offset: nil
+          }
+        ],
+        length: nil,
+        offset: nil
+      }
+
+      assert Adbc.Column.to_list(list_of_structs) == [
+               [%{"val1" => "hello1", "val2" => "world1"}],
+               [%{"val1" => "hello2", "val2" => "world2"}],
+               [%{"val1" => "hello3", "val2" => "world3"}]
+             ]
+    end
+  end
 end

@@ -10,14 +10,15 @@ defmodule Adbc.StreamResult do
   It contains:
 
     * `:ref` - internal reference to the stream (do not use directly)
-    * `:conn_ref` - internal connection reference (do not use directly)
+    * `:conn` - internal connection pid (do not use directly)
     * `:pointer` - pointer to the ArrowArrayStream (integer memory address)
     * `:num_rows` - the number of rows affected by the query, may be `nil`
       for queries depending on the database driver
   """
-  defstruct [:ref, :pointer, :num_rows]
+  defstruct [:conn, :ref, :pointer, :num_rows]
 
   @type t :: %__MODULE__{
+          conn: pid(),
           ref: reference(),
           pointer: non_neg_integer(),
           num_rows: non_neg_integer() | nil

@@ -630,6 +630,57 @@ defmodule Adbc.ConnectionTest do
     end
   end
 
+  describe "lock" do
+    test "serializes access", %{db: db} do
+      conn = start_supervised!({Connection, database: db})
+
+      for _ <- 1..10 do
+        Task.async(fn -> run_anything(conn) end)
+      end
+      |> Task.await_many()
+    end
+
+    test "crashes releases the lock", %{db: db} do
+      conn = start_supervised!({Connection, database: db})
+
+      assert_raise RuntimeError, fn ->
+        Connection.query_pointer(conn, "SELECT 1", fn _ ->
+          raise "oops"
+        end)
+      end
+
+      run_anything(conn)
+    end
+
+    test "broken link releases the lock", %{db: db} do
+      conn = start_supervised!({Connection, database: db})
+      parent = self()
+
+      child =
+        spawn(fn ->
+          Connection.query_pointer(conn, "SELECT 1", fn _ ->
+            send(parent, :ready)
+            Process.sleep(:infinity)
+          end)
+        end)
+
+      assert_receive :ready
+      Process.exit(child, :kill)
+      run_anything(conn)
+    end
+
+    test "commands that error do not lock", %{db: db} do
+      conn = start_supervised!({Connection, database: db})
+      {:error, %Adbc.Error{}} = Connection.query(conn, "NOT VALID SQL")
+      {:error, %Adbc.Error{}} = Connection.prepare(conn, "NOT VALID SQL")
+      run_anything(conn)
+    end
+
+    defp run_anything(conn) do
+      {:ok, %{}} = Connection.get_table_types(conn)
+    end
+  end
+
   describe "bulk_insert" do
     test "creates table and inserts data", %{db: db} do
       conn = start_supervised!({Connection, database: db})
@@ -938,52 +989,21 @@ defmodule Adbc.ConnectionTest do
       assert map["name"] == ["Alice", "Bob", "Charlie"]
     end
 
-    test "efficient stream-based bulk insert with query_pointer", %{db: db} do
+    test "stream-based bulk insert raises on same connection", %{db: db} do
       conn = start_supervised!({Connection, database: db})
 
-      # Create initial data
-      initial_columns = [
-        Adbc.Column.s64([1, 2, 3], name: "id"),
-        Adbc.Column.string(["Alice", "Bob", "Charlie"], name: "name")
-      ]
-
-      assert {:ok, 3} = Connection.bulk_insert(conn, initial_columns, table: "source_table")
-
-      # Use query_pointer to efficiently transfer data without materializing
-      result =
-        Connection.query_pointer(conn, "SELECT * FROM source_table", fn stream ->
-          # Stream should be a StreamResult struct
-          assert %Adbc.StreamResult{} = stream
-          assert is_reference(stream.ref)
-          assert is_integer(stream.pointer)
-          # num_rows may be nil for queries depending on driver
-
-          # Efficiently insert stream into target table
-          Connection.bulk_insert(conn, stream, table: "target_table")
-        end)
-
-      assert {:ok, {:ok, 3}} = result
-
-      # Verify the data was inserted correctly
-      {:ok, verify} = Connection.query(conn, "SELECT * FROM target_table ORDER BY id")
-      verify = Adbc.Result.materialize(verify)
-      map = Adbc.Result.to_map(verify)
-
-      assert map["id"] == [1, 2, 3]
-      assert map["name"] == ["Alice", "Bob", "Charlie"]
+      assert_raise ArgumentError,
+                   "cannot use bulk_insert to transfer results over the same connection",
+                   fn ->
+                     Connection.query_pointer(conn, "SELECT 1, 2, 3", fn stream ->
+                       Connection.bulk_insert(conn, stream, table: "dest_table")
+                     end)
+                   end
     end
 
     test "stream-based bulk insert across different connections", %{db: db} do
-      source_conn =
-        start_supervised!({Connection, database: db, process_options: [name: :source]})
-
-      # Create a second database and connection
-      db2 = start_supervised!({Adbc.Database, driver: :sqlite, uri: ":memory:"}, id: :db2)
-
-      dest_conn =
-        start_supervised!({Connection, database: db2, process_options: [name: :dest]},
-          id: :dest_conn
-        )
+      source_conn = start_supervised!({Connection, database: db})
+      dest_conn = start_supervised!({Connection, database: db}, id: :dest_conn)
 
       # Create initial data in source
       initial_columns = [
@@ -1009,40 +1029,6 @@ defmodule Adbc.ConnectionTest do
 
       assert map["id"] == [10, 20, 30]
       assert map["code"] == ["X", "Y", "Z"]
-    end
-
-    test "stream-based bulk insert with different modes", %{db: db} do
-      conn = start_supervised!({Connection, database: db})
-
-      # Create source data
-      source_columns = [
-        Adbc.Column.s64([1, 2], name: "id"),
-        Adbc.Column.string(["A", "B"], name: "value")
-      ]
-
-      assert {:ok, 2} = Connection.bulk_insert(conn, source_columns, table: "source")
-
-      # Test create mode
-      result =
-        Connection.query_pointer(conn, "SELECT * FROM source", fn stream ->
-          Connection.bulk_insert(conn, stream, table: "target", mode: :create)
-        end)
-
-      assert {:ok, {:ok, 2}} = result
-
-      # Test append mode
-      result =
-        Connection.query_pointer(conn, "SELECT * FROM source", fn stream ->
-          Connection.bulk_insert(conn, stream, table: "target", mode: :append)
-        end)
-
-      assert {:ok, {:ok, 2}} = result
-
-      # Verify 4 rows (2 from create + 2 from append)
-      {:ok, verify} = Connection.query(conn, "SELECT COUNT(*) as count FROM target")
-      verify = Adbc.Result.materialize(verify)
-      map = Adbc.Result.to_map(verify)
-      assert map["count"] == [4]
     end
   end
 end

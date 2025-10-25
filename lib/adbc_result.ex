@@ -14,7 +14,7 @@ defmodule Adbc.Result do
 
   @type t :: %Adbc.Result{
           num_rows: non_neg_integer() | nil,
-          data: [%Adbc.Column{}]
+          data: [Adbc.Column.t()]
         }
 
   @doc """

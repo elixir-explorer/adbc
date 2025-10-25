@@ -309,61 +309,6 @@ defmodule Adbc.ConnectionTest do
              } = Adbc.Result.materialize(results)
     end
 
-    test "use reference type results as query parameter", %{db: db} do
-      conn = start_supervised!({Connection, database: db})
-
-      assert {:ok, results = %Adbc.Result{data: [column]}} =
-               Connection.query(conn, "SELECT 123 + ? as num", [456])
-
-      assert %Adbc.Result{
-               data: [
-                 %Adbc.Column{
-                   name: "num",
-                   type: :s64,
-                   nullable: true,
-                   metadata: nil,
-                   data: [579]
-                 }
-               ]
-             } = Adbc.Result.materialize(results)
-
-      assert {:ok,
-              results = %Adbc.Result{
-                data: _,
-                num_rows: nil
-              }} = Connection.query(conn, "SELECT ? + ? as num", [421, column])
-
-      assert %Adbc.Result{
-               data: [
-                 %Adbc.Column{
-                   name: "num",
-                   type: :s64,
-                   nullable: true,
-                   metadata: nil,
-                   data: [1000]
-                 }
-               ]
-             } = Adbc.Result.materialize(results)
-
-      assert {:ok,
-              results = %Adbc.Result{
-                data: _,
-                num_rows: nil
-              }} = Connection.query(conn, "SELECT ? + ? as num", [column, column])
-
-      assert %Adbc.Result{
-               data: [
-                 %Adbc.Column{
-                   name: "num",
-                   type: :s64,
-                   nullable: true,
-                   metadata: nil,
-                   data: [1158]
-                 }
-               ]
-             } = Adbc.Result.materialize(results)
-    end
-
     test "fails on invalid query", %{db: db} do
       conn = start_supervised!({Connection, database: db})
       assert {:error, %Adbc.Error{} = error} = Connection.query(conn, "NOT VALID SQL")
@@ -985,6 +930,56 @@ defmodule Adbc.ConnectionTest do
                Connection.bulk_insert(conn, columns2, table: "schema_test", mode: :append)
 
       assert error.message =~ "has no column named"
+    end
+
+    test "error: unmaterialized columns are rejected", %{db: db} do
+      conn = start_supervised!({Connection, database: db})
+
+      # Create initial data
+      initial_columns = [
+        Adbc.Column.s64([1, 2, 3], name: "id"),
+        Adbc.Column.string(["Alice", "Bob", "Charlie"], name: "name")
+      ]
+      assert {:ok, 3} = Connection.bulk_insert(conn, initial_columns, table: "source_table")
+
+      # Query the data (returns unmaterialized columns)
+      {:ok, result} = Connection.query(conn, "SELECT * FROM source_table")
+
+      # Verify data is unmaterialized (contains references)
+      assert is_list(hd(result.data).data)
+      assert is_reference(hd(hd(result.data).data))
+
+      # Try to use unmaterialized columns in bulk_insert - should fail with clear ArgumentError
+      assert {:error, %ArgumentError{} = error} = Connection.bulk_insert(conn, result.data, table: "target_table")
+      error_message = Exception.message(error)
+      assert error_message =~ "Cannot use unmaterialized"
+      assert error_message =~ "materialize"
+    end
+
+    test "materialized columns work in bulk_insert", %{db: db} do
+      conn = start_supervised!({Connection, database: db})
+
+      # Create initial data
+      initial_columns = [
+        Adbc.Column.s64([1, 2, 3], name: "id"),
+        Adbc.Column.string(["Alice", "Bob", "Charlie"], name: "name")
+      ]
+      assert {:ok, 3} = Connection.bulk_insert(conn, initial_columns, table: "source_table")
+
+      # Query and materialize the data
+      {:ok, result} = Connection.query(conn, "SELECT * FROM source_table")
+      materialized_result = Adbc.Result.materialize(result)
+
+      # Materialized data should work
+      assert {:ok, 3} = Connection.bulk_insert(conn, materialized_result.data, table: "target_table")
+
+      # Verify the data was inserted correctly
+      {:ok, verify} = Connection.query(conn, "SELECT * FROM target_table ORDER BY id")
+      verify = Adbc.Result.materialize(verify)
+      map = Adbc.Result.to_map(verify)
+
+      assert map["id"] == [1, 2, 3]
+      assert map["name"] == ["Alice", "Bob", "Charlie"]
     end
   end
 end

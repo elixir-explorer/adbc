@@ -1446,7 +1446,6 @@ int adbc_column_to_adbc_field(ErlNifEnv *env, ERL_NIF_TERM adbc_column, bool all
 
 // non-zero return value indicating errors
 int adbc_column_to_arrow_type_struct(ErlNifEnv *env, ERL_NIF_TERM values, struct ArrowArray* array_out, struct ArrowSchema* schema_out, struct ArrowError* error_out) {
-    using res_type = NifRes<struct ArrowArrayStreamRecord>;
     unsigned n_items = 0;
     if (!enif_get_list_length(env, values, &n_items)) {
         return 1;
@@ -1458,7 +1457,7 @@ int adbc_column_to_arrow_type_struct(ErlNifEnv *env, ERL_NIF_TERM values, struct
     NANOARROW_RETURN_NOT_OK(ArrowArrayAllocateChildren(array_out, static_cast<int64_t>(n_items)));
     array_out->length = 1;
 
-    ERL_NIF_TERM head, tail, error;
+    ERL_NIF_TERM head, tail;
     tail = values;
     int64_t processed = 0;
     while (enif_get_list_cell(env, tail, &head, &tail)) {
@@ -1472,58 +1471,29 @@ int adbc_column_to_arrow_type_struct(ErlNifEnv *env, ERL_NIF_TERM values, struct
                 return 1;
             }
 
-            std::vector<ERL_NIF_TERM> refs;
-            // there're two possibilities here:
-            // 1. data_term is a reference
-            // 2. data_term is a list of references, not supported yet, except if the length is 1
+            // Check if data_term contains any references (unmaterialized data)
+            // If so, reject it with a clear error message
             if (enif_is_ref(env, data_term)) {
-                refs.emplace_back(data_term);
-            } else {
+                snprintf(error_out->message, sizeof(error_out->message),
+                    "Cannot use unmaterialized `Adbc.Column` data (reference type). "
+                    "Please call `Adbc.Result.materialize/1` or `Adbc.Column.materialize/1` first.");
+                return 1;
+            }
+
+            // Check if data_term is a list containing any references
+            if (enif_is_list(env, data_term)) {
                 ERL_NIF_TERM ref_head, ref_tail, ref_list;
                 ref_list = data_term;
                 while (enif_get_list_cell(env, ref_list, &ref_head, &ref_tail)) {
                     if (enif_is_ref(env, ref_head)) {
-                        refs.emplace_back(ref_head);
-                        if (refs.size() > 1) {
-                            snprintf(error_out->message, sizeof(error_out->message), "`data` field of `%%Adbc.Column{}` with multiple references is not supported yet.");
-                            return 1;
-                        }
-                    } else {
-                        if (refs.size() > 1) {
-                            snprintf(error_out->message, sizeof(error_out->message), "`data` field of `%%Adbc.Column{}` cannot be a mix of references and values.");
-                            return 1;
-                        } else {
-                            break;
-                        }
+                        snprintf(error_out->message, sizeof(error_out->message),
+                            "Cannot use unmaterialized `Adbc.Column` data (list of references). "
+                            "Please call `Adbc.Result.materialize/1` or `Adbc.Column.materialize/1` first.");
+                        return 1;
                     }
-                    ref_list = ref_tail;
+                    // If it's not a reference, it's regular data, so break and continue processing
+                    break;
                 }
-            }
-
-            if (refs.size() == 1) {
-                res_type *record = nullptr;
-                if ((record = res_type::get_resource(env, refs[0], error)) == nullptr) {
-                    snprintf(error_out->message, sizeof(error_out->message), "cannot access Nif resource");
-                    return 1;
-                }
-
-                // note: we have ArrowSchemaDeepCopy but a shallow copy + setting `release` to nullptr seems to be fine
-                if (strcmp(record->val.schema->format, "+s") == 0 && record->val.schema->n_children == 1) {
-                    // ArrowSchemaDeepCopy(record->val.schema->children[0], schema_out->children[processed]);
-                    memcpy(schema_out->children[processed], record->val.schema->children[0], sizeof(struct ArrowSchema));
-                    schema_out->children[processed]->release = nullptr;
-                    memcpy(array_out->children[processed], record->val.values->children[0], sizeof(struct ArrowArray));
-                    array_out->children[processed]->release = nullptr;
-                } else {
-                    // ArrowSchemaDeepCopy(record->val.schema, schema_out->children[processed]);
-                    memcpy(schema_out->children[processed], record->val.schema, sizeof(struct ArrowSchema));
-                    schema_out->children[processed]->release = nullptr;
-                    memcpy(array_out->children[processed], record->val.values, sizeof(struct ArrowArray));
-                    array_out->children[processed]->release = nullptr;
-                }
-
-                processed++;
-                continue;
             }
 
             ArrowSchemaInit(schema_i);

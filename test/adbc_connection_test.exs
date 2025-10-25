@@ -609,9 +609,10 @@ defmodule Adbc.ConnectionTest do
       conn = start_supervised!({Connection, database: db})
 
       assert {:ok, :from_pointer} =
-               Connection.query_pointer(conn, "SELECT 123 as num", fn
-                 pointer, nil when is_integer(pointer) ->
-                   :from_pointer
+               Connection.query_pointer(conn, "SELECT 123 as num", fn stream ->
+                 assert %Adbc.StreamResult{pointer: pointer} = stream
+                 assert is_integer(pointer)
+                 :from_pointer
                end)
     end
 
@@ -621,9 +622,10 @@ defmodule Adbc.ConnectionTest do
       {:ok, ref} = Connection.prepare(conn, "SELECT 123 + ? as num")
 
       assert {:ok, :from_pointer} =
-               Connection.query_pointer(conn, ref, [456], fn
-                 pointer, nil when is_integer(pointer) ->
-                   :from_pointer
+               Connection.query_pointer(conn, ref, [456], fn stream ->
+                 assert %Adbc.StreamResult{pointer: pointer} = stream
+                 assert is_integer(pointer)
+                 :from_pointer
                end)
     end
   end

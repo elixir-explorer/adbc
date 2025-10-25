@@ -184,6 +184,145 @@ defmodule Adbc.Connection do
   end
 
   @doc """
+  Performs a bulk insert operation.
+
+  This function creates a table (or appends to an existing one) and inserts a list of
+  `Adbc.Column`s in supported databases. This should be more efficient than using SQL
+  query in supported databases.
+
+  ## Arguments
+
+    * `conn` - The connection process
+    * `columns` - A list of `Adbc.Column.t()` representing the data to insert
+    * `opts` - Options for the bulk insert operation
+
+  ## Options
+
+    * `:table` (required) - The name of the target table for bulk insert
+
+    * `:mode` (optional) - The ingestion mode. When not specified, the default behavior
+      is driver-dependent but typically behaves like `:create`. Available modes:
+      * `:create` - Create the table and insert data; error if the table already exists
+      * `:append` - Insert data into existing table; error if the table does not exist
+        or if the schema does not match
+      * `:replace` - Drop the table if it exists, create it, and insert data
+      * `:create_append` - Create the table if it does not exist, otherwise append;
+        error if the table exists but the schema does not match
+
+    * `:catalog` (optional) - The catalog of the table. Support is driver-dependent.
+      Not supported with `:temporary`.
+
+    * `:schema` (optional) - The database schema of the table. Support is driver-dependent.
+      For example, SQLite does not support this option. Not supported with `:temporary`.
+
+    * `:temporary` (optional) - If `true`, create a temporary table. Default is `false`.
+      Cannot be used with `:catalog` or `:schema`.
+
+  ## Examples
+
+      columns = [
+        Adbc.Column.s64([1, 2, 3], name: "id"),
+        Adbc.Column.string(["Alice", "Bob", "Charlie"], name: "name")
+      ]
+
+      # Create a new table
+      Adbc.Connection.bulk_insert(conn, columns, table: "users")
+      #=> {:ok, 3}
+
+      # Append to an existing table
+      Adbc.Connection.bulk_insert(conn, columns, table: "users", mode: :append)
+      #=> {:ok, 3}
+
+      # Create a temporary table
+      Adbc.Connection.bulk_insert(conn, columns, table: "temp_users", temporary: true)
+      #=> {:ok, 3}
+
+      # Replace an existing table
+      Adbc.Connection.bulk_insert(conn, columns, table: "users", mode: :replace)
+      #=> {:ok, 3}
+
+  """
+  @spec bulk_insert(t(), [Adbc.Column.t()], Keyword.t()) ::
+          {:ok, non_neg_integer()} | {:error, Exception.t()}
+  def bulk_insert(conn, columns, opts \\ [])
+      when is_list(columns) and is_list(opts) do
+    unless opts[:table] do
+      raise ArgumentError, ":table option must be specified"
+    end
+
+    statement_options = build_ingest_options(opts)
+    command(conn, {:bulk_insert, columns, statement_options})
+  end
+
+  @doc """
+  Same as `bulk_insert/3` but raises an exception on error.
+  """
+  @spec bulk_insert!(t(), [Adbc.Column.t()], Keyword.t()) :: non_neg_integer()
+  def bulk_insert!(conn, columns, opts \\ [])
+      when is_list(columns) and is_list(opts) do
+    case bulk_insert(conn, columns, opts) do
+      {:ok, rows_affected} -> rows_affected
+      {:error, reason} -> raise reason
+    end
+  end
+
+  defp build_ingest_options(opts) do
+    statement_options = []
+
+    statement_options =
+      if table = opts[:table] do
+        [{"adbc.ingest.target_table", table} | statement_options]
+      else
+        statement_options
+      end
+
+    statement_options =
+      case opts[:mode] do
+        nil ->
+          statement_options
+
+        :create ->
+          [{"adbc.ingest.mode", "adbc.ingest.mode.create"} | statement_options]
+
+        :append ->
+          [{"adbc.ingest.mode", "adbc.ingest.mode.append"} | statement_options]
+
+        :replace ->
+          [{"adbc.ingest.mode", "adbc.ingest.mode.replace"} | statement_options]
+
+        :create_append ->
+          [{"adbc.ingest.mode", "adbc.ingest.mode.create_append"} | statement_options]
+
+        other ->
+          raise ArgumentError,
+                "invalid :mode option #{inspect(other)}, expected one of: :create, :append, :replace, :create_append"
+      end
+
+    statement_options =
+      if catalog = opts[:catalog] do
+        [{"adbc.ingest.target_catalog", catalog} | statement_options]
+      else
+        statement_options
+      end
+
+    statement_options =
+      if schema = opts[:schema] do
+        [{"adbc.ingest.target_db_schema", schema} | statement_options]
+      else
+        statement_options
+      end
+
+    statement_options =
+      if opts[:temporary] do
+        [{"adbc.ingest.temporary", "true"} | statement_options]
+      else
+        statement_options
+      end
+
+    statement_options
+  end
+
+  @doc """
   Runs the given `query` with `params` and
   pass the ArrowStream pointer to the given function.
 
@@ -493,6 +632,15 @@ defmodule Adbc.Connection do
     with {:ok, stmt} <- create_statement(conn, query),
          :ok <- Adbc.Nif.adbc_statement_prepare(stmt) do
       {:ok, stmt}
+    end
+  end
+
+  defp handle_command({:bulk_insert, columns, statement_options}, conn) do
+    with {:ok, stmt} <- Adbc.Nif.adbc_statement_new(conn),
+         :ok <- init_statement_options(stmt, statement_options),
+         :ok <- Adbc.Nif.adbc_statement_bind(stmt, columns),
+         {:ok, rows_affected} <- Adbc.Nif.adbc_statement_execute(stmt) do
+      {:ok, rows_affected}
     end
   end
 

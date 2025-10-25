@@ -52,6 +52,8 @@ defmodule Adbc.Nif do
 
   def adbc_statement_execute_query(_self), do: :erlang.nif_error(:not_loaded)
 
+  def adbc_statement_execute(_self), do: :erlang.nif_error(:not_loaded)
+
   def adbc_statement_prepare(_self), do: :erlang.nif_error(:not_loaded)
 
   def adbc_statement_set_sql_query(_self, _query), do: :erlang.nif_error(:not_loaded)

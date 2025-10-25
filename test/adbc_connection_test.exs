@@ -733,4 +733,258 @@ defmodule Adbc.ConnectionTest do
       {:ok, %{}} = Connection.get_table_types(conn)
     end
   end
+
+  describe "bulk_insert" do
+    test "creates table and inserts data", %{db: db} do
+      conn = start_supervised!({Connection, database: db})
+
+      columns = [
+        Adbc.Column.s64([1, 2, 3], name: "id"),
+        Adbc.Column.string(["Alice", "Bob", "Charlie"], name: "name"),
+        Adbc.Column.s32([25, 30, 35], name: "age")
+      ]
+
+      assert {:ok, 3} = Connection.bulk_insert(conn, columns, table: "users")
+
+      # Verify the data was inserted
+      {:ok, result} = Connection.query(conn, "SELECT * FROM users ORDER BY id")
+      result = Adbc.Result.materialize(result)
+      map = Adbc.Result.to_map(result)
+
+      assert map["id"] == [1, 2, 3]
+      assert map["name"] == ["Alice", "Bob", "Charlie"]
+      assert map["age"] == [25, 30, 35]
+    end
+
+    test "appends to existing table", %{db: db} do
+      conn = start_supervised!({Connection, database: db})
+
+      # First insert
+      columns = [
+        Adbc.Column.s64([1, 2], name: "id"),
+        Adbc.Column.string(["Alice", "Bob"], name: "name")
+      ]
+
+      assert {:ok, 2} = Connection.bulk_insert(conn, columns, table: "users")
+
+      # Append more data
+      more_columns = [
+        Adbc.Column.s64([3, 4], name: "id"),
+        Adbc.Column.string(["Charlie", "David"], name: "name")
+      ]
+
+      assert {:ok, 2} = Connection.bulk_insert(conn, more_columns, table: "users", mode: :append)
+
+      # Verify all data
+      {:ok, result} = Connection.query(conn, "SELECT * FROM users ORDER BY id")
+      result = Adbc.Result.materialize(result)
+      map = Adbc.Result.to_map(result)
+
+      assert map["id"] == [1, 2, 3, 4]
+      assert map["name"] == ["Alice", "Bob", "Charlie", "David"]
+    end
+
+    test "replaces existing table", %{db: db} do
+      conn = start_supervised!({Connection, database: db})
+
+      # First insert
+      columns = [
+        Adbc.Column.s64([1, 2], name: "id"),
+        Adbc.Column.string(["Alice", "Bob"], name: "name")
+      ]
+
+      assert {:ok, 2} = Connection.bulk_insert(conn, columns, table: "users")
+
+      # Replace with new data
+      new_columns = [
+        Adbc.Column.s64([10, 20], name: "id"),
+        Adbc.Column.string(["Frank", "Grace"], name: "name")
+      ]
+
+      assert {:ok, 2} = Connection.bulk_insert(conn, new_columns, table: "users", mode: :replace)
+
+      # Verify only new data exists
+      {:ok, result} = Connection.query(conn, "SELECT * FROM users ORDER BY id")
+      result = Adbc.Result.materialize(result)
+      map = Adbc.Result.to_map(result)
+
+      assert map["id"] == [10, 20]
+      assert map["name"] == ["Frank", "Grace"]
+    end
+
+    test "create_append mode creates if not exists", %{db: db} do
+      conn = start_supervised!({Connection, database: db})
+
+      columns = [
+        Adbc.Column.s64([1, 2], name: "id"),
+        Adbc.Column.string(["Alice", "Bob"], name: "name")
+      ]
+
+      assert {:ok, 2} =
+               Connection.bulk_insert(conn, columns, table: "new_users", mode: :create_append)
+
+      # Verify data was inserted
+      {:ok, result} = Connection.query(conn, "SELECT * FROM new_users ORDER BY id")
+      result = Adbc.Result.materialize(result)
+      map = Adbc.Result.to_map(result)
+
+      assert map["id"] == [1, 2]
+      assert map["name"] == ["Alice", "Bob"]
+    end
+
+    test "create_append mode appends if exists", %{db: db} do
+      conn = start_supervised!({Connection, database: db})
+
+      # First insert
+      columns = [
+        Adbc.Column.s64([1, 2], name: "id"),
+        Adbc.Column.string(["Alice", "Bob"], name: "name")
+      ]
+
+      assert {:ok, 2} =
+               Connection.bulk_insert(conn, columns, table: "users", mode: :create_append)
+
+      # Append using create_append
+      more_columns = [
+        Adbc.Column.s64([3, 4], name: "id"),
+        Adbc.Column.string(["Charlie", "David"], name: "name")
+      ]
+
+      assert {:ok, 2} =
+               Connection.bulk_insert(conn, more_columns, table: "users", mode: :create_append)
+
+      # Verify all data
+      {:ok, result} = Connection.query(conn, "SELECT * FROM users ORDER BY id")
+      result = Adbc.Result.materialize(result)
+      map = Adbc.Result.to_map(result)
+
+      assert map["id"] == [1, 2, 3, 4]
+      assert map["name"] == ["Alice", "Bob", "Charlie", "David"]
+    end
+
+    test "raises error when table is not specified", %{db: db} do
+      conn = start_supervised!({Connection, database: db})
+
+      columns = [
+        Adbc.Column.s64([1, 2], name: "id")
+      ]
+
+      assert_raise ArgumentError, ":table option must be specified", fn ->
+        Connection.bulk_insert(conn, columns, [])
+      end
+    end
+
+    test "raises error for invalid mode", %{db: db} do
+      conn = start_supervised!({Connection, database: db})
+
+      columns = [
+        Adbc.Column.s64([1, 2], name: "id")
+      ]
+
+      assert_raise ArgumentError, ~r/invalid :mode option/, fn ->
+        Connection.bulk_insert(conn, columns, table: "users", mode: :invalid)
+      end
+    end
+
+    test "bulk_insert! returns rows affected", %{db: db} do
+      conn = start_supervised!({Connection, database: db})
+
+      columns = [
+        Adbc.Column.s64([1, 2, 3], name: "id")
+      ]
+
+      assert 3 = Connection.bulk_insert!(conn, columns, table: "test_table")
+    end
+
+    test "bulk_insert! raises on error", %{db: db} do
+      conn = start_supervised!({Connection, database: db})
+
+      # Create a table first
+      columns = [
+        Adbc.Column.s64([1, 2], name: "id")
+      ]
+
+      Connection.bulk_insert!(conn, columns, table: "users")
+
+      # Try to create again (should fail)
+      assert_raise Adbc.Error, fn ->
+        Connection.bulk_insert!(conn, columns, table: "users", mode: :create)
+      end
+    end
+
+    test "temporary table", %{db: db} do
+      conn = start_supervised!({Connection, database: db})
+
+      columns = [
+        Adbc.Column.s64([1, 2, 3], name: "id"),
+        Adbc.Column.string(["Alice", "Bob", "Charlie"], name: "name")
+      ]
+
+      # Create a temporary table
+      assert {:ok, 3} =
+               Connection.bulk_insert(conn, columns, table: "temp_users", temporary: true)
+
+      # Verify the data was inserted into the temp table
+      {:ok, result} = Connection.query(conn, "SELECT * FROM temp_users ORDER BY id")
+      result = Adbc.Result.materialize(result)
+      map = Adbc.Result.to_map(result)
+
+      assert map["id"] == [1, 2, 3]
+      assert map["name"] == ["Alice", "Bob", "Charlie"]
+    end
+
+    test "error: create mode when table already exists", %{db: db} do
+      conn = start_supervised!({Connection, database: db})
+
+      columns = [
+        Adbc.Column.s64([1, 2], name: "id")
+      ]
+
+      # Create the table first
+      assert {:ok, 2} =
+               Connection.bulk_insert(conn, columns, table: "existing_table", mode: :create)
+
+      # Try to create again with :create mode (should fail)
+      assert {:error, %Adbc.Error{} = error} =
+               Connection.bulk_insert(conn, columns, table: "existing_table", mode: :create)
+
+      assert error.message =~ "already exists"
+    end
+
+    test "error: append mode when table doesn't exist", %{db: db} do
+      conn = start_supervised!({Connection, database: db})
+
+      columns = [
+        Adbc.Column.s64([1, 2], name: "id")
+      ]
+
+      # Try to append to a non-existent table
+      assert {:error, %Adbc.Error{} = error} =
+               Connection.bulk_insert(conn, columns, table: "nonexistent_table", mode: :append)
+
+      assert error.message =~ "no such table"
+    end
+
+    test "error: schema mismatch on append", %{db: db} do
+      conn = start_supervised!({Connection, database: db})
+
+      # Create table with one schema
+      columns1 = [
+        Adbc.Column.s64([1, 2], name: "id")
+      ]
+
+      assert {:ok, 2} =
+               Connection.bulk_insert(conn, columns1, table: "schema_test", mode: :create)
+
+      # Try to append with different schema
+      columns2 = [
+        Adbc.Column.string(["a", "b"], name: "name")
+      ]
+
+      assert {:error, %Adbc.Error{} = error} =
+               Connection.bulk_insert(conn, columns2, table: "schema_test", mode: :append)
+
+      assert error.message =~ "has no column named"
+    end
+  end
 end

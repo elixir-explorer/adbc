@@ -702,6 +702,29 @@ static ERL_NIF_TERM adbc_statement_execute_query(ErlNifEnv *env, int argc, const
     );
 }
 
+static ERL_NIF_TERM adbc_statement_execute(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
+    using res_type = NifRes<struct AdbcStatement>;
+
+    ERL_NIF_TERM error{};
+
+    res_type * statement = nullptr;
+    if ((statement = res_type::get_resource(env, argv[0], error)) == nullptr) {
+        return error;
+    }
+
+    int64_t rows_affected = 0;
+    struct AdbcError adbc_error{};
+    AdbcStatusCode code = AdbcStatementExecuteQuery(&statement->val, nullptr, &rows_affected, &adbc_error);
+    if (code != ADBC_STATUS_OK) {
+        return nif_error_from_adbc_error(env, &adbc_error);
+    }
+
+    return enif_make_tuple2(env,
+        erlang::nif::ok(env),
+        enif_make_int64(env, rows_affected)
+    );
+}
+
 static ERL_NIF_TERM adbc_statement_prepare(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
     using res_type = NifRes<struct AdbcStatement>;
 
@@ -1007,6 +1030,7 @@ static ErlNifFunc nif_functions[] = {
     {"adbc_statement_get_option", 3, adbc_statement_get_option, 0},
     {"adbc_statement_set_option", 4, adbc_statement_set_option, 0},
     {"adbc_statement_execute_query", 1, adbc_statement_execute_query, ERL_NIF_DIRTY_JOB_IO_BOUND},
+    {"adbc_statement_execute", 1, adbc_statement_execute, ERL_NIF_DIRTY_JOB_IO_BOUND},
     {"adbc_statement_prepare", 1, adbc_statement_prepare, ERL_NIF_DIRTY_JOB_IO_BOUND},
     {"adbc_statement_set_sql_query", 2, adbc_statement_set_sql_query, ERL_NIF_DIRTY_JOB_IO_BOUND},
     {"adbc_statement_bind", 2, adbc_statement_bind, ERL_NIF_DIRTY_JOB_IO_BOUND},

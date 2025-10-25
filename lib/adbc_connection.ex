@@ -190,10 +190,13 @@ defmodule Adbc.Connection do
   `Adbc.Column`s in supported databases. This should be more efficient than using SQL
   query in supported databases.
 
+  Alternatively, you can pass an `Adbc.StreamResult.t()` (obtained from
+  `query_pointer/4`) to efficiently insert query results without materializing the data.
+
   ## Arguments
 
     * `conn` - The connection process
-    * `columns` - A list of `Adbc.Column.t()` representing the data to insert
+    * `columns_or_stream` - Either a list of `Adbc.Column.t()` or an `Adbc.StreamResult.t()`
     * `opts` - Options for the bulk insert operation
 
   ## Options
@@ -241,15 +244,26 @@ defmodule Adbc.Connection do
       Adbc.Connection.bulk_insert(conn, columns, table: "users", mode: :replace)
       #=> {:ok, 3}
 
-  """
-  @spec bulk_insert(t(), [Adbc.Column.t()], Keyword.t()) ::
-          {:ok, non_neg_integer()} | {:error, Exception.t()}
-  def bulk_insert(conn, columns, opts \\ [])
-      when is_list(columns) and is_list(opts) do
-    unless opts[:table] do
-      raise ArgumentError, ":table option must be specified"
-    end
+      # Efficiently insert from a query (within query_pointer callback)
+      # This is most useful for transferring across databases.
+      # Within the same database, you most likely have custom SQL commands,
+      # such as COPY, CREATE TEMPORARY TABLE, etc.
+      Adbc.Connection.query_pointer(source_conn, "SELECT * FROM source_table", fn stream ->
+        Adbc.Connection.bulk_insert(dest_conn, stream, table: "dest_table")
+      end)
 
+  """
+  @spec bulk_insert(t(), [Adbc.Column.t()] | Adbc.StreamResult.t(), Keyword.t()) ::
+          {:ok, non_neg_integer()} | {:error, Exception.t()}
+  def bulk_insert(conn, columns_or_stream, opts \\ [])
+
+  def bulk_insert(conn, %Adbc.StreamResult{} = stream, opts) when is_list(opts) do
+    statement_options = build_ingest_options(opts)
+    # Pass the target connection (conn) where we want to insert the data
+    command(conn, {:bulk_insert_stream, stream, statement_options})
+  end
+
+  def bulk_insert(conn, columns, opts) when is_list(columns) and is_list(opts) do
     statement_options = build_ingest_options(opts)
     command(conn, {:bulk_insert, columns, statement_options})
   end
@@ -257,16 +271,20 @@ defmodule Adbc.Connection do
   @doc """
   Same as `bulk_insert/3` but raises an exception on error.
   """
-  @spec bulk_insert!(t(), [Adbc.Column.t()], Keyword.t()) :: non_neg_integer()
-  def bulk_insert!(conn, columns, opts \\ [])
-      when is_list(columns) and is_list(opts) do
-    case bulk_insert(conn, columns, opts) do
+  @spec bulk_insert!(t(), [Adbc.Column.t()] | Adbc.StreamResult.t(), Keyword.t()) ::
+          non_neg_integer()
+  def bulk_insert!(conn, columns_or_stream, opts \\ []) do
+    case bulk_insert(conn, columns_or_stream, opts) do
       {:ok, rows_affected} -> rows_affected
       {:error, reason} -> raise reason
     end
   end
 
   defp build_ingest_options(opts) do
+    unless opts[:table] do
+      raise ArgumentError, ":table option must be specified"
+    end
+
     statement_options = []
 
     statement_options =
@@ -324,17 +342,36 @@ defmodule Adbc.Connection do
 
   @doc """
   Runs the given `query` with `params` and
-  pass the ArrowStream pointer to the given function.
+  pass the Adbc.StreamResult to the given function.
 
-  The pointer will point to a valid ArrowStream through
-  the duration of the function. The function may call
-  native code that consumes the ArrowStream accordingly.
+  The StreamResult holds a pointer to a valid ArrowStream through
+  the duration of the function. A StreamResult can only be consumed once.
+
+  The callback function should accept a single argument of type
+  `Adbc.StreamResult.t()`. For backwards compatibility, 2-arity
+  functions are still supported but deprecated (a warning will be emitted).
   """
   def query_pointer(conn, query, params \\ [], fun, statement_options \\ [])
       when (is_binary(query) or is_reference(query)) and is_list(params) and is_function(fun) and
              is_list(statement_options) do
     stream(conn, {:query, query, params, statement_options}, fn stream_ref, rows_affected ->
-      {:ok, fun.(Adbc.Nif.adbc_arrow_array_stream_get_pointer(stream_ref), rows_affected)}
+      pointer = Adbc.Nif.adbc_arrow_array_stream_get_pointer(stream_ref)
+
+      if is_function(fun, 2) do
+        IO.warn(
+          "query_pointer/5 callback should be 1-arity (receiving %Adbc.StreamResult{}), 2-arity is deprecated"
+        )
+
+        {:ok, fun.(Adbc.Nif.adbc_arrow_array_stream_get_pointer(stream_ref), rows_affected)}
+      else
+        stream_result = %Adbc.StreamResult{
+          ref: stream_ref,
+          pointer: pointer,
+          num_rows: normalize_rows(rows_affected)
+        }
+
+        {:ok, fun.(stream_result)}
+      end
     end)
   end
 
@@ -515,11 +552,11 @@ defmodule Adbc.Connection do
 
   defp stream(conn, command, fun) do
     case GenServer.call(conn, {:stream, command}, :infinity) do
-      {:ok, conn, unlock_ref, stream_ref, rows_affected} ->
+      {:ok, conn_pid, stream_ref, rows_affected} ->
         try do
           fun.(stream_ref, normalize_rows(rows_affected))
         after
-          GenServer.cast(conn, {:unlock, unlock_ref})
+          GenServer.cast(conn_pid, {:delete_stream_ref, stream_ref})
         end
 
       {:error, reason} ->
@@ -527,6 +564,7 @@ defmodule Adbc.Connection do
     end
   end
 
+  defp normalize_rows(nil), do: nil
   defp normalize_rows(-1), do: nil
   defp normalize_rows(rows) when is_integer(rows) and rows >= 0, do: rows
 
@@ -560,7 +598,7 @@ defmodule Adbc.Connection do
     case GenServer.call(db, {:initialize_connection, conn}, :infinity) do
       {:ok, driver} ->
         Process.put(:adbc_driver, driver)
-        {:ok, %{conn: conn, lock: :none, queue: :queue.new()}}
+        {:ok, %{conn: conn, queue: :queue.new(), stream_refs: %{}}}
 
       {:error, reason} ->
         {:stop, error_to_exception(reason)}
@@ -583,24 +621,25 @@ defmodule Adbc.Connection do
   end
 
   @impl true
-  def handle_cast({:unlock, ref}, %{lock: {ref, stream_ref}} = state) do
+  def handle_cast({:delete_stream_ref, stream_ref}, state) do
     # We could let the GC be the one release it but,
     # since a stream can be a large resource, we release
     # it now and let the GC free the remaining resources.
     Adbc.Nif.adbc_arrow_array_stream_release(stream_ref)
-    Process.demonitor(ref, [:flush])
-    {:noreply, maybe_dequeue(%{state | lock: :none})}
+    {_, state} = pop_in(state.stream_refs[stream_ref])
+    {:noreply, state}
   end
 
   @impl true
-  def handle_info({:DOWN, ref, _, _, _}, %{lock: {ref, stream_ref}} = state) do
+  def handle_info({{:delete_stream_ref, stream_ref}, _, _, _, _}, state) do
     Adbc.Nif.adbc_arrow_array_stream_release(stream_ref)
-    {:noreply, maybe_dequeue(%{state | lock: :none})}
+    {_, state} = pop_in(state.stream_refs[stream_ref])
+    {:noreply, state}
   end
 
   ## Queue helpers
 
-  defp maybe_dequeue(%{lock: :none, queue: queue} = state) do
+  defp maybe_dequeue(%{queue: queue} = state) do
     case :queue.out(queue) do
       {:empty, queue} ->
         %{state | queue: queue}
@@ -610,14 +649,13 @@ defmodule Adbc.Connection do
         GenServer.reply(from, result)
         maybe_dequeue(%{state | queue: queue})
 
-      {{:value, {:stream, command, from}}, queue} ->
-        {pid, _} = from
-
+      {{:value, {:stream, command, {pid, _} = from}}, queue} ->
         case handle_stream(command, state.conn) do
           {:ok, stream_ref, rows_affected} when is_reference(stream_ref) ->
-            unlock_ref = Process.monitor(pid)
-            GenServer.reply(from, {:ok, self(), unlock_ref, stream_ref, rows_affected})
-            %{state | lock: {unlock_ref, stream_ref}, queue: queue}
+            _ = Process.monitor(pid, tag: {:delete_stream_ref, stream_ref})
+            GenServer.reply(from, {:ok, self(), stream_ref, rows_affected})
+            stream_refs = Map.put(state.stream_refs, stream_ref, state.conn)
+            %{state | queue: queue, stream_refs: stream_refs}
 
           {:error, error} ->
             GenServer.reply(from, {:error, error})
@@ -625,8 +663,6 @@ defmodule Adbc.Connection do
         end
     end
   end
-
-  defp maybe_dequeue(state), do: state
 
   defp handle_command({:prepare, query}, conn) do
     with {:ok, stmt} <- create_statement(conn, query),
@@ -639,6 +675,18 @@ defmodule Adbc.Connection do
     with {:ok, stmt} <- Adbc.Nif.adbc_statement_new(conn),
          :ok <- init_statement_options(stmt, statement_options),
          :ok <- Adbc.Nif.adbc_statement_bind(stmt, columns),
+         {:ok, rows_affected} <- Adbc.Nif.adbc_statement_execute(stmt) do
+      {:ok, rows_affected}
+    end
+  end
+
+  defp handle_command(
+         {:bulk_insert_stream, %Adbc.StreamResult{ref: stream_ref}, statement_options},
+         conn
+       ) do
+    with {:ok, stmt} <- Adbc.Nif.adbc_statement_new(conn),
+         :ok <- init_statement_options(stmt, statement_options),
+         :ok <- Adbc.Nif.adbc_statement_bind_stream(stmt, stream_ref),
          {:ok, rows_affected} <- Adbc.Nif.adbc_statement_execute(stmt) do
       {:ok, rows_affected}
     end

@@ -1973,7 +1973,7 @@ defmodule Adbc.Column do
   defp decode_fixed_size_binary(<<>>, _validity, _bit_offset, _nbytes, _index), do: []
 
   defp decode_fixed_size_binary(data, validity, bit_offset, nbytes, index) do
-    <<chunk::binary-size(nbytes), rest::binary>> = data
+    <<chunk::binary-size(^nbytes), rest::binary>> = data
     value = if bitmap_valid?(validity, index, bit_offset), do: chunk
     [value | decode_fixed_size_binary(rest, validity, bit_offset, nbytes, index + 1)]
   end

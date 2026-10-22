@@ -1592,8 +1592,12 @@ defmodule Adbc.Column do
   Returns whether the column contains a validity bitmap (which would
   indicate the presence of nils).
 
+  Arrow null columns return `false`, as they have no buffers.
+
   """
   @spec has_validity?(t()) :: boolean()
+  def has_validity?(%Adbc.Column{field: %{type: nil}}), do: false
+
   def has_validity?(%Adbc.Column{
         field: %{type: {:dictionary, key_field, value_field}},
         data: %Adbc.DictionaryData{key: key, value: value}
@@ -1672,6 +1676,11 @@ defmodule Adbc.Column do
   """
   @spec to_list(t()) :: [term()]
   def to_list(column)
+
+  def to_list(%Adbc.Column{field: %{type: nil}, data: count})
+      when is_integer(count) and count >= 0 do
+    List.duplicate(nil, count)
+  end
 
   def to_list(%Adbc.Column{
         field: %{type: {:dictionary, key_field, value_field}},

@@ -33,6 +33,161 @@ defmodule Adbc.PythonxTest do
     end
   end
 
+  describe "null" do
+    for count <- [0, 1, 3] do
+      test "materializes #{count} null values" do
+        result =
+          eval!("""
+          import pyarrow
+          batch = pyarrow.record_batch([pyarrow.nulls(#{unquote(count)})], names=["nulls"])
+          pyarrow.RecordBatchReader.from_batches(batch.schema, [batch])
+          """)
+
+        assert [[%Adbc.Column{field: %Adbc.Field{type: nil}} = column]] = result.data
+        assert Adbc.Column.to_list(column) == List.duplicate(nil, unquote(count))
+        refute Adbc.Column.has_validity?(column)
+        assert Result.to_map(result) == %{"nulls" => List.duplicate(nil, unquote(count))}
+      end
+    end
+
+    test "materializes sliced null arrays without counting the offset" do
+      result =
+        eval!("""
+        import pyarrow
+        data = pyarrow.nulls(8).slice(5, 3)
+        assert data.offset == 5
+        pyarrow.Table.from_arrays([data], names=["nulls"])
+        """)
+
+      assert Result.to_map(result) == %{"nulls" => [nil, nil, nil]}
+    end
+
+    test "materializes nested null fields and preserves struct validity" do
+      result =
+        eval!("""
+        import pyarrow
+        inner_type = pyarrow.struct([("value", pyarrow.null())])
+        data = pyarrow.array([
+          {"inner": {"value": None}},
+          None,
+          {"inner": None},
+          {"inner": {"value": None}}
+        ], type=pyarrow.struct([("inner", inner_type)]))
+        pyarrow.Table.from_arrays([data], names=["structs"])
+        """)
+
+      assert Result.to_map(result) == %{
+               "structs" => [
+                 %{"inner" => %{"value" => nil}},
+                 nil,
+                 %{"inner" => nil},
+                 %{"inner" => %{"value" => nil}}
+               ]
+             }
+    end
+
+    test "materializes lists of null values" do
+      result =
+        eval!("""
+        import pyarrow
+        data = pyarrow.array([[None, None], [], None, [None]], type=pyarrow.list_(pyarrow.null()))
+        pyarrow.Table.from_arrays([data], names=["lists"])
+        """)
+
+      assert Result.to_map(result) == %{"lists" => [[nil, nil], [], nil, [nil]]}
+    end
+
+    for offset <- [-1, 2] do
+      test "rejects out-of-range null child offset #{offset}" do
+        {data, %{}} =
+          Pythonx.eval(
+            """
+            import pyarrow
+            data = pyarrow.UnionArray.from_dense(
+              pyarrow.array([0], type=pyarrow.int8()),
+              pyarrow.array([#{unquote(offset)}], type=pyarrow.int32()),
+              [pyarrow.nulls(1)], field_names=["nulls"])
+            pyarrow.Table.from_arrays([data], names=["unions"])
+            """,
+            %{}
+          )
+
+        assert {:error, error} = Result.from_py(data)
+        assert Exception.message(error) =~ "invalid offset/count for ArrowArray (null)"
+      end
+    end
+
+    for count <- [0, 1, 3] do
+      test "round-trips #{count} null values and nested children through parameter binding" do
+        result =
+          eval!("""
+          import pyarrow
+          nulls = pyarrow.nulls(#{unquote(count)})
+          structs = pyarrow.array([{"value": None}] * #{unquote(count)}, type=pyarrow.struct([("value", pyarrow.null())]))
+          lists = pyarrow.array([[None, None]] * #{unquote(count)}, type=pyarrow.list_(pyarrow.null()))
+          batch = pyarrow.record_batch([nulls, structs, lists], names=["nulls", "structs", "lists"])
+          pyarrow.RecordBatchReader.from_batches(batch.schema, [batch])
+          """)
+
+        db = start_supervised!({Adbc.Database, driver: :duckdb})
+        conn = start_supervised!({Adbc.Connection, database: db})
+        assert [columns] = result.data
+        assert {:ok, _} = Adbc.Connection.bulk_insert(conn, columns, table: "nulls")
+        map = conn |> Adbc.Connection.query!("SELECT * FROM nulls") |> Result.to_map()
+        assert Map.get(map, "nulls", []) == List.duplicate(nil, unquote(count))
+        assert Map.get(map, "structs", []) == List.duplicate(%{"value" => nil}, unquote(count))
+        assert Map.get(map, "lists", []) == List.duplicate([nil, nil], unquote(count))
+
+        if unquote(count) == 3 do
+          [column | _] = columns
+
+          assert {:error, error} =
+                   Adbc.Connection.bulk_insert(conn, [%{column | data: -1}],
+                     table: "invalid_nulls"
+                   )
+
+          assert Exception.message(error) =~ "invalid count for ArrowArray (null)"
+        end
+      end
+    end
+
+    test "round-trips a raw null IPC stream with Python and preserves field metadata" do
+      {ipc, %{}} =
+        Pythonx.eval(
+          """
+          import pyarrow
+          schema = pyarrow.schema([pyarrow.field("nulls", pyarrow.null(), metadata={b"key": b"value"})])
+          batch = pyarrow.record_batch([pyarrow.nulls(3)], schema=schema)
+          sink = pyarrow.BufferOutputStream()
+          with pyarrow.ipc.new_stream(sink, schema) as writer:
+              writer.write_batch(batch)
+          sink.getvalue().to_pybytes()
+          """,
+          %{}
+        )
+
+      ipc = Pythonx.decode(ipc)
+      stream = Adbc.StreamResult.from_ipc_stream!(ipc)
+      encoded = Adbc.StreamResult.to_ipc_stream(stream)
+      result = Result.from_ipc_stream!(encoded)
+      assert [[column]] = result.data
+      assert column.field == %Adbc.Field{name: "nulls", type: nil, metadata: %{"key" => "value"}}
+      assert Adbc.Column.to_list(column) == [nil, nil, nil]
+
+      {valid, %{}} =
+        Pythonx.eval(
+          """
+          import pyarrow
+          table = pyarrow.ipc.open_stream(encoded).read_all()
+          table.to_pydict() == {"nulls": [None, None, None]} and table.schema.field(0).nullable and table.schema.field(0).metadata == {b"key": b"value"}
+          """,
+          %{"encoded" => encoded}
+        )
+
+      assert Pythonx.decode(valid)
+    end
+  end
+
   describe "string_view and binary_view" do
     test "materializes utf8_view and binary_view columns" do
       result =

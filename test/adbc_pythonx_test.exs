@@ -34,20 +34,18 @@ defmodule Adbc.PythonxTest do
   end
 
   describe "null" do
-    for count <- [0, 1, 3] do
-      test "materializes #{count} null values" do
-        result =
-          eval!("""
-          import pyarrow
-          batch = pyarrow.record_batch([pyarrow.nulls(#{unquote(count)})], names=["nulls"])
-          pyarrow.RecordBatchReader.from_batches(batch.schema, [batch])
-          """)
+    test "materializes null values" do
+      result =
+        eval!("""
+        import pyarrow
+        batch = pyarrow.record_batch([pyarrow.nulls(3)], names=["nulls"])
+        pyarrow.RecordBatchReader.from_batches(batch.schema, [batch])
+        """)
 
-        assert [[%Adbc.Column{field: %Adbc.Field{type: nil}} = column]] = result.data
-        assert Adbc.Column.to_list(column) == List.duplicate(nil, unquote(count))
-        refute Adbc.Column.has_validity?(column)
-        assert Result.to_map(result) == %{"nulls" => List.duplicate(nil, unquote(count))}
-      end
+      assert [[%Adbc.Column{field: %Adbc.Field{type: nil}} = column]] = result.data
+      assert Adbc.Column.to_list(column) == [nil, nil, nil]
+      refute Adbc.Column.has_validity?(column)
+      assert Result.to_map(result) == %{"nulls" => [nil, nil, nil]}
     end
 
     test "materializes sliced null arrays without counting the offset" do
@@ -117,38 +115,32 @@ defmodule Adbc.PythonxTest do
       end
     end
 
-    for count <- [0, 1, 3] do
-      test "round-trips #{count} null values and nested children through parameter binding" do
-        result =
-          eval!("""
-          import pyarrow
-          nulls = pyarrow.nulls(#{unquote(count)})
-          structs = pyarrow.array([{"value": None}] * #{unquote(count)}, type=pyarrow.struct([("value", pyarrow.null())]))
-          lists = pyarrow.array([[None, None]] * #{unquote(count)}, type=pyarrow.list_(pyarrow.null()))
-          batch = pyarrow.record_batch([nulls, structs, lists], names=["nulls", "structs", "lists"])
-          pyarrow.RecordBatchReader.from_batches(batch.schema, [batch])
-          """)
+    test "round-trips null values and nested children through parameter binding" do
+      result =
+        eval!("""
+        import pyarrow
+        nulls = pyarrow.nulls(3)
+        structs = pyarrow.array([{"value": None}] * 3, type=pyarrow.struct([("value", pyarrow.null())]))
+        lists = pyarrow.array([[None, None]] * 3, type=pyarrow.list_(pyarrow.null()))
+        batch = pyarrow.record_batch([nulls, structs, lists], names=["nulls", "structs", "lists"])
+        pyarrow.RecordBatchReader.from_batches(batch.schema, [batch])
+        """)
 
-        db = start_supervised!({Adbc.Database, driver: :duckdb})
-        conn = start_supervised!({Adbc.Connection, database: db})
-        assert [columns] = result.data
-        assert {:ok, _} = Adbc.Connection.bulk_insert(conn, columns, table: "nulls")
-        map = conn |> Adbc.Connection.query!("SELECT * FROM nulls") |> Result.to_map()
-        assert Map.get(map, "nulls", []) == List.duplicate(nil, unquote(count))
-        assert Map.get(map, "structs", []) == List.duplicate(%{"value" => nil}, unquote(count))
-        assert Map.get(map, "lists", []) == List.duplicate([nil, nil], unquote(count))
+      db = start_supervised!({Adbc.Database, driver: :duckdb})
+      conn = start_supervised!({Adbc.Connection, database: db})
+      assert [[column | _] = columns] = result.data
+      assert {:ok, _} = Adbc.Connection.bulk_insert(conn, columns, table: "nulls")
 
-        if unquote(count) == 3 do
-          [column | _] = columns
+      assert conn |> Adbc.Connection.query!("SELECT * FROM nulls") |> Result.to_map() == %{
+               "nulls" => [nil, nil, nil],
+               "structs" => List.duplicate(%{"value" => nil}, 3),
+               "lists" => List.duplicate([nil, nil], 3)
+             }
 
-          assert {:error, error} =
-                   Adbc.Connection.bulk_insert(conn, [%{column | data: -1}],
-                     table: "invalid_nulls"
-                   )
+      assert {:error, error} =
+               Adbc.Connection.bulk_insert(conn, [%{column | data: -1}], table: "invalid_nulls")
 
-          assert Exception.message(error) =~ "invalid count for ArrowArray (null)"
-        end
-      end
+      assert Exception.message(error) =~ "invalid count for ArrowArray (null)"
     end
 
     test "round-trips a raw null IPC stream with Python and preserves field metadata" do

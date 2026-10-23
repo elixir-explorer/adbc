@@ -746,6 +746,13 @@ arrow_column(ErlNifEnv *env, struct ArrowSchema *schema,
 
   auto metadata = arrow_metadata_to_nif_term(env, schema->metadata);
 
+  if (fmt == "n" &&
+      (values->length < 0 || values->offset < 0 || offset < 0 ||
+       offset > values->length || count < -1 ||
+       (count != -1 && count > values->length - offset))) {
+    throw std::invalid_argument("invalid offset/count for ArrowArray (null)");
+  }
+
   if (count == -1 || count > values->length) {
     count = values->length - offset;
   }
@@ -765,7 +772,9 @@ arrow_column(ErlNifEnv *env, struct ArrowSchema *schema,
   // Primitive types: fixed-size buffers
   if (fmt == "n") {
     auto type = fine::encode(env, atoms::nil);
-    auto data = fine::encode(env, atoms::nil);
+    // Null arrays have no buffers. Store the logical slice length, including
+    // for nested fields where there is no Column.size to retain it.
+    auto data = fine::encode(env, count);
     return {type, data, metadata};
   } else if (fmt == "b") {
     auto type = fine::encode(env, atoms::boolean);

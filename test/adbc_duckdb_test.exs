@@ -12,6 +12,24 @@ defmodule Adbc.DuckDBTest do
     %{db: db, conn: conn}
   end
 
+  for count <- [0, 1, 3] do
+    test "preserves #{count} untyped NULL rows", %{conn: conn} do
+      result = Connection.query!(conn, "SELECT NULL AS value FROM range(#{unquote(count)})")
+
+      assert Map.get(Adbc.Result.to_map(result), "value", []) ==
+               List.duplicate(nil, unquote(count))
+    end
+  end
+
+  test "preserves NULL fields in nested structs", %{conn: conn} do
+    result =
+      Connection.query!(conn, "SELECT {'inner': {'value': NULL}} AS nested FROM range(3)")
+
+    assert Adbc.Result.to_map(result) == %{
+             "nested" => List.duplicate(%{"inner" => %{"value" => nil}}, 3)
+           }
+  end
+
   test "error", %{conn: conn} do
     assert {:error, %Adbc.Error{} = error} =
              Adbc.Connection.query(conn, "SELECT * from $1", ["foo"])

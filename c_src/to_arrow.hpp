@@ -466,7 +466,21 @@ static void column_to_arrow(ErlNifEnv *env, ExAdbcField &field, fine::Term data,
   auto decoded = fine::decode<TypeVariant>(env, field.type);
 
   if (auto *atom = std::get_if<fine::Atom>(&decoded)) {
-    if (*atom == atoms::boolean) {
+    if (*atom == atoms::nil) {
+      int64_t count = fine::decode<int64_t>(env, data);
+      if (count < 0) {
+        throw std::invalid_argument("invalid count for ArrowArray (null)");
+      }
+      NANOARROW_THROW_NOT_OK(
+          ArrowSchemaSetType(schema_out, NANOARROW_TYPE_NA));
+      schema_out->flags |= ARROW_FLAG_NULLABLE;
+      nanoarrow::UniqueArray tmp;
+      NANOARROW_THROW_NOT_OK(
+          ArrowArrayInitFromType(tmp.get(), NANOARROW_TYPE_NA));
+      NANOARROW_THROW_NOT_OK(ArrowArrayAppendNull(tmp.get(), count));
+      ArrowArrayMove(tmp.get(), array_out);
+      return;
+    } else if (*atom == atoms::boolean) {
       return get_boolean_data(env, data, NANOARROW_TYPE_BOOL, array_out,
                               schema_out);
     } else if (*atom == atoms::s8) {

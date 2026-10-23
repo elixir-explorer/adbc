@@ -49,7 +49,8 @@ defmodule Adbc.Field do
           | {:interval, :month_day_nano}
 
   @type data_type ::
-          :boolean
+          nil
+          | :boolean
           | signed_integer()
           | unsigned_integer()
           | floating()
